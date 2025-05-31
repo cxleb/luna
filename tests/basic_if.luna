@@ -1,0 +1,17 @@
+func foo() {
+    return 1
+}
+
+func bar() {
+    return 0
+}
+
+func main() {
+    let a = 10
+
+    if a != 10 { 
+        return foo()
+    } else { 
+        return bar()   
+    }
+}

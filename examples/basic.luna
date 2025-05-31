@@ -1,0 +1,12 @@
+func maths() {
+    return 10 / 3.333 > 2.5;
+}
+
+func main() {
+    print(maths());
+    let a = 0;
+    while a < 10 {
+        a = a +  1;
+        print(a);
+    }
+}
