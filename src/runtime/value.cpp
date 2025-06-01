@@ -3,6 +3,17 @@
 
 namespace luna::runtime {
 
+
+const char* TypeKindNames[] = {
+#define A(name) #name,
+    TYPES(A)
+#undef A
+};
+
+const char* get_name_for_type(Type type) {
+    return TypeKindNames[type];
+}
+
 OpResult value_add(Value a, Value b) {
     // if the values are the same type, then just do a direct comparison
     if (a.type == TypeInt && b.type == TypeInt) {

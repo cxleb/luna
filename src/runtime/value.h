@@ -4,12 +4,19 @@
 
 namespace luna::runtime {
 
+#define TYPES(A) \
+    A(Int) \
+    A(Float) \
+    A(Bool) \
+    A(Object) \
+
 enum Type {
-    TypeInt,
-    TypeFloat,
-    TypeBool,
-    TypeObject,
+#define A(name) Type##name,
+    TYPES(A)
+#undef A
 };
+
+const char* get_name_for_type(Type type);
 
 struct Value {
     Value() = default;

@@ -1,0 +1,37 @@
+func returns10() {
+    return 10;
+}
+
+func main() {
+    assert(0 == 0);
+    assert(1 > 0);
+    assert(0 < 1);
+    assert(1 >= 0);
+    assert(1 >= 1);
+    assert(0 <= 1);
+    assert(1 <= 1);
+
+    assert(10.0 == 10.0);
+    assert(11.0 > 10.0);
+    assert(10.0 < 11.0);
+    assert(11.0 >= 10.0);
+    assert(11.0 >= 11.0);
+    assert(10.0 <= 11.0);
+    assert(11.0 <= 11.0);
+
+    assert(returns10() == 10);
+
+    let a = 0;
+    if a == 0 {
+        a = 10;
+    } else {
+        a = 11;
+    }
+    assert(a == 10);
+
+    let b = 0;
+    while b < 10 {
+        b = b + 1;
+    }
+    assert(b == 10);
+}
