@@ -55,9 +55,9 @@ int main(int argc, const char** argv) {
     env.add_host_func("print", print);
     env.add_host_func("assert", _assert);
     
-    luna::compiler::Parser parser;
+    luna::compiler::Parser parser(std::move(*maybe_file));
     luna::compiler::Gen gen;
-    auto module = parser.parse_file(std::move(*maybe_file));
+    auto module = parser.parse_module();
     if (module.is_error()) {
         printf("Error compiling: %s\n", module.error().msg().c_str());
     }
