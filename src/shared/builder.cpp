@@ -29,7 +29,7 @@ void FunctionBuilder::create_local(const std::string& name) {
     });
 }
 
-std::optional<uint32_t> FunctionBuilder::get_local_id(const std::string& name) {
+std::optional<uint64_t> FunctionBuilder::get_local_id(const std::string& name) {
     for(auto it = scopes.rbegin(); it != scopes.rend(); it += 1) {
         auto& scope = *it;
         if (scope.contains(name)) {
@@ -181,7 +181,8 @@ void FunctionBuilder::float_(double value) {
 
 ref<runtime::Function> FunctionBuilder::build() {
     // if the last bytecode is not a return, add a return so we always return.
-    if((*function->code.end()).opcode != runtime::OpcodeRet) {
+    auto& code = function->code;
+    if(code[code.size() - 1].opcode != runtime::OpcodeRet) {
         insert({
             .opcode = runtime::OpcodeRet,
         });

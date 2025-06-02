@@ -60,6 +60,7 @@ int main(int argc, const char** argv) {
     auto module = parser.parse_module();
     if (module.is_error()) {
         printf("Error compiling: %s\n", module.error().msg().c_str());
+        return 1;
     }
     auto runtime_module = gen.generate(module.value(), &env);
     luna::runtime::Runtime runtime(&env);

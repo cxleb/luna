@@ -18,7 +18,7 @@ public:
     void push_scope();
     void pop_scope();
     void create_local(const std::string& name);
-    std::optional<uint32_t> get_local_id(const std::string& name);
+    std::optional<uint64_t> get_local_id(const std::string& name);
     // Label management
     uint64_t new_label();
     void mark_label(uint64_t label);
