@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <stdint.h>
+#include "../shared/error.h"
 
 namespace luna::compiler {
 
@@ -61,17 +62,17 @@ struct Lexer {
 
     Lexer(std::vector<char>&& source);
     void eat_whitespace();
-    Token peek();
-    Token next();
+    ErrorOr<Token> peek();
+    ErrorOr<Token> next();
     // Returns true if the token is a float
     bool is_token_int_or_float(Token token);
-    void copy_token(char* buf, uint32_t size, Token token);
-    double token_to_float(Token token);
-    uint64_t token_to_int(Token token);
-    std::string token_to_string(Token token);
-    bool test(TokenKind kind);
-    bool test(const std::string& str);
-    Token expect(TokenKind kind);
+    ErrorOr<int> copy_token(char* buf, uint32_t size, Token token);
+    ErrorOr<double> token_to_float(Token token);
+    ErrorOr<uint64_t> token_to_int(Token token);
+    ErrorOr<std::string> token_to_string(Token token);
+    ErrorOr<bool> test(TokenKind kind);
+    ErrorOr<bool> test(const std::string& str);
+    ErrorOr<Token> expect(TokenKind kind);
 };
 
 }

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <_abort.h>
-#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include "../shared/utils.h"

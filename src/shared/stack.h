@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
-#include <cassert>
+#include "error.h"
 
 namespace luna {
 
@@ -68,12 +68,12 @@ public:
     }
 
     T pop() {
-        assert(top != 0);
+        luna_assert(top != 0);
         return data[--top];
     }
 
     T& peak() {
-        assert(top != 0);
+        luna_assert(top != 0);
         return data[top - 1];
     }
 
@@ -121,7 +121,7 @@ private:
     }
 
     void remove() {
-        assert(data != nullptr);
+        luna_assert(data != nullptr);
         delete[] data;
         data = nullptr;
     }

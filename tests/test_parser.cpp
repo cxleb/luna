@@ -82,7 +82,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("func test() { }"));
         Parser parser;
-        auto func = parser.parse_func(lexer);
+        auto func = parser.parse_func(lexer).value();
         TEST_ASSERT(func->name != "test");
         TEST_ASSERT(func->params.size() != 0);
     }
@@ -90,7 +90,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("func test(a, b) { }"));
         Parser parser;
-        auto func = parser.parse_func(lexer);
+        auto func = parser.parse_func(lexer).value();
         TEST_ASSERT(func->name != "test");
         TEST_ASSERT(func->params.size() != 2);
         TEST_ASSERT(func->params[0].name != "a");
@@ -103,7 +103,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("10"));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindInteger);
         auto integer = static_ref_cast<Integer>(expr);
         TEST_ASSERT(integer->value != 10);
@@ -112,7 +112,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("ident"));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindIdentifier);
         auto integer = static_ref_cast<Identifier>(expr);
         TEST_ASSERT(integer->name != "ident");
@@ -121,7 +121,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("10.10"));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindFloat);
         auto integer = static_ref_cast<Float>(expr);
         TEST_ASSERT(integer->value != 10.10);
@@ -130,7 +130,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("\"string\""));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindString);
         auto integer = static_ref_cast<String>(expr);
         TEST_ASSERT(integer->value != "\"string\"");
@@ -141,7 +141,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("10 + 10"));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindBinaryExpr);
         auto bin_expr = static_ref_cast<BinaryExpr>(expr);
         TEST_ASSERT(bin_expr->bin_kind != BinaryExpr::KindAdd);
@@ -152,7 +152,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("1 + 2 * 3"));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindBinaryExpr);
         auto bin_expr = static_ref_cast<BinaryExpr>(expr);
         TEST_ASSERT(bin_expr->bin_kind != BinaryExpr::KindAdd);
@@ -165,7 +165,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("1 * 2 + 3"));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindBinaryExpr);
         auto bin_expr = static_ref_cast<BinaryExpr>(expr);
         TEST_ASSERT(bin_expr->bin_kind != BinaryExpr::KindAdd);
@@ -178,7 +178,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("10 == 10"));
         Parser parser;
-        auto expr = parser.parse_expr(lexer);
+        auto expr = parser.parse_expr(lexer).value();
         TEST_ASSERT(expr->kind != Expr::KindBinaryExpr);
         auto bin_expr = static_ref_cast<BinaryExpr>(expr);
         TEST_ASSERT(bin_expr->bin_kind != BinaryExpr::KindEqual);
@@ -189,7 +189,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("return;"));
         Parser parser;
-        auto stmt = parser.parse_stmt(lexer);
+        auto stmt = parser.parse_stmt(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindReturn);
         auto return_stmt = static_ref_cast<Return>(stmt);
         TEST_ASSERT(return_stmt->value != std::nullopt);
@@ -198,7 +198,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("return 10;"));
         Parser parser;
-        auto stmt = parser.parse_stmt(lexer);
+        auto stmt = parser.parse_stmt(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindReturn);
         auto return_stmt = static_ref_cast<Return>(stmt);
         TEST_ASSERT(return_stmt->value == std::nullopt);
@@ -208,7 +208,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("if 1 {}"));
         Parser parser;
-        auto stmt = parser.parse_stmt(lexer);
+        auto stmt = parser.parse_stmt(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindIf);
         auto if_stmt = static_ref_cast<If>(stmt);
         TEST_ASSERT(if_stmt->condition->kind != Expr::KindInteger);
@@ -217,7 +217,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("if 1 {} else {}"));
         Parser parser;
-        auto stmt = parser.parse_stmt(lexer);
+        auto stmt = parser.parse_stmt(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindIf);
         auto if_stmt = static_ref_cast<If>(stmt);
         TEST_ASSERT(if_stmt->condition->kind != Expr::KindInteger);
@@ -227,7 +227,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("if 1 {} else if 1 {} else {}"));
         Parser parser;
-        auto stmt = parser.parse_stmt(lexer);
+        auto stmt = parser.parse_stmt(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindIf);
         auto if_stmt = static_ref_cast<If>(stmt);
         TEST_ASSERT(if_stmt->condition->kind != Expr::KindInteger);
@@ -240,7 +240,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("let a = 10;"));
         Parser parser;
-        auto stmt = parser.parse_stmt(lexer);
+        auto stmt = parser.parse_stmt(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindVarDecl);
         auto var_stmt = static_ref_cast<VarDecl>(stmt);
         TEST_ASSERT(var_stmt->name != "a");
@@ -251,7 +251,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("const a = 10;"));
         Parser parser;
-        auto stmt = parser.parse_stmt(lexer);
+        auto stmt = parser.parse_stmt(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindVarDecl);
         auto var_stmt = static_ref_cast<VarDecl>(stmt);
         TEST_ASSERT(var_stmt->name != "a");
@@ -262,7 +262,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("a = 10;"));
         Parser parser;
-        auto stmt = parser.parse_stmt_ident(lexer);
+        auto stmt = parser.parse_stmt_ident(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindAssign);
         auto var_stmt = static_ref_cast<Assign>(stmt);
         TEST_ASSERT(var_stmt->name != "a");
@@ -272,7 +272,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("print();"));
         Parser parser;
-        auto stmt = parser.parse_stmt_ident(lexer);
+        auto stmt = parser.parse_stmt_ident(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindCall);
         auto var_stmt = static_ref_cast<Call>(stmt);
         TEST_ASSERT(var_stmt->name != "print");
@@ -282,7 +282,7 @@ int main(const int argc, const char** argv) {
     {
         Lexer lexer(to_source("print(10);"));
         Parser parser;
-        auto stmt = parser.parse_stmt_ident(lexer);
+        auto stmt = parser.parse_stmt_ident(lexer).value();
         TEST_ASSERT(stmt->kind != Stmt::KindCall);
         auto var_stmt = static_ref_cast<Call>(stmt);
         TEST_ASSERT(var_stmt->name != "print");

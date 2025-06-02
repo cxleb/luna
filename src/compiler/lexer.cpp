@@ -3,12 +3,13 @@
 
 namespace luna::compiler {
 
-void lexer_error [[noreturn]] (Token token, const char* message, ...) {
+Error lexer_error (Token token, const char* message, ...) {
     fprintf(stderr, "%llu:%llu: ", token.line + 1, token.col + 1);
     va_list args;
     va_start(args, message);
-    verror(message, args);
-    va_end(args);     
+    auto err = verror(message, args);
+    va_end(args);    
+    return err;
 }
 
 const char* TokenKindNames[] = {
@@ -58,13 +59,13 @@ void Lexer::eat_whitespace() {
     }
 }
 
-Token Lexer::peek() {
+ErrorOr<Token> Lexer::peek() {
     // save lexer state
     auto saved_at = at;
     auto saved_line = line;
     auto saved_col = col;
 
-    auto token = next();
+    auto token = TRY(next());
     
     // restore lexer state
     at = saved_at;
@@ -74,7 +75,7 @@ Token Lexer::peek() {
     return token;
 }
 
-Token Lexer::next() {
+ErrorOr<Token> Lexer::next() {
     eat_whitespace();
     
     Token token;
@@ -273,14 +274,15 @@ end:
     return token;
 }
 
-void Lexer::copy_token(char* buf, uint32_t size, Token token) {
+ErrorOr<int> Lexer::copy_token(char* buf, uint32_t size, Token token) {
     if (token.size > size) {
-        lexer_error(token, "copy_token: buffer too small(%d)", size);
+       return lexer_error(token, "copy_token: buffer too small(%d)", size);
     }
     for (uint64_t i = 0; i < token.size; i++) {
         buf[i] = source[token.offset + i];
     }
     buf[token.size] = '\0';
+    return 0;
 }
 
 bool Lexer::is_token_int_or_float(Token token) {
@@ -297,32 +299,32 @@ bool Lexer::is_token_int_or_float(Token token) {
     return false;
 }
 
-double Lexer::token_to_float(Token token) {
+ErrorOr<double> Lexer::token_to_float(Token token) {
     char buf[64];
-    copy_token(buf, 64, token);
+    TRY(copy_token(buf, 64, token));
     return atof(buf);
 }
 
-uint64_t Lexer::token_to_int(Token token) {
+ErrorOr<uint64_t> Lexer::token_to_int(Token token) {
     char buf[64];
-    copy_token(buf, 64, token);
+    TRY(copy_token(buf, 64, token));
     return atoi(buf);
 }
 
-std::string Lexer::token_to_string(Token token) {
+ErrorOr<std::string> Lexer::token_to_string(Token token) {
     char buf[64];
-    copy_token(buf, 64, token);
+    TRY(copy_token(buf, 64, token));
     return std::string(buf, token.size);
 }
 
-bool Lexer::test(TokenKind kind) {
-    auto token = peek();
+ErrorOr<bool> Lexer::test(TokenKind kind) {
+    auto token = TRY(peek());
     return token.kind == kind;
 }
 
 
-bool Lexer::test(const std::string& str) {
-    auto token = peek();
+ErrorOr<bool> Lexer::test(const std::string& str) {
+    auto token = TRY(peek());
     if (token.kind != TokenIdentifier) {
         return false;
     }
@@ -331,8 +333,8 @@ bool Lexer::test(const std::string& str) {
     return strcmp(buf, str.c_str()) == 0;
 }
 
-Token Lexer::expect(TokenKind kind) {
-    auto token = next();
+ErrorOr<Token> Lexer::expect(TokenKind kind) {
+    auto token = TRY(next());
     if (token.kind != kind) {
         lexer_error(token, "Expected token %s, got %s\n", 
             get_token_name(kind), 

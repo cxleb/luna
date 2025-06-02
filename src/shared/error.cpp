@@ -2,26 +2,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void error [[noreturn]] (const char* message, ...) {
-    fprintf(stderr, "Error: ");
+namespace luna {
+
+Error error(const char* message, ...) {
+    char buf[500];
     va_list args;
     va_start (args, message);
-    vfprintf (stderr, message, args);
+    auto count = vsnprintf (buf, 500, message, args);
     va_end (args);
-#ifdef NDEBUG
-    exit(1);
-#else
-    abort();
-#endif
+    return std::string(buf, count);
 }
 
 
-void verror [[noreturn]] (const char* message, va_list args) {
+Error verror (const char* message, va_list args) {
+    char buf[500];
     fprintf(stderr, "Error: ");
+    auto count = vsnprintf (buf, 500, message, args);
     vfprintf (stderr, message, args);
-#ifdef NDEBUG
-    exit(1);
-#else
-    abort();
-#endif
+    return std::string(buf, count);
+}
+
 }

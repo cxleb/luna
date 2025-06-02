@@ -54,8 +54,11 @@ int main(int argc, const char** argv) {
     luna::compiler::Gen gen;
     printf("done\nparsing... "); fflush(stdout);
     auto module = parser.parse_file(std::move(*maybe_file));
+    if (module.is_error()) {
+        printf("Error compiling: %s\n", module.error().msg().c_str());
+    }
     printf("done\ngenerating byte code... "); fflush(stdout);
-    auto runtime_module = gen.generate(module, &env);
+    auto runtime_module = gen.generate(module.value(), &env);
     printf("done\nstarting runtime... "); fflush(stdout);
     luna::runtime::Runtime runtime(&env);
     printf("done\nexecuting.\n"); fflush(stdout);
