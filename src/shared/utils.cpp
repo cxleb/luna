@@ -3,7 +3,7 @@
 
 std::optional<std::vector<char>> slerp(const std::string& path) {
     FILE* file;
-#if WIN32
+#if _WIN32
     auto err = fopen_s(&file, path.c_str(), "rb");
     if(err != 0) {
         return std::nullopt;
