@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "heap.h"
 
 namespace luna::runtime {
 
@@ -20,6 +21,10 @@ const char* get_name_for_type(Type type);
 
 struct Value {
     Value() = default;
+    Value(Cell* cell) {
+        value_object = cell;
+        type = TypeObject;
+    }
     Value(int64_t value) {
         value_int = value;
         type = TypeInt;
@@ -39,7 +44,7 @@ struct Value {
         double value_float;
         bool value_boolean;
         // not used yet
-        void* value_object;
+        Cell* value_object;
     };
 };
 

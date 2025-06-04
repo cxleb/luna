@@ -179,6 +179,14 @@ void FunctionBuilder::float_(double value) {
     });
 }
 
+void FunctionBuilder::cell(runtime::Cell* cell) {
+    insert({
+        .opcode = runtime::OpcodeCell,
+        .operand_ptr = cell,
+    });
+}
+
+
 ref<runtime::Function> FunctionBuilder::build() {
     // if the last bytecode is not a return, add a return so we always return.
     if((*function->code.end()).opcode != runtime::OpcodeRet) {

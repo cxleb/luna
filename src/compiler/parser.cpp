@@ -249,6 +249,9 @@ ErrorOr<ref<Expr>> Parser::parse_number() {
 ErrorOr<ref<Expr>> Parser::parse_string() {
     auto token = TRY(lexer.expect(TokenString));
     auto expr = make_ref<String>();
+    // trim the leading and trailing quote marks
+    token.offset += 1;
+    token.size -= 2;
     expr->value = TRY(lexer.token_to_string(token));
     return static_ref_cast<Expr>(expr);
 }

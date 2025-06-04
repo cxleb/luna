@@ -19,6 +19,7 @@ set(luna_sources
     src/runtime/bytecode.cpp
     src/runtime/value.cpp
     src/runtime/runtime.cpp
+    src/runtime/heap.cpp
 )
 
 add_executable(luna 

@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "runtime/bytecode.h"
 #include "runtime/value.h"
 #include "shared/environment.h"
 #include "shared/error.h"
@@ -191,6 +192,10 @@ void Runtime::exec(ref<Module> module) {
                 } 
                 stack.push(result.value);
 
+                break;
+            }
+            case OpcodeCell: {
+                stack.push((Cell*)inst.operand_ptr);
                 break;
             }
             case OpcodeInt: {

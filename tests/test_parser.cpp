@@ -126,7 +126,7 @@ int main(const int argc, const char** argv) {
         auto expr = parser.parse_expr().value();
         TEST_ASSERT(expr->kind != Expr::KindString);
         auto integer = static_ref_cast<String>(expr);
-        TEST_ASSERT(integer->value != "\"string\"");
+        TEST_ASSERT(integer->value != "string");
     }
 
     // Binary expression tests

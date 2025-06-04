@@ -21,6 +21,10 @@ enum Opcode {
     // Memory
     OpcodeStore,
     OpcodeLoad,
+    OpcodeObjectCreate,
+    OpcodeObjectSet,
+    OpcodeObjectGet,
+
     // Numeric
     OpcodeAdd,
     OpcodeSub,
@@ -32,8 +36,11 @@ enum Opcode {
     OpcodeLess,
     OpcodeGrEq,
     OpcodeLessEq,
+
+    // Values
     OpcodeInt,
     OpcodeFloat,
+    OpcodeCell,
 };
 
 struct Inst {
@@ -42,6 +49,7 @@ struct Inst {
         uint64_t operand_int;
         double operand_float;
         bool operand_boolean;
+        void* operand_ptr;
     };
 };
 

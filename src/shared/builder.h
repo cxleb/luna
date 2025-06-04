@@ -2,6 +2,7 @@
 
 #include "environment.h"
 #include "runtime/bytecode.h"
+#include "runtime/heap.h"
 #include "shared/stack.h"
 #include <cstdint>
 #include <unordered_map>
@@ -42,6 +43,7 @@ public:
     void less_eq();
     void int_(uint64_t value);
     void float_(double value);
+    void cell(runtime::Cell* cell);
 
     ref<runtime::Function> build();
 private:

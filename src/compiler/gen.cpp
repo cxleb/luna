@@ -7,7 +7,7 @@ namespace luna::compiler {
 
 class GenVisitor : public Visitor<GenVisitor> {
 public:
-    GenVisitor(FunctionBuilder* b): builder(b) {}
+    GenVisitor(FunctionBuilder* b, Environment* e): builder(b), env(e) {}
 
     // Statements
     void accept(ref<Stmt> stmt) {
@@ -157,8 +157,10 @@ public:
         builder->float_(expr->value);
     }
     
-    void accept(ref<String> expr) {
+    void accept(ref<String> str) {
         //printf("Visiting string\n");
+        auto cell = env->heap.alloc_string(str->value);
+        builder->cell(cell);
     }
     
     void accept(ref<Identifier> ident) {
@@ -167,6 +169,7 @@ public:
     }
 
     FunctionBuilder* builder;
+    Environment* env;
 }; 
 
 ref<runtime::Module> Gen::generate(ref<Module> module, Environment* env) {
@@ -174,7 +177,7 @@ ref<runtime::Module> Gen::generate(ref<Module> module, Environment* env) {
 
     for(auto func: module->funcs) {
         FunctionBuilder builder = module_builder.new_function(func->name);
-        GenVisitor visitor(&builder);
+        GenVisitor visitor(&builder, env);
         visitor.visit(func->root);
         module_builder.add_function(builder.build());
     }

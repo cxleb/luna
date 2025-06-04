@@ -1,3 +1,4 @@
+#include "runtime/heap.h"
 #include "shared/environment.h"
 #include "shared/utils.h"
 
@@ -25,9 +26,21 @@ void print(luna::runtime::Runtime* rt, uint64_t nargs) {
         case luna::runtime::TypeBool:
             printf("%s ", value.value_boolean ? "true" : "false");
             break;
-        case luna::runtime::TypeObject:
-            printf("<obj> ");
+        case luna::runtime::TypeObject: {
+            auto* cell = value.value_object;
+            switch(cell->kind) {
+                case luna::runtime::Cell::KindString: {
+                    auto* str = static_cast<luna::runtime::String*>(cell);
+                    printf("%s ", str->c_str());
+                    break;
+                }
+                case luna::runtime::Cell::KindObject: {
+                    printf("<obj> ");
+                    break;
+                }
+            }
             break;
+        }
         }
     }
     printf("\n");
