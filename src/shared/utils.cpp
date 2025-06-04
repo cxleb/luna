@@ -1,11 +1,16 @@
 #include "utils.h"
+#include <stdio.h>
 
 std::optional<std::vector<char>> slerp(const std::string& path) {
-    auto file = fopen(path.c_str(), "rb");
+    FILE* file;
+    auto err = fopen_s(&file, path.c_str(), "rb");
+    if(err != 0) {
+        return std::nullopt;
+    }
     if (!file) {
         return std::nullopt;
     }
-
+    
     fseek(file, 0, SEEK_END);
     auto size = ftell(file);
     rewind(file);

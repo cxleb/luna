@@ -39,6 +39,8 @@ void Lexer::eat_whitespace() {
             at++;
             line++;
             col = 0;
+        } else if (c == '\r') { // just ignore carriage returns 
+            at++;
         } else if (c == '/') {
             at++;
             if (at < source.size() && source[at] == '/') {
@@ -262,7 +264,7 @@ ErrorOr<Token> Lexer::next() {
         goto end;
     } else {
         // Unknown character
-        lexer_error(token, "Unknown character: %c", source[at]);
+        return lexer_error(token, "Unknown character: %d", source[at]);
     }
 
     goto end;
@@ -329,14 +331,14 @@ ErrorOr<bool> Lexer::test(const std::string& str) {
         return false;
     }
     char buf[64];
-    copy_token(buf, 64, token);
+    TRY(copy_token(buf, 64, token));
     return strcmp(buf, str.c_str()) == 0;
 }
 
 ErrorOr<Token> Lexer::expect(TokenKind kind) {
     auto token = TRY(next());
     if (token.kind != kind) {
-        lexer_error(token, "Expected token %s, got %s\n", 
+        return lexer_error(token, "Expected token %s, got %s\n", 
             get_token_name(kind), 
             get_token_name(token.kind));
     }
