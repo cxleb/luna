@@ -11,6 +11,10 @@ FunctionBuilder::FunctionBuilder(const std::string& name, ModuleBuilder* builder
     label_counter = 0;
     function = make_ref<runtime::Function>();
     function->name = name;
+    function->locals = 0; // allocate 32 temporary values
+    //for(auto i = 0; i < 32; i++) {
+    //    temporaries[i] = false;
+    //}
     this->builder = builder;
 }
 
@@ -22,14 +26,16 @@ void FunctionBuilder::pop_scope() {
     scopes.pop();
 }
 
-void FunctionBuilder::create_local(const std::string& name) {
+uint8_t FunctionBuilder::create_local(const std::string& name) {
+    uint8_t idx = function->locals++;
     scopes.peek().insert({
         name,
-        function->locals++,
+        idx,
     });
+    return idx;
 }
 
-std::optional<uint16_t> FunctionBuilder::get_local_id(const std::string& name) {
+std::optional<uint8_t> FunctionBuilder::get_local_id(const std::string& name) {
     for(auto it = scopes.rbegin(); it != scopes.rend(); it += 1) {
         auto& scope = *it;
         if (scope.contains(name)) {
@@ -37,6 +43,22 @@ std::optional<uint16_t> FunctionBuilder::get_local_id(const std::string& name) {
         }
     }
     return std::nullopt;
+}
+
+uint8_t FunctionBuilder::alloc_temp() {
+    // find first free temporary
+    for(auto i = 0; i < temporaries.size(); i++) {
+        if(!temporaries[i]) return i;
+    }
+    // TODO(caleb) handle error?
+    return 0;
+}
+
+void FunctionBuilder::free_temp(uint8_t id) {
+    // if its greater then 32 its a local variable
+    if (id < 32) {
+        temporaries[id] = false;
+    }
 }
 
 void FunctionBuilder::insert(runtime::Inst inst) {
@@ -51,6 +73,14 @@ uint16_t FunctionBuilder::new_label() {
 
 void FunctionBuilder::mark_label(uint16_t label) {
     labels[label] = function->code.size();
+}
+
+void FunctionBuilder::arg(uint8_t arg, uint8_t reg) {
+    insert({
+        .opcode = runtime::OpcodeArg,
+        .a = arg,
+        .b = reg,
+    });
 }
 
 void FunctionBuilder::call(const std::string& function_name, uint8_t nargs) {
@@ -95,18 +125,18 @@ void FunctionBuilder::condbr(uint8_t reg, uint16_t label) {
 void FunctionBuilder::store(uint8_t reg, const std::string& name) {
     auto id = get_local_id(name);
     insert({
-        .opcode = runtime::OpcodeStore,
-        .a = reg,
-        .s = *id,
+        .opcode = runtime::OpcodeMove,
+        .a = *id,
+        .b = reg,
     });
 }
 
 void FunctionBuilder::load(uint8_t reg, const std::string& name) {
     auto id = get_local_id(name);
     insert({
-        .opcode = runtime::OpcodeLoad,
+        .opcode = runtime::OpcodeMove,
         .a = reg,
-        .s = *id,
+        .b = *id,
     });
 }
 

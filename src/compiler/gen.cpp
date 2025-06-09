@@ -1,12 +1,38 @@
 #include "gen.h"
 #include "compiler/ast.h"
+#include "runtime/value.h"
 #include "shared/builder.h"
 #include "shared/environment.h"
+#include "shared/stack.h"
 
 namespace luna::compiler {
 
-class GenVisitor : public Visitor<GenVisitor> {
+class GenVisitor {
     bool is_assign;
+    luna::Stack<uint8_t> temp_stack;
+
+    uint8_t visit(ref<Expr> expr, uint8_t into) {
+        switch(expr->kind) {
+#define VISITOR_SWITCH(name) \
+        case Expr::Kind##name: \
+            return this->accept( \
+                static_ref_cast<name>(expr), into);
+        EXPR_NODES(VISITOR_SWITCH)
+#undef VISITOR_SWITCH
+        }
+    }
+
+    void visit(ref<Stmt> stmt) {
+        switch(stmt->kind) {
+#define VISITOR_SWITCH(name) \
+        case Stmt::Kind##name: \
+            this->accept( \
+                static_ref_cast<name>(stmt));
+        STMT_NODES(VISITOR_SWITCH)
+#undef VISITOR_SWITCH
+        }
+    }
+
 public:
     GenVisitor(FunctionBuilder* b, Environment* e): builder(b), env(e), is_assign(false) {}
 
@@ -21,8 +47,11 @@ public:
         auto end_label = builder->new_label();
         auto body_label = builder->new_label();
         
-        visit(stmt->condition);
-        builder->condbr(body_label);
+        auto temp = builder->alloc_temp();
+        auto cond = visit(stmt->condition, temp);
+        builder->condbr(cond, body_label);
+        builder->free_temp(temp);
+
         if (stmt->else_stmt != nullptr) {
             visit(stmt->else_stmt);
         }
@@ -35,16 +64,15 @@ public:
     void accept(ref<Return> ret) {
         //printf("Visiting return\n");
         if(ret->value.has_value()) {
-            visit(*ret->value);
+            visit(*ret->value, 0);
         }
         builder->ret();
     }
     
     void accept(ref<VarDecl> decl) {
         //printf("Visiting var decl\n");
-        builder->create_local(decl->name);
-        visit(decl->value);
-        builder->store(decl->name);
+        auto local = builder->create_local(decl->name);
+        visit(decl->value, local);
     }
     
     void accept(ref<While> stmt) {
@@ -57,8 +85,10 @@ public:
         auto end_label = builder->new_label();
         
         builder->mark_label(start_label);
-        visit(stmt->condition);
-        builder->condbr(body_label);
+        auto temp = builder->alloc_temp();
+        auto cond = visit(stmt->condition, temp);
+        builder->condbr(cond, body_label);
+        builder->free_temp(temp);
         builder->br(end_label);
         builder->mark_label(body_label);
         visit(stmt->loop);
@@ -80,99 +110,123 @@ public:
     }
 
     void accept(ref<ExprStmt> expr_stmt) {
-        visit(expr_stmt->expr);
+        auto temp = builder->alloc_temp();
+        visit(expr_stmt->expr, temp);
+        builder->free_temp(temp);
     }
 
     // Expressionss
-    void accept(ref<Expr> expr) {
+    uint8_t accept(ref<Expr> expr, uint8_t into) {
         printf("Oh fuck, we should not be here! (Expr)\n");
+        return 0;
     }
 
-    void accept(ref<BinaryExpr> expr) {
+    uint8_t accept(ref<BinaryExpr> expr, uint8_t into) {
         //printf("Visiting BinaryExpr\n");
-        visit(expr->lhs);
-        visit(expr->rhs);
+        auto lhs_temp = builder->alloc_temp();
+        auto rhs_temp = builder->alloc_temp();
+        auto lhs = visit(expr->lhs, lhs_temp);
+        auto rhs = visit(expr->rhs, rhs_temp);
         switch(expr->bin_kind) {
             case BinaryExpr::KindAdd:
-                builder->add();
+                builder->add(lhs, rhs, into);
                 break;
             case BinaryExpr::KindSubtract:
-                builder->sub();
+                builder->sub(lhs, rhs, into);
                 break;
             case BinaryExpr::KindMultiply:
-                builder->mul();
+                builder->mul(lhs, rhs, into);
                 break;
             case BinaryExpr::KindDivide:
-                builder->div();
+                builder->div(lhs, rhs, into);
                 break;
             case BinaryExpr::KindEqual:
-                builder->eq();
+                builder->eq(lhs, rhs, into);
                 break;
             case BinaryExpr::KindNotEqual:
-                builder->noteq();
+                builder->noteq(lhs, rhs, into);
                 break;
             case BinaryExpr::KindLessThan:
-                builder->less();
+                builder->less(lhs, rhs, into);
                 break;
             case BinaryExpr::KindGreaterThan:
-                builder->gr();
+                builder->gr(lhs, rhs, into);
                 break;
             case BinaryExpr::KindLessThanEqual:
-                builder->less_eq();
+                builder->less_eq(lhs, rhs, into);
                 break;
             case BinaryExpr::KindGreaterThanEqual:
-                builder->gr_eq();
+                builder->gr_eq(lhs, rhs, into);
                 break;
         }
+        builder->free_temp(lhs_temp);
+        builder->free_temp(rhs_temp);
+
+        return into;
     }
     
-    void accept(ref<Unary> expr) {
-        //printf("Visiting unary\n");
+    uint8_t accept(ref<Unary> expr, uint8_t into) {
+        printf("Visiting unary\n");
+        return 0;
     }
 
-    void accept(ref<Assign> assign) {
+    uint8_t accept(ref<Assign> assign, uint8_t into) {
         //printf("Visiting assign\n");
-        visit(assign->value);
-        auto temp_is_assign = is_assign;
-        is_assign = true;
-        visit(assign->local);
-        is_assign = temp_is_assign;
+        auto local = visit(assign->local, into);
+        visit(assign->value, local);
+        return local;
     }
     
-    void accept(ref<Call> call) {
+    uint8_t accept(ref<Call> call, uint8_t into) {
         //printf("Visiting call\n");
+        uint8_t temp = builder->alloc_temp();
+        uint8_t n = 0;
         for(auto arg: call->args) {
-            visit(arg);
+            // this might use the temp
+            // which is why we need to make the copy using the returned index
+            auto a = visit(arg, temp);
+            builder->arg(n++, a);
         }
+        builder->free_temp(temp);
         builder->call(call->name, call->args.size());
+        return 0;
     }
     
-    void accept(ref<Integer> expr) {
+    uint8_t accept(ref<Integer> expr, uint8_t into) {
         //printf("Visiting int\n");
-        builder->int_(expr->value);
+        // todo(caleb): optimize loading directly into variables
+        builder->load_const(into, expr->value);
+        return into;
     }
     
-    void accept(ref<Float> expr) {
+    uint8_t accept(ref<Float> expr, uint8_t into) {
         //printf("Visiting float\n");
-        builder->float_(expr->value);
+        // todo(caleb): optimize loading directly into variables
+        builder->load_const(into, expr->value);
+        return into;
     }
     
-    void accept(ref<String> str) {
+    uint8_t accept(ref<String> str, uint8_t into) {
         //printf("Visiting string\n");
         auto cell = env->heap.alloc_string(str->value);
-        builder->cell(cell);
+        // todo(caleb): optimize loading directly into variables
+        auto temp = builder->alloc_temp();
+        builder->load_const(into, cell);
+        return into;
     }
     
-    void accept(ref<Identifier> ident) {
+    uint8_t accept(ref<Identifier> ident, uint8_t into) {
         //printf("Visiting ident\n");
-        if (is_assign) {
-            builder->store(ident->name);
-        } else {
-            builder->load(ident->name);
-        }
+        auto id = builder->get_local_id(ident->name);
+        return *id;
+        //if (is_assign) {
+        //    builder->store(ident->name);
+        //} else {
+        //    builder->load(ident->name);
+        //}
     }
 
-    void accept(ref<Lookup> lookup) {
+    uint8_t accept(ref<Lookup> lookup, uint8_t into) {
         visit(lookup->expr);
         visit(lookup->index);
         if(is_assign) {
@@ -182,11 +236,11 @@ public:
         }
     }
 
-    void accept(ref<ObjectLiteral> literal) {
-        builder->object_new();
+    uint8_t accept(ref<ObjectLiteral> literal, uint8_t into) {
+        builder->object_new(into);
     }
 
-    void accept(ref<ArrayLiteral> literal) {
+    uint8_t accept(ref<ArrayLiteral> literal, uint8_t into) {
         builder->object_new();
         uint64_t i = 0;
         for(auto& expr : literal->elements) {

@@ -193,7 +193,7 @@ public:
 class Integer : public Expr {
 public:
     Integer();
-    uint64_t value;
+    int64_t value;
 };
 
 class Float : public Expr {
@@ -231,34 +231,28 @@ public:
 };
 
 // Visitor
-template <typename Impl, typename... Args>
+template <typename Impl, typename StmtRet, typename ExprRet, typename... Args>
 class Visitor {
 public:
-    void visit(ref<Expr> expr, Args&... args) {
+    uint8_t visit(ref<Expr> expr, Args&... args) {
         switch(expr->kind) {
 #define VISITOR_SWITCH(name) \
         case Expr::Kind##name: \
-            static_cast<Impl*>(this)->accept( \
-                static_ref_cast<name>(expr), args...); \
-            return;
+            return static_cast<Impl*>(this)->accept( \
+                static_ref_cast<name>(expr), args...);
         EXPR_NODES(VISITOR_SWITCH)
 #undef VISITOR_SWITCH
-        default:
-            return;
         }
     }
 
-    void visit(ref<Stmt> stmt, Args&... args) {
+    StmtRet visit(ref<Stmt> stmt, Args&... args) {
         switch(stmt->kind) {
 #define VISITOR_SWITCH(name) \
         case Stmt::Kind##name: \
-            static_cast<Impl*>(this)->accept( \
-                static_ref_cast<name>(stmt), args...); \
-            return;
+            return static_cast<Impl*>(this)->accept( \
+                static_ref_cast<name>(stmt), args...);
         STMT_NODES(VISITOR_SWITCH)
 #undef VISITOR_SWITCH
-        default:
-            return;
         }
     }
 

@@ -4,6 +4,7 @@
 #include "runtime/bytecode.h"
 #include "runtime/value.h"
 #include "shared/stack.h"
+#include <array>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -18,13 +19,16 @@ public:
     // Variables
     void push_scope();
     void pop_scope();
-    void create_local(const std::string& name);
-    std::optional<uint16_t> get_local_id(const std::string& name);
+    uint8_t create_local(const std::string& name);
+    std::optional<uint8_t> get_local_id(const std::string& name);
+    uint8_t alloc_temp();
+    void free_temp(uint8_t);
     // Label management
     uint16_t new_label();
     void mark_label(uint16_t label);
     // Op codes
     void insert(runtime::Inst inst);
+    void arg(uint8_t arg, uint8_t reg);
     void call(const std::string& function_name, uint8_t nargs);
     void ret();
     void br(uint16_t label);
@@ -53,7 +57,8 @@ public:
 private:
     ModuleBuilder* builder;
     uint16_t label_counter;
-    std::vector<uint16_t> labels;
+    std::vector<uint8_t> labels;
+    std::array<bool, 32> temporaries;
     luna::Stack<std::unordered_map<std::string, uint64_t>> scopes;
     ref<runtime::Function> function;
 };

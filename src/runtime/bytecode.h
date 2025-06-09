@@ -17,12 +17,12 @@ enum Opcode {
     OpcodeCondBr,
     // calls have the lower 32 bits as the id and the upper 32 bits as the 
     // number of arguements
+    OpcodeArg, // arg[a] = r[b]
     OpcodeCall, // Calls another byte code function
     OpcodeCallHost, // Calls a native function
     OpcodeRet,
     // Memory
-    OpcodeStore, // local[s] = r[a]
-    OpcodeLoad, // r[a] = local[s]
+    OpcodeMove, // r[a] = r[b]
     OpcodeObjectNew, // r[a] = new object
     OpcodeObjectSet, // r[a][r[b]] = r[c] 
     OpcodeObjectGet, // r[a] = r[b][r[c]]

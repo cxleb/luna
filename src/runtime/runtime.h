@@ -27,7 +27,6 @@ public:
     void op_result_error(OpResult result, Value a, Value b);
 private:
     Environment* environment;
-    Value registers[32];
     std::vector<Value> locals;
     //luna::Stack<Value> stack;
     luna::Stack<Frame> frames;
