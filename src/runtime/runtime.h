@@ -21,14 +21,15 @@ public:
     Runtime(Environment* env);
 
     void exec(ref<Module> module);
-    inline Value pop_last_value() { return stack.pop(); }
+    //inline Value pop_last_value() { return stack.pop(); }
 
     bool value_equal(Value a, Value b);
     void op_result_error(OpResult result, Value a, Value b);
 private:
     Environment* environment;
+    Value registers[32];
     std::vector<Value> locals;
-    luna::Stack<Value> stack;
+    //luna::Stack<Value> stack;
     luna::Stack<Frame> frames;
     uint64_t current_frame;
 };

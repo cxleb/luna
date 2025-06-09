@@ -72,7 +72,7 @@ public:
         return data[--top];
     }
 
-    T& peak() {
+    T& peek() {
         luna_assert(top != 0);
         return data[top - 1];
     }

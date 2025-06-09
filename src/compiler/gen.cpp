@@ -6,8 +6,9 @@
 namespace luna::compiler {
 
 class GenVisitor : public Visitor<GenVisitor> {
+    bool is_assign;
 public:
-    GenVisitor(FunctionBuilder* b, Environment* e): builder(b), env(e) {}
+    GenVisitor(FunctionBuilder* b, Environment* e): builder(b), env(e), is_assign(false) {}
 
     // Statements
     void accept(ref<Stmt> stmt) {
@@ -46,12 +47,6 @@ public:
         builder->store(decl->name);
     }
     
-    void accept(ref<Assign> assign) {
-        //printf("Visiting assign\n");
-        visit(assign->value);
-        builder->store(assign->name);
-    }
-    
     void accept(ref<While> stmt) {
         //printf("Visiting while\n");
 
@@ -75,14 +70,6 @@ public:
         //printf("Visiting for\n");
     }
     
-    void accept(ref<Call> call) {
-        //printf("Visiting call\n");
-        for(auto arg: call->args) {
-            visit(arg);
-        }
-        builder->call(call->name, call->args.size());
-    }
-    
     void accept(ref<Block> block) {
         //printf("Visiting block\n");
         builder->push_scope();
@@ -90,6 +77,10 @@ public:
             visit(stmt);
         }
         builder->pop_scope();
+    }
+
+    void accept(ref<ExprStmt> expr_stmt) {
+        visit(expr_stmt->expr);
     }
 
     // Expressionss
@@ -138,13 +129,22 @@ public:
     void accept(ref<Unary> expr) {
         //printf("Visiting unary\n");
     }
+
+    void accept(ref<Assign> assign) {
+        //printf("Visiting assign\n");
+        visit(assign->value);
+        auto temp_is_assign = is_assign;
+        is_assign = true;
+        visit(assign->local);
+        is_assign = temp_is_assign;
+    }
     
-    void accept(ref<CallExpr> call) {
+    void accept(ref<Call> call) {
         //printf("Visiting call\n");
-        for(auto arg: call->call.args) {
+        for(auto arg: call->args) {
             visit(arg);
         }
-        builder->call(call->call.name, call->call.args.size());
+        builder->call(call->name, call->args.size());
     }
     
     void accept(ref<Integer> expr) {
@@ -165,7 +165,35 @@ public:
     
     void accept(ref<Identifier> ident) {
         //printf("Visiting ident\n");
-        builder->load(ident->name);
+        if (is_assign) {
+            builder->store(ident->name);
+        } else {
+            builder->load(ident->name);
+        }
+    }
+
+    void accept(ref<Lookup> lookup) {
+        visit(lookup->expr);
+        visit(lookup->index);
+        if(is_assign) {
+            builder->object_set();
+        } else {
+            builder->object_get();
+        }
+    }
+
+    void accept(ref<ObjectLiteral> literal) {
+        builder->object_new();
+    }
+
+    void accept(ref<ArrayLiteral> literal) {
+        builder->object_new();
+        uint64_t i = 0;
+        for(auto& expr : literal->elements) {
+            builder->int_(i);
+            builder->
+            i++;
+        }
     }
 
     FunctionBuilder* builder;

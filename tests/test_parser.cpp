@@ -129,6 +129,86 @@ int main(const int argc, const char** argv) {
         TEST_ASSERT(integer->value != "string");
     }
 
+    {
+        Parser parser(to_source("[]"));
+        auto expr = parser.parse_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindArrayLiteral);
+        auto literal = static_ref_cast<ArrayLiteral>(expr);
+        TEST_ASSERT(literal->elements.size() != 0);
+    }
+
+    {
+        Parser parser(to_source("[1, 2, 3]"));
+        auto expr = parser.parse_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindArrayLiteral);
+        auto literal = static_ref_cast<ArrayLiteral>(expr);
+        TEST_ASSERT(literal->elements.size() != 3);
+    }
+
+    {
+        Parser parser(to_source("{}"));
+        auto expr = parser.parse_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindObjectLiteral);
+        auto literal = static_ref_cast<ObjectLiteral>(expr);
+    }
+
+    {
+        Parser parser(to_source("array[0]"));
+        auto expr = parser.parse_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindLookup);
+        auto lookup = static_ref_cast<Lookup>(expr);
+        TEST_ASSERT(lookup->expr->kind != Expr::KindIdentifier);
+        TEST_ASSERT(lookup->index->kind != Expr::KindInteger);
+    }
+
+    {
+        Parser parser(to_source("array[\"string\"]"));
+        auto expr = parser.parse_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindLookup);
+        auto lookup = static_ref_cast<Lookup>(expr);
+        TEST_ASSERT(lookup->expr->kind != Expr::KindIdentifier);
+        TEST_ASSERT(lookup->index->kind != Expr::KindString);
+    }
+
+    {
+        Parser parser(to_source("array[10 + a]"));
+        auto expr = parser.parse_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindLookup);
+        auto lookup = static_ref_cast<Lookup>(expr);
+        TEST_ASSERT(lookup->expr->kind != Expr::KindIdentifier);
+        TEST_ASSERT(lookup->index->kind != Expr::KindBinaryExpr);
+    }
+
+    // Left Hand Side Expression tests
+
+    {
+        Parser parser(to_source("a = 10"));
+        auto expr = parser.parse_left_hand_side_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindAssign);
+        auto assign = static_ref_cast<Assign>(expr);
+        TEST_ASSERT(assign->local->kind != Expr::KindIdentifier);
+        TEST_ASSERT(assign->value->kind != Expr::KindInteger);
+    }
+
+    {
+        Parser parser(to_source("print()"));
+        auto expr = parser.parse_left_hand_side_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindCall);
+        auto call = static_ref_cast<Call>(expr);
+        TEST_ASSERT(call->name != "print");
+        TEST_ASSERT(call->args.size() != 0);
+    }
+
+    {
+        Parser parser(to_source("print(10)"));
+        auto expr = parser.parse_left_hand_side_expr().value();
+        TEST_ASSERT(expr->kind != Expr::KindCall);
+        auto var_stmt = static_ref_cast<Call>(expr);
+        TEST_ASSERT(var_stmt->name != "print");
+        TEST_ASSERT(var_stmt->args.size() != 1);
+        TEST_ASSERT(var_stmt->args[0]->kind != Expr::KindInteger);
+    }
+
     // Binary expression tests
 
     {
@@ -174,6 +254,8 @@ int main(const int argc, const char** argv) {
         TEST_ASSERT(bin_expr->lhs->kind != Expr::KindInteger);
         TEST_ASSERT(bin_expr->rhs->kind != Expr::KindInteger);
     }
+
+    // Statements
 
     {
         Parser parser(to_source("return;"));
@@ -243,30 +325,26 @@ int main(const int argc, const char** argv) {
 
     {
         Parser parser(to_source("a = 10;"));
-        auto stmt = parser.parse_stmt_ident().value();
-        TEST_ASSERT(stmt->kind != Stmt::KindAssign);
-        auto var_stmt = static_ref_cast<Assign>(stmt);
-        TEST_ASSERT(var_stmt->name != "a");
-        TEST_ASSERT(var_stmt->value->kind != Expr::KindInteger);
+        auto stmt = parser.parse_expr_stmt().value();
+        TEST_ASSERT(stmt->kind != Stmt::KindExprStmt);
+        auto expr_stmt = static_ref_cast<ExprStmt>(stmt);
+        TEST_ASSERT(expr_stmt->expr->kind != Expr::KindAssign);
     }
 
     {
         Parser parser(to_source("print();"));
-        auto stmt = parser.parse_stmt_ident().value();
-        TEST_ASSERT(stmt->kind != Stmt::KindCall);
-        auto var_stmt = static_ref_cast<Call>(stmt);
-        TEST_ASSERT(var_stmt->name != "print");
-        TEST_ASSERT(var_stmt->args.size() != 0);
+        auto stmt = parser.parse_expr_stmt().value();
+        TEST_ASSERT(stmt->kind != Stmt::KindExprStmt);
+        auto expr_stmt = static_ref_cast<ExprStmt>(stmt);
+        TEST_ASSERT(expr_stmt->expr->kind != Expr::KindCall);
     }
 
     {
         Parser parser(to_source("print(10);"));
-        auto stmt = parser.parse_stmt_ident().value();
-        TEST_ASSERT(stmt->kind != Stmt::KindCall);
-        auto var_stmt = static_ref_cast<Call>(stmt);
-        TEST_ASSERT(var_stmt->name != "print");
-        TEST_ASSERT(var_stmt->args.size() != 1);
-        TEST_ASSERT(var_stmt->args[0]->kind != Expr::KindInteger);
+        auto stmt = parser.parse_expr_stmt().value(); 
+        TEST_ASSERT(stmt->kind != Stmt::KindExprStmt);
+        auto expr_stmt = static_ref_cast<ExprStmt>(stmt);
+        TEST_ASSERT(expr_stmt->expr->kind != Expr::KindCall);
     }
 
     return 0;

@@ -75,10 +75,8 @@ ErrorOr<ref<Stmt>> Parser::parse_stmt() {
         return parse_var();
     } else if (TRY(lexer.test(TokenIdentifier))) {
         return parse_stmt_ident();
-    } else if (TRY(lexer.test(TokenLeftCurly))) {
-        return parse_block();
     } else {
-        return parser_error(TRY(lexer.peek()), "Expected statement\n");
+        return parse_expr_stmt();
     }
 }
 
@@ -148,35 +146,12 @@ ErrorOr<ref<Stmt>> Parser::parse_var() {
     return static_ref_cast<Stmt>(stmt);
 }
 
-ErrorOr<ref<Stmt>> Parser::parse_stmt_ident() {
-    auto name = TRY(lexer.token_to_string(TRY(lexer.expect(TokenIdentifier))));
-    if (TRY(lexer.test(TokenLeftParen))) {
-        // parse function call
-        auto stmt = make_ref<Call>();
-        stmt->name = name;
-        TRY(lexer.expect(TokenLeftParen));
         auto token = TRY(lexer.peek());
-        while (token.kind != TokenRightParen) {
-            auto expr = TRY(parse_expr());
-            stmt->args.push_back(expr);
-            token = TRY(lexer.peek());
-            if (token.kind == TokenComma) {
-                lexer.next();
-                token = TRY(lexer.peek());
-            }
-        }
-        TRY(lexer.expect(TokenRightParen));
-        TRY(lexer.expect(TokenSemiColon));
-        return static_ref_cast<Stmt>(stmt);
-    } else if (TRY(lexer.test(TokenEquals))) {
-        auto stmt = make_ref<Assign>();
-        stmt->name = name;
-        TRY(lexer.expect(TokenEquals));
-        stmt->value = TRY(parse_expr());
-        TRY(lexer.expect(TokenSemiColon));
-        return static_ref_cast<Stmt>(stmt);
-    }
-    return parser_error(TRY(lexer.next()), "Unexpected token after identifier");
+ErrorOr<ref<Stmt>> Parser::parse_expr_stmt() {
+    auto expr_stmt = make_ref<ExprStmt>();
+    expr_stmt->expr = TRY(parse_expr());
+    lexer.expect(TokenSemiColon);
+    return static_ref_cast<Stmt>(expr_stmt);
 }
 
 ErrorOr<ref<Stmt>> Parser::parse_block() {
@@ -200,6 +175,10 @@ ErrorOr<ref<Expr>> Parser::parse_primary_expr() {
         return parse_number();
     } else if (TRY(lexer.test(TokenString))) {
         return parse_string();
+    } else if (TRY(lexer.test(TokenLeftCurly))) {
+        return parse_object_literal();
+    } else if (TRY(lexer.test(TokenLeftBracket))) {
+        return parse_array_literal();
     } else {
         return parser_error(TRY(lexer.peek()), 
             "Expected expression, found token: %s\n", 
@@ -211,13 +190,13 @@ ErrorOr<ref<Expr>> Parser::parse_ident() {
     auto name = TRY(lexer.token_to_string(TRY(lexer.expect(TokenIdentifier))));
     if (TRY(lexer.test(TokenLeftParen))) {
         // parse function call
-        auto call = make_ref<CallExpr>();
-        call->call.name = name;
+        auto call = make_ref<Call>();
+        call->name = name;
         TRY(lexer.expect(TokenLeftParen));
         auto token = TRY(lexer.peek());
         while (token.kind != TokenRightParen) {
             auto expr = TRY(parse_expr());
-            call->call.args.push_back(expr);
+            call->args.push_back(expr);
             token = TRY(lexer.peek());
             if (token.kind == TokenComma) {
                 lexer.next();
@@ -254,6 +233,29 @@ ErrorOr<ref<Expr>> Parser::parse_string() {
     token.size -= 2;
     expr->value = TRY(lexer.token_to_string(token));
     return static_ref_cast<Expr>(expr);
+}
+
+ErrorOr<ref<Expr>> Parser::parse_object_literal() {
+    lexer.expect(TokenLeftCurly);
+    auto expr = make_ref<ObjectLiteral>();
+    lexer.expect(TokenRightCurly);
+    return static_ref_cast<Expr>(expr);
+}
+
+ErrorOr<ref<Expr>> Parser::parse_array_literal() {
+    lexer.expect(TokenLeftBracket);
+    auto literal = make_ref<ArrayLiteral>();
+    while(TRY(lexer.peek()).kind != TokenRightBracket) {
+        auto expr = TRY(parse_expr());
+        literal->elements.push_back(expr);
+        auto token = TRY(lexer.peek());
+        if (token.kind == TokenComma) {
+            lexer.next();
+            token = TRY(lexer.peek());
+        }
+    }
+    lexer.expect(TokenRightBracket);
+    return static_ref_cast<Expr>(literal);
 }
 
 u8 Parser::parse_prec(Token token) {
@@ -304,7 +306,7 @@ ErrorOr<BinaryExpr::Kind> Parser::parse_bin_op_kind(Token token) {
 }
 
 ErrorOr<ref<Expr>> Parser::parse_bin_expr(u8 prec) {
-    auto lhs = TRY(parse_primary_expr());
+    auto lhs = TRY(parse_left_hand_side_expr());
     while (true) {
         auto token = TRY(lexer.peek());
         u8 new_prec = parse_prec(token);
@@ -321,6 +323,31 @@ ErrorOr<ref<Expr>> Parser::parse_bin_expr(u8 prec) {
     }
     return lhs;
 }
+
+ErrorOr<ref<Expr>> Parser::parse_left_hand_side_expr() {
+    auto expr = TRY(parse_primary_expr());
+
+    while (true) {
+        if (TRY(lexer.test(TokenLeftBracket))) {
+            TRY(lexer.expect(TokenLeftBracket));
+            auto index = TRY(parse_expr());
+            TRY(lexer.expect(TokenRightBracket));
+            auto lookup = make_ref<Lookup>();
+            lookup->expr = expr;
+            lookup->index = index;
+            expr = static_ref_cast<Expr>(lookup);
+        }  else if (TRY(lexer.test(TokenEquals))) {
+            auto assign = make_ref<Assign>();
+            assign->local = expr;
+            TRY(lexer.expect(TokenEquals));
+            assign->value = TRY(parse_expr());
+            return static_ref_cast<Expr>(assign);
+        } else {
+            return expr;
+        }
+    }
+}
+
 
 // Type Parser::parse_type(s) {
 //     Type type;

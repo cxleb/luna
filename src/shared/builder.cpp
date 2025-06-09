@@ -24,12 +24,13 @@ void FunctionBuilder::pop_scope() {
 
 void FunctionBuilder::create_local(const std::string& name) {
     scopes.peak().insert({
+    scopes.peek().insert({
         name,
         function->locals++,
     });
 }
 
-std::optional<uint64_t> FunctionBuilder::get_local_id(const std::string& name) {
+std::optional<uint16_t> FunctionBuilder::get_local_id(const std::string& name) {
     for(auto it = scopes.rbegin(); it != scopes.rend(); it += 1) {
         auto& scope = *it;
         if (scope.contains(name)) {
@@ -43,28 +44,30 @@ void FunctionBuilder::insert(runtime::Inst inst) {
     function->code.push_back(inst);
 }
 
-uint64_t FunctionBuilder::new_label() {
+uint16_t FunctionBuilder::new_label() {
     auto label = label_counter++;
     labels.resize(label_counter);
     return label;
 }
 
-void FunctionBuilder::mark_label(uint64_t label) {
+void FunctionBuilder::mark_label(uint16_t label) {
     labels[label] = function->code.size();
 }
 
-void FunctionBuilder::call(const std::string& function_name, uint64_t nargs) {
+void FunctionBuilder::call(const std::string& function_name, uint8_t nargs) {
     auto host_func_id = builder->get_env()->get_func_id(function_name);
     if (host_func_id.has_value()) {
         insert({
             .opcode = runtime::OpcodeCallHost,
-            .operand_int = *host_func_id | ( nargs << 32),
+            .a = nargs,
+            .s = *host_func_id,// | ( nargs << 32),
         });
     } else {
         auto id = builder->get_func_name_id(function_name);
         insert({
             .opcode = runtime::OpcodeCall,
-            .operand_int = id | ( nargs << 32),
+            .a = nargs,
+            .s = id,// | ( nargs << 32),
         });
     }
 }
@@ -75,116 +78,182 @@ void FunctionBuilder::ret() {
     });
 }
 
-void FunctionBuilder::br(uint64_t label) {
+void FunctionBuilder::br(uint16_t label) {
     insert({
         .opcode = runtime::OpcodeBr,
-        .operand_int = label,
+        .s = label,
     });
 }
 
-void FunctionBuilder::condbr(uint64_t label) {
+void FunctionBuilder::condbr(uint8_t reg, uint16_t label) {
     insert({
         .opcode = runtime::OpcodeCondBr,
-        .operand_int = label,
+        .a = reg,
+        .s = label,
     });
 }
 
-void FunctionBuilder::store(const std::string& name) {
+void FunctionBuilder::store(uint8_t reg, const std::string& name) {
     auto id = get_local_id(name);
     insert({
         .opcode = runtime::OpcodeStore,
-        .operand_int = *id,
+        .a = reg,
+        .s = *id,
     });
 }
 
-void FunctionBuilder::load(const std::string& name) {
+void FunctionBuilder::load(uint8_t reg, const std::string& name) {
     auto id = get_local_id(name);
     insert({
         .opcode = runtime::OpcodeLoad,
-        .operand_int = *id,
+        .a = reg,
+        .s = *id,
     });
 }
 
-void FunctionBuilder::add() {
+void FunctionBuilder::object_new(uint8_t a) {
+    insert({
+        .opcode = runtime::OpcodeObjectNew,
+        .a = a
+    });
+}
+
+void FunctionBuilder::object_set(uint8_t reg, uint8_t idx, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeObjectSet,
+        .a = reg,
+        .b = idx,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::object_get(uint8_t reg, uint8_t idx, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeObjectGet,
+        .a = eq,
+        .b = reg,
+        .c = idx
+    });
+}
+
+void FunctionBuilder::add(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeAdd,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::sub() {
+void FunctionBuilder::sub(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeSub,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::mul() {
+void FunctionBuilder::mul(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeMul,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::div() {
+void FunctionBuilder::div(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeDiv,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::eq() {
+void FunctionBuilder::eq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::noteq() {
+void FunctionBuilder::noteq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeNotEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::gr() {
+void FunctionBuilder::gr(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeGr,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::gr_eq() {
+void FunctionBuilder::gr_eq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeGrEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::less() {
+void FunctionBuilder::less(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeLess,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::less_eq() {
+void FunctionBuilder::less_eq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
         .opcode = runtime::OpcodeLessEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
     });
 }
 
-void FunctionBuilder::int_(uint64_t value) {
+void FunctionBuilder::load_const(uint8_t reg, runtime::Value value) {
     insert({
-        .opcode = runtime::OpcodeInt,
-        .operand_int = value,
+        .opcode = runtime::OpcodeLoadConst,
+        .a = reg,
+        .s = 0,
     });
 }
 
-void FunctionBuilder::float_(double value) {
-    insert({
-        .opcode = runtime::OpcodeFloat,
-        .operand_float = value,
-    });
-}
-
-void FunctionBuilder::cell(runtime::Cell* cell) {
-    insert({
-        .opcode = runtime::OpcodeCell,
-        .operand_ptr = cell,
-    });
-}
+//void FunctionBuilder::int_(uint64_t value) {
+//    insert({
+//        .opcode = runtime::OpcodeInt,
+//        .operand_int = value,
+//    });
+//}
+//
+//void FunctionBuilder::float_(double value) {
+//    insert({
+//        .opcode = runtime::OpcodeFloat,
+//        .operand_float = value,
+//    });
+//}
+//
+//void FunctionBuilder::cell(runtime::Cell* cell) {
+//    insert({
+//        .opcode = runtime::OpcodeCell,
+//        .operand_ptr = cell,
+//    });
+//}
 
 
 ref<runtime::Function> FunctionBuilder::build() {
@@ -199,7 +268,7 @@ ref<runtime::Function> FunctionBuilder::build() {
     for(auto& inst: function->code) {
         if (inst.opcode == runtime::OpcodeBr 
             || inst.opcode == runtime::OpcodeCondBr) {
-            inst.operand_int = labels[inst.operand_int];
+            inst.s = labels[inst.s];
         }
     }
 
@@ -221,7 +290,7 @@ void ModuleBuilder::add_function(ref<runtime::Function> function) {
     module->functions[id] = function;
 }
 
-uint64_t ModuleBuilder::get_func_name_id(const std::string& name) {
+uint16_t ModuleBuilder::get_func_name_id(const std::string& name) {
     if (module->name_mapping.contains(name)) {
         return module->name_mapping[name];
     }
@@ -230,6 +299,13 @@ uint64_t ModuleBuilder::get_func_name_id(const std::string& name) {
     module->functions.resize(id + 1);
     return id;
 }
+
+uint16_t ModuleBuilder::push_constant(runtime::Value value) {
+    uint16_t idx = module->constants.size();
+    module->constants.push_back(value);
+    return idx;
+}
+
 
 ref<runtime::Module> ModuleBuilder::link() {
     return module;

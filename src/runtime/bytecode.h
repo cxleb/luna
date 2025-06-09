@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../shared/utils.h"
+#include "runtime/value.h"
 
 #include <cstdint>
 #include <vector>
@@ -9,6 +10,7 @@
 
 namespace luna::runtime {
 
+// Instructions are 32 bit have eiter 3 8-bit operands or 1 8-bit and 1 16-bit
 enum Opcode {
     // Control Flow
     OpcodeBr,
@@ -19,37 +21,40 @@ enum Opcode {
     OpcodeCallHost, // Calls a native function
     OpcodeRet,
     // Memory
-    OpcodeStore,
-    OpcodeLoad,
-    OpcodeObjectCreate,
-    OpcodeObjectSet,
-    OpcodeObjectGet,
+    OpcodeStore, // local[s] = r[a]
+    OpcodeLoad, // r[a] = local[s]
+    OpcodeObjectNew, // r[a] = new object
+    OpcodeObjectSet, // r[a][r[b]] = r[c] 
+    OpcodeObjectGet, // r[a] = r[b][r[c]]
 
     // Numeric
-    OpcodeAdd,
-    OpcodeSub,
-    OpcodeMul,
-    OpcodeDiv,
-    OpcodeEq,
-    OpcodeNotEq,
-    OpcodeGr,
-    OpcodeLess,
-    OpcodeGrEq,
-    OpcodeLessEq,
+    OpcodeAdd, // r[c] = r[a] + r[b]
+    OpcodeSub, // r[c] = r[a] + r[b]
+    OpcodeMul, // r[c] = r[a] + r[b]
+    OpcodeDiv, // r[c] = r[a] + r[b]
+    OpcodeEq, // r[c] = r[a] + r[b]
+    OpcodeNotEq, // r[c] = r[a] + r[b]
+    OpcodeGr, // r[c] = r[a] + r[b]
+    OpcodeLess,  // r[c] = r[a] + r[b]
+    OpcodeGrEq, // r[c] = r[a] + r[b]
+    OpcodeLessEq, // r[c] = r[a] + r[b]
 
     // Values
-    OpcodeInt,
-    OpcodeFloat,
-    OpcodeCell,
+    OpcodeLoadConst, // r[a] = const[b]
+    OpcodeInt,  // r[a] = i
+    OpcodeFloat,  // r[a] = i
+    OpcodeCell, // r[a] = i
 };
 
 struct Inst {
-    uint32_t opcode;
+    uint8_t opcode;
+    uint8_t a;
     union {
-        uint64_t operand_int;
-        double operand_float;
-        bool operand_boolean;
-        void* operand_ptr;
+        uint16_t s;
+        struct {
+            uint8_t b;
+            uint8_t c;
+        };
     };
 };
 
@@ -62,6 +67,7 @@ struct Function {
 struct Module {
     std::unordered_map<std::string, uint64_t> name_mapping;
     std::vector<ref<Function>> functions;
+    std::vector<Value> constants;
 };
 
 }

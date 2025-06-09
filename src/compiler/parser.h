@@ -19,15 +19,18 @@ public:
     ErrorOr<ref<Stmt>> parse_return();
     ErrorOr<ref<Stmt>> parse_block();
     ErrorOr<ref<Stmt>> parse_var();
-    ErrorOr<ref<Stmt>> parse_stmt_ident();
+    ErrorOr<ref<Stmt>> parse_expr_stmt();
     ErrorOr<ref<Expr>> parse_expr();
     ErrorOr<ref<Expr>> parse_primary_expr();
     ErrorOr<ref<Expr>> parse_ident();
     ErrorOr<ref<Expr>> parse_number();
     ErrorOr<ref<Expr>> parse_string();
+    ErrorOr<ref<Expr>> parse_object_literal();
+    ErrorOr<ref<Expr>> parse_array_literal();
     u8 parse_prec(Token token);
     ErrorOr<BinaryExpr::Kind> parse_bin_op_kind(Token token);
     ErrorOr<ref<Expr>> parse_bin_expr(u8 prec);
+    ErrorOr<ref<Expr>> parse_left_hand_side_expr();
     //ast::Type parse_type(Lexer& lexer);
 private:
     Lexer lexer;

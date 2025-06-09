@@ -1,4 +1,5 @@
 #include "ast.h"
+#include <sys/syslimits.h>
 
 namespace luna::compiler {
 
@@ -14,16 +15,8 @@ VarDecl::VarDecl() {
     kind = KindVarDecl;
 }
 
-Call::Call() {
-    kind = KindCall;
-}
-
 Block::Block() {
     kind = KindBlock;
-}
-
-Assign::Assign() {
-    kind = KindAssign;
 }
 
 While::While() {
@@ -34,6 +27,10 @@ For::For() {
     kind = KindFor;
 }
 
+ExprStmt::ExprStmt() {
+    kind = KindExprStmt;
+}
+
 BinaryExpr::BinaryExpr() {
     kind = KindBinaryExpr;
 }
@@ -42,8 +39,16 @@ Unary::Unary() {
     kind = KindUnary;
 }
 
-CallExpr::CallExpr() {
-    kind = KindCallExpr;
+Call::Call() {
+    kind = KindCall;
+}
+
+Assign::Assign() {
+    kind = KindAssign;
+}
+
+Lookup::Lookup() {
+    kind = KindLookup;
 }
 
 Identifier::Identifier() {
@@ -60,6 +65,14 @@ Float::Float() {
 
 String::String() {
     kind = KindString;
+}
+
+ArrayLiteral::ArrayLiteral() {
+    kind = KindArrayLiteral;
+}
+
+ObjectLiteral::ObjectLiteral() {
+    kind = KindObjectLiteral;
 }
 
 }

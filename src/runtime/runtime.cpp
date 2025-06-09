@@ -17,7 +17,7 @@ void Runtime::op_result_error(OpResult result, Value a, Value b) {
 void Runtime::exec(ref<Module> module) {
     uint64_t base = 0;
 
-    auto load_function = [&] (uint64_t id) {
+    auto load_function = [&] (uint16_t id) {
         auto function = module->functions[id].get();
         frames.push({
             .code = function->code.data(),
@@ -34,28 +34,25 @@ void Runtime::exec(ref<Module> module) {
     load_function(main_func_id);
 
     while(true) {
-        auto& frame = frames.peak();
+        auto& frame = frames.peek();
         auto inst = frame.code[frame.ip++];
         switch (inst.opcode) {
             case OpcodeBr: {
-                frame.ip = inst.operand_int;
+                frame.ip = inst.s;
                 break;
             }
             case OpcodeCondBr: {
-                auto a = stack.pop();
-                if (value_truthy(a)) {
-                    frame.ip = inst.operand_int;
+                if (value_truthy(registers[inst.a])) {
+                    frame.ip = inst.s;
                 }
                 break;
             }
             case OpcodeCall: {
-                load_function(inst.operand_int);
+                load_function(inst.s);
                 break;
             }
             case OpcodeCallHost: {
-                auto id = inst.operand_int & 0xFFFFFFFF;
-                auto nargs = inst.operand_int >> 32;
-                environment->invoke_function(this, id, nargs);
+                environment->invoke_function(this, inst.s, inst.a);
                 break;
             }
             case OpcodeRet: {
@@ -67,145 +64,149 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeStore: {
-                locals[base + inst.operand_int] = stack.pop();
+                locals[base + inst.s] = registers[inst.a];
                 break;
             }
             case OpcodeLoad: {
-                stack.push(locals[base + inst.operand_int]);
+                registers[inst.a] = locals[base + inst.b];
                 break;
             }
             case OpcodeAdd: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_add(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeSub: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_sub(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeMul: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_mul(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeDiv: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_div(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeEq: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_eq(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeNotEq: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_neq(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeGr: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_gr(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeLess: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_less(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeGrEq: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_gr_eq(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
             case OpcodeLessEq: {
-                auto b = stack.pop();
-                auto a = stack.pop();
+                auto a = registers[inst.a];
+                auto b = registers[inst.b];
 
                 auto result = value_less_eq(a, b);
                 if (result.not_valid) {
                     op_result_error(result, a, b);
                 } 
-                stack.push(result.value);
+                registers[inst.c] = result.value;
 
                 break;
             }
-            case OpcodeCell: {
-                stack.push((Cell*)inst.operand_ptr);
+            case OpcodeLoadConst: {
+                registers[inst.a] = module->constants[inst.s];
                 break;
             }
-            case OpcodeInt: {
-                stack.push((int64_t)inst.operand_int);
-                break;
-            }
-            case OpcodeFloat: {
-                stack.push(inst.operand_float);
-                break;
-            }
+            //case OpcodeCell: {
+            //    stack.push((Cell*)inst.operand_ptr);
+            //    break;
+            //}
+            //case OpcodeInt: {
+            //    stack.push((int64_t)inst.operand_int);
+            //    break;
+            //}
+            //case OpcodeFloat: {
+            //    stack.push(inst.operand_float);
+            //    break;
+            //}
         }
     }
 }

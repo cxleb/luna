@@ -11,20 +11,23 @@ namespace luna::compiler {
     D(If) \
     D(Return) \
     D(VarDecl) \
-    D(Assign) \
     D(While) \
     D(For) \
-    D(Call) \
-    D(Block)
+    D(Block) \
+    D(ExprStmt) \
     
 #define EXPR_NODES(D) \
     D(BinaryExpr) \
     D(Unary) \
-    D(CallExpr) \
+    D(Assign) \
+    D(Call) \
     D(Integer) \
     D(Float) \
     D(String) \
-    D(Identifier)
+    D(Identifier) \
+    D(Lookup) \
+    D(ArrayLiteral) \
+    D(ObjectLiteral)
 
 class Node {
 public:
@@ -95,24 +98,10 @@ public:
     ref<Expr> value;
 };
 
-class Call : public Stmt {
-public:
-    Call();
-    std::string name;
-    std::vector<ref<Expr>> args;
-};
-
 class Block : public Stmt {
 public:
     Block();
     std::vector<ref<Stmt>> stmts;
-};
-
-class Assign : public Stmt {
-public:
-    Assign();
-    std::string name;
-    ref<Expr> value;
 };
 
 class While : public Stmt {
@@ -128,6 +117,12 @@ public:
     std::string name;
     ref<Expr> iterator;
     ref<Stmt> loop;
+};
+
+class ExprStmt : public Stmt {
+public:
+    ExprStmt();
+    ref<Expr> expr;
 };
 
 // Expressions
@@ -156,16 +151,43 @@ class Unary : public Expr {
     ref<Expr> expr;
 };
 
-class CallExpr : public Expr {
+class Call : public Expr {
 public:
-    CallExpr();
-    Call call;
+    Call();
+    std::string name;
+    std::vector<ref<Expr>> args;
+};
+
+class Assign : public Expr {
+public:
+    Assign();
+    ref<Expr> local;
+    ref<Expr> value;
 };
 
 class Identifier : public Expr {
 public:
     Identifier();
     std::string name;
+};
+
+class Lookup : public Expr {
+public:
+    Lookup();
+    ref<Expr> expr;
+    ref<Expr> index;
+};
+
+class ObjectLiteral : public Expr {
+public:
+    ObjectLiteral();
+    std::vector<ref<Expr>> elements;
+};
+
+class ArrayLiteral : public Expr {
+public:
+    ArrayLiteral();
+    std::vector<ref<Expr>> elements;
 };
 
 class Integer : public Expr {
