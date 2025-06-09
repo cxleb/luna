@@ -33,7 +33,7 @@ ErrorOr<ref<Module>> Parser::parse_module() {
 
     return module;
 }
-
+    
 ErrorOr<ref<Func>> Parser::parse_func() {
     luna_assert(TRY(lexer.test("func")));
     lexer.expect(TokenIdentifier);
@@ -73,8 +73,6 @@ ErrorOr<ref<Stmt>> Parser::parse_stmt() {
         return parse_var();
     } else if (TRY(lexer.test("const"))) {
         return parse_var();
-    } else if (TRY(lexer.test(TokenIdentifier))) {
-        return parse_stmt_ident();
     } else {
         return parse_expr_stmt();
     }
@@ -146,7 +144,6 @@ ErrorOr<ref<Stmt>> Parser::parse_var() {
     return static_ref_cast<Stmt>(stmt);
 }
 
-        auto token = TRY(lexer.peek());
 ErrorOr<ref<Stmt>> Parser::parse_expr_stmt() {
     auto expr_stmt = make_ref<ExprStmt>();
     expr_stmt->expr = TRY(parse_expr());

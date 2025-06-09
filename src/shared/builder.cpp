@@ -23,7 +23,6 @@ void FunctionBuilder::pop_scope() {
 }
 
 void FunctionBuilder::create_local(const std::string& name) {
-    scopes.peak().insert({
     scopes.peek().insert({
         name,
         function->locals++,
