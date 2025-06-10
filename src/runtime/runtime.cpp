@@ -6,7 +6,6 @@
 #include <_stdio.h>
 #include <cassert>
 #include <cstdint>
-#include <thread>
 
 namespace luna::runtime {
 
@@ -48,13 +47,12 @@ void Runtime::exec(ref<Module> module) {
 
     auto main_func_id = module->name_mapping["main"];
     load_function(main_func_id, 0);
-    
+
     while(true) {
         auto& frame = frames.peek();
         //printf("%llx [%llu] ", (uint64_t)frame.code, frame.ip);
         auto inst = frame.code[frame.ip++];
         //dump_inst(inst);
-        //std::this_thread::sleep_for(16ms);
         switch (inst.opcode) {
             case OpcodeBr: {
                 frame.ip = inst.s;
