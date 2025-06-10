@@ -42,9 +42,6 @@ enum Opcode {
 
     // Values
     OpcodeLoadConst, // r[a] = const[b]
-    OpcodeInt,  // r[a] = i
-    OpcodeFloat,  // r[a] = i
-    OpcodeCell, // r[a] = i
 };
 
 struct Inst {

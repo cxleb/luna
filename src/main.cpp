@@ -5,12 +5,16 @@
 #include "compiler/gen.h"
 
 #include "runtime/runtime.h"
+#include <_abort.h>
 #include <cstdio>
 
 void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     for(auto i = nargs; i > 0; i--) {
         auto value = args[i - 1];
         switch (value.type) {    
+        case luna::runtime::TypeNull:
+            printf("Null ");
+            break;
         case luna::runtime::TypeInt:
             printf("%lld ", value.value_int);
             break;
@@ -66,11 +70,11 @@ int main(int argc, const char** argv) {
     }
     printf("done\ngenerating byte code... "); fflush(stdout);
     auto runtime_module = gen.generate(module.value(), &env);
-    //luna::runtime::dump_module(runtime_module);
+    luna::runtime::dump_module(runtime_module);
     printf("done\nstarting runtime... "); fflush(stdout);
     luna::runtime::Runtime runtime(&env);
     printf("done\nexecuting.\n"); fflush(stdout);
     runtime.exec(runtime_module);
-    
+
     return 0;
 }

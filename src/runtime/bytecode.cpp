@@ -33,6 +33,18 @@ void dump_inst(Inst inst) {
         printf("ret\n");
         break;
     }
+    case OpcodeObjectNew: {
+        printf("obj new %u\n", inst.a);
+        break;
+    }
+    case OpcodeObjectSet: {
+        printf("obj set %u[%u] = %u\n", inst.a, inst.b, inst.c);
+        break;
+    } 
+    case OpcodeObjectGet: {
+        printf("obj get %u = %u[%u]\n", inst.a, inst.b, inst.c);
+        break;
+    }
     case OpcodeMove: {
         printf("move %u %u\n", inst.a, inst.b);
         break;

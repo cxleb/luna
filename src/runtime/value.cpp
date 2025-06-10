@@ -1,5 +1,7 @@
 #include "value.h"
+#include "heap.h"
 #include <cmath>
+#include <functional>
 
 namespace luna::runtime {
 
@@ -185,6 +187,8 @@ bool value_truthy(Value a) {
 
 bool value_falsy(Value a) {
     switch (a.type) {
+        case TypeNull:
+            return true;
         case TypeInt:
             return a.value_int == 0;
         case TypeFloat:
@@ -194,6 +198,22 @@ bool value_falsy(Value a) {
         case TypeObject:
             return a.value_object == nullptr;
     }
+}
+
+uint64_t hash_value(Value a) {
+    switch (a.type) {
+        case TypeNull:
+            return 0;
+        case TypeInt:
+            return std::hash<int64_t>()(a.value_int);
+        case TypeFloat:
+            return std::hash<int64_t>()(a.value_float);
+        case TypeBool:
+            return std::hash<bool>()(a.value_float);
+        case TypeObject:
+            return a.value_object->hash();
+    }
+    return 0;
 }
 
 }

@@ -1,11 +1,12 @@
 #pragma once
 
+#include <functional>
 #include <cstdint>
-#include "heap.h"
 
 namespace luna::runtime {
 
 #define TYPES(A) \
+    A(Null) \
     A(Int) \
     A(Float) \
     A(Bool) \
@@ -19,8 +20,13 @@ enum Type {
 
 const char* get_name_for_type(Type type);
 
+// forward declare Cell from heap
+struct Cell;
+
 struct Value {
-    Value() = default;
+    Value() {
+        type = TypeNull;
+    }
     Value(Cell* cell) {
         value_object = cell;
         type = TypeObject;
@@ -46,6 +52,22 @@ struct Value {
         // not used yet
         Cell* value_object;
     };
+
+    bool operator==(const Value&& other) {
+        if (type != other.type) return false;
+        switch (type) {
+        case TypeNull:
+            return true;
+        case TypeInt:
+            return value_int == other.value_int;
+        case TypeFloat:
+            return value_float == other.value_float;
+        case TypeBool:
+            return value_boolean == other.value_boolean;
+        case TypeObject:
+            return value_object == other.value_object;
+        }
+    }
 };
 
 struct OpResult {
@@ -77,5 +99,13 @@ OpResult value_less(Value a, Value b);
 OpResult value_less_eq(Value a, Value b);
 bool value_truthy(Value a);
 bool value_falsy(Value a);
+uint64_t value_hash(Value a);
 
 }
+
+template<>
+struct std::hash<luna::runtime::Value> {
+    std::size_t operator()(const luna::runtime::Value& v) {
+        return value_hash(v);
+    }
+};

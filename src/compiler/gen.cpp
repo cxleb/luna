@@ -249,7 +249,10 @@ public:
     }
 
     uint8_t accept(ref<Lookup> lookup, std::optional<uint8_t> maybe_into) {
+        bool temp_is_assign = is_assign;
+        is_assign = false;
         auto expr = visit(lookup->expr, std::nullopt);
+        is_assign = temp_is_assign;
         auto idx = visit(lookup->index, std::nullopt);
         uint8_t into;
         if(is_assign) {

@@ -6,6 +6,7 @@
 #include <_stdio.h>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 
 namespace luna::runtime {
 
@@ -47,6 +48,8 @@ void Runtime::exec(ref<Module> module) {
 
     auto main_func_id = module->name_mapping["main"];
     load_function(main_func_id, 0);
+
+    printf("constants %zu\n", module->constants.size());
 
     while(true) {
         auto& frame = frames.peek();
@@ -96,6 +99,19 @@ void Runtime::exec(ref<Module> module) {
                     return;
                 }
                 base = popped_frame.prev_base;
+                break;
+            }
+            case OpcodeObjectNew: {
+                LOCAL_AT(inst.a) = environment->heap.alloc_object();
+                break;
+            }
+            case OpcodeObjectSet: {
+                auto a = LOCAL_AT(inst.a);
+                 
+                break;
+            } 
+            case OpcodeObjectGet: {
+                printf("obj get %u = %u[%u]\n", inst.a, inst.b, inst.c);
                 break;
             }
             case OpcodeMove: {
