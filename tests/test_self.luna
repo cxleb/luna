@@ -2,6 +2,10 @@ func returns10() {
     return 10;
 }
 
+func maths() {
+    return 10 / 3.333 > 2.5;
+}
+
 func main() {
     // integer math
     assert(10 + 10 == 20);
@@ -46,6 +50,7 @@ func main() {
     assert(11.0 <= 11.0);
 
     assert(returns10() == 10);
+    assert(maths());
 
     let a = 0;
     if a == 0 {

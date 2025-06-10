@@ -2,17 +2,14 @@
 #include "compiler/parser.h"
 #include "compiler/gen.h"
 
+#include "runtime/bytecode.h"
 #include "runtime/runtime.h"
 #include "runtime/value.h"
 
 
-void print(luna::runtime::Runtime* rt, uint64_t nargs) {
-    std::vector<luna::runtime::Value> values;
-    for(auto i = 0; i < nargs; i++) {
-        values.push_back(rt->pop_last_value());
-    }
+void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     for(auto i = nargs; i > 0; i--) {
-        auto value = values[i - 1];
+        auto value = args[i - 1];
         switch (value.type) {    
         case luna::runtime::TypeInt:
             printf("%lld ", value.value_int);
@@ -31,8 +28,8 @@ void print(luna::runtime::Runtime* rt, uint64_t nargs) {
     printf("\n");
 }
 
-void _assert(luna::runtime::Runtime* rt, uint64_t nargs) {
-    auto value = rt->pop_last_value();
+void _assert(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
+    auto value = args[0];
     if (value.type != luna::runtime::TypeBool) {
         printf("Expected bool value but got %s\n", 
             luna::runtime::get_name_for_type(value.type));
@@ -64,6 +61,7 @@ int main(int argc, const char** argv) {
     }
     auto runtime_module = gen.generate(module.value(), &env);
     luna::runtime::Runtime runtime(&env);
+    luna::runtime::dump_module(runtime_module);
     runtime.exec(runtime_module);
     
     return 0;

@@ -21,6 +21,7 @@ enum Opcode {
     OpcodeCall, // Calls another byte code function
     OpcodeCallHost, // Calls a native function
     OpcodeRet,
+    OpcodeRetVal, // retval = r[a]
     // Memory
     OpcodeMove, // r[a] = r[b]
     OpcodeObjectNew, // r[a] = new object
@@ -69,5 +70,8 @@ struct Module {
     std::vector<ref<Function>> functions;
     std::vector<Value> constants;
 };
+
+void dump_inst(Inst inst);
+void dump_module(ref<Module>);
 
 }

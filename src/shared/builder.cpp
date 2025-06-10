@@ -3,6 +3,7 @@
 #include "shared/environment.h"
 #include "shared/utils.h"
 #include <cstdint>
+#include <optional>
 #include <unordered_map>
 
 namespace luna {
@@ -47,16 +48,30 @@ std::optional<uint8_t> FunctionBuilder::get_local_id(const std::string& name) {
 
 uint8_t FunctionBuilder::alloc_temp() {
     // find first free temporary
-    for(auto i = 0; i < temporaries.size(); i++) {
-        if(!temporaries[i]) return i;
+    for (auto& temp: temporaries) {
+        if(temp.second == false) {
+            temp.second = true;
+            return temp.first;
+        }
     }
-    // TODO(caleb) handle error?
-    return 0;
+    // if we didnt get one then create one
+    uint8_t idx = function->locals++;
+    temporaries.insert({
+        idx,
+        true,
+    });
+    return idx;
+
+}
+
+void FunctionBuilder::free_temp_if_not_used(uint8_t temp, uint8_t local) {
+    if(temp != local) {
+        free_temp(temp);
+    }
 }
 
 void FunctionBuilder::free_temp(uint8_t id) {
-    // if its greater then 32 its a local variable
-    if (id < 32) {
+    if (temporaries.contains(id)) {
         temporaries[id] = false;
     }
 }
@@ -83,7 +98,7 @@ void FunctionBuilder::arg(uint8_t arg, uint8_t reg) {
     });
 }
 
-void FunctionBuilder::call(const std::string& function_name, uint8_t nargs) {
+void FunctionBuilder::call(const std::string& function_name, uint8_t nargs, uint8_t ret) {
     auto host_func_id = builder->get_env()->get_func_id(function_name);
     if (host_func_id.has_value()) {
         insert({
@@ -95,7 +110,7 @@ void FunctionBuilder::call(const std::string& function_name, uint8_t nargs) {
         auto id = builder->get_func_name_id(function_name);
         insert({
             .opcode = runtime::OpcodeCall,
-            .a = nargs,
+            .a = ret,
             .s = id,// | ( nargs << 32),
         });
     }
@@ -104,6 +119,13 @@ void FunctionBuilder::call(const std::string& function_name, uint8_t nargs) {
 void FunctionBuilder::ret() {
     insert({
         .opcode = runtime::OpcodeRet,
+    });
+}
+
+void FunctionBuilder::ret(uint8_t ret) {
+    insert({
+        .opcode = runtime::OpcodeRetVal,
+        .a = ret,
     });
 }
 
@@ -256,10 +278,11 @@ void FunctionBuilder::less_eq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 }
 
 void FunctionBuilder::load_const(uint8_t reg, runtime::Value value) {
+    auto idx = builder->push_constant(value);
     insert({
         .opcode = runtime::OpcodeLoadConst,
         .a = reg,
-        .s = 0,
+        .s = idx,
     });
 }
 

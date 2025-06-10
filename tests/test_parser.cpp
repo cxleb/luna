@@ -1,22 +1,21 @@
 #include "testing.h"
 #include "compiler/ast.h"
 #include "compiler/parser.h"
-#include <cstdio>
 
 using namespace luna::compiler;
 
-class TestingVisitor : public Visitor<TestingVisitor> {
-public:
-    void accept(ref<Expr> expr) {
-        printf("Visiting Expr\n");
-        // TEST_ASSERT(expr->value != 0);
-    }
-    void accept(ref<BinaryExpr> expr) {
-        printf("Visiting BinaryExpr\n");
-        // /TEST_ASSERT(expr->lhs != nullptr);
-        // TEST_ASSERT(expr->rhs != nullptr);
-    }
-};
+//class TestingVisitor : public Visitor<TestingVisitor> {
+//public:
+//    void accept(ref<Expr> expr) {
+//        printf("Visiting Expr\n");
+//        // TEST_ASSERT(expr->value != 0);
+//    }
+//    void accept(ref<BinaryExpr> expr) {
+//        printf("Visiting BinaryExpr\n");
+//        // /TEST_ASSERT(expr->lhs != nullptr);
+//        // TEST_ASSERT(expr->rhs != nullptr);
+//    }
+//};
 
 int main(const int argc, const char** argv) {
     // {

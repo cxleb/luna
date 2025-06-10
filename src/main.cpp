@@ -1,4 +1,4 @@
-#include "runtime/heap.h"
+#include "runtime/bytecode.h"
 #include "shared/environment.h"
 #include "shared/utils.h"
 
@@ -7,15 +7,10 @@
 
 #include "runtime/runtime.h"
 #include <cstdio>
-#include <vector>
 
-void print(luna::runtime::Runtime* rt, uint64_t nargs) {
-    std::vector<luna::runtime::Value> values;
-    for(auto i = 0; i < nargs; i++) {
-        values.push_back(rt->pop_last_value());
-    }
+void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     for(auto i = nargs; i > 0; i--) {
-        auto value = values[i - 1];
+        auto value = args[i - 1];
         switch (value.type) {    
         case luna::runtime::TypeInt:
             printf("%lld ", value.value_int);
@@ -72,6 +67,7 @@ int main(int argc, const char** argv) {
     }
     printf("done\ngenerating byte code... "); fflush(stdout);
     auto runtime_module = gen.generate(module.value(), &env);
+    //luna::runtime::dump_module(runtime_module);
     printf("done\nstarting runtime... "); fflush(stdout);
     luna::runtime::Runtime runtime(&env);
     printf("done\nexecuting.\n"); fflush(stdout);

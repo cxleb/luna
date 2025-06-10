@@ -228,6 +228,7 @@ public:
 class Module : public Node {
 public:
     std::vector<ref<Func>> funcs;
+    void dump();
 };
 
 // Visitor

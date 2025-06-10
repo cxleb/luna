@@ -3,6 +3,10 @@
 #include "runtime/value.h"
 #include "shared/environment.h"
 #include "shared/error.h"
+#include <_stdio.h>
+#include <cassert>
+#include <cstdint>
+#include <thread>
 
 namespace luna::runtime {
 
@@ -15,33 +19,42 @@ void Runtime::op_result_error(OpResult result, Value a, Value b) {
 }
 
 #define LOCAL_AT(i) locals[base + i]
+//#define LOCAL_AT(i) ({assert(base + i < top); locals[base + i];})
 
 void Runtime::exec(ref<Module> module) {
-    uint64_t base = 0;
+    using namespace std::chrono_literals;
 
-    auto load_function = [&] (uint16_t id) {
+    uint64_t base = 0;
+    uint64_t top = 0;
+
+    auto load_function = [&] (uint16_t id, uint8_t ret) {
         auto function = module->functions[id].get();
         frames.push({
             .code = function->code.data(),
             .ip = 0,
             .locals = function->locals,
+            .prev_base = base,
+            .ret = ret
         });
-        // 32 temps + locals is the size we need
-        // locals should already have an offset of 32 so we dont need to add it
-        // here
-        uint64_t needed_locals = base + function->locals;
+        uint64_t needed_locals = top + function->locals;
         if(locals.size() < needed_locals) {
             locals.resize(needed_locals);
         }
+        base = top;
+        top = needed_locals;
     };
+
     frames.clear();
 
     auto main_func_id = module->name_mapping["main"];
-    load_function(main_func_id);
-
+    load_function(main_func_id, 0);
+    
     while(true) {
         auto& frame = frames.peek();
+        //printf("%llx [%llu] ", (uint64_t)frame.code, frame.ip);
         auto inst = frame.code[frame.ip++];
+        //dump_inst(inst);
+        //std::this_thread::sleep_for(16ms);
         switch (inst.opcode) {
             case OpcodeBr: {
                 frame.ip = inst.s;
@@ -54,11 +67,29 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeCall: {
-                load_function(inst.s);
+                load_function(inst.s, inst.a);
                 break;
             }
             case OpcodeCallHost: {
-                environment->invoke_function(this, inst.s, inst.a);
+                environment->invoke_function(this, inst.s, &locals[top], inst.a);
+                break;
+            }
+            case OpcodeArg: {
+                auto needed_locals = top + inst.a;
+                if(locals.size() < needed_locals) {
+                    locals.resize(needed_locals);
+                }
+                locals[top + inst.a] = LOCAL_AT(inst.b);
+                break;
+            }
+            case OpcodeRetVal: {
+                return_value = LOCAL_AT(inst.a);
+                auto popped_frame = frames.pop();
+                if (frames.count() == 0) {
+                    return;
+                }
+                base = popped_frame.prev_base;
+                LOCAL_AT(popped_frame.ret) = return_value;
                 break;
             }
             case OpcodeRet: {
@@ -66,7 +97,7 @@ void Runtime::exec(ref<Module> module) {
                 if (frames.count() == 0) {
                     return;
                 }
-                base -= popped_frame.locals;
+                base = popped_frame.prev_base;
                 break;
             }
             case OpcodeMove: {
@@ -194,21 +225,9 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeLoadConst: {
-                LOCAL_AT(inst.a] = module->constants[inst.s);
+                LOCAL_AT(inst.a) = module->constants[inst.s];
                 break;
             }
-            //case OpcodeCell: {
-            //    stack.push((Cell*)inst.operand_ptr);
-            //    break;
-            //}
-            //case OpcodeInt: {
-            //    stack.push((int64_t)inst.operand_int);
-            //    break;
-            //}
-            //case OpcodeFloat: {
-            //    stack.push(inst.operand_float);
-            //    break;
-            //}
         }
     }
 }

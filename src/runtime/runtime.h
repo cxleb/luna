@@ -14,6 +14,8 @@ struct Frame {
     Inst* code;
     uint64_t ip;
     uint64_t locals;
+    uint64_t prev_base;
+    uint8_t ret;
 };
 
 class Runtime {
@@ -21,10 +23,11 @@ public:
     Runtime(Environment* env);
 
     void exec(ref<Module> module);
-    //inline Value pop_last_value() { return stack.pop(); }
-
+    
     bool value_equal(Value a, Value b);
     void op_result_error(OpResult result, Value a, Value b);
+    
+    Value return_value;
 private:
     Environment* environment;
     std::vector<Value> locals;

@@ -1,4 +1,5 @@
 #include "ast.h"
+#include <cstdio>
 #include <sys/syslimits.h>
 
 namespace luna::compiler {
@@ -73,6 +74,12 @@ ArrayLiteral::ArrayLiteral() {
 
 ObjectLiteral::ObjectLiteral() {
     kind = KindObjectLiteral;
+}
+
+void Module::dump() {
+    for(auto& func: funcs) {
+        printf("Func: %s\n", func->name.c_str());
+    }
 }
 
 }
