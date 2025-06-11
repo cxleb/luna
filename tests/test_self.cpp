@@ -11,6 +11,9 @@ void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t narg
     for(auto i = nargs; i > 0; i--) {
         auto value = args[i - 1];
         switch (value.type) {    
+        case luna::runtime::TypeNull:
+            printf("Null ");
+            break;    
         case luna::runtime::TypeInt:
             printf("%lld ", value.value_int);
             break;

@@ -53,7 +53,7 @@ struct Value {
         Cell* value_object;
     };
 
-    bool operator==(const Value&& other) {
+    bool operator==(const Value& other) const {
         if (type != other.type) return false;
         switch (type) {
         case TypeNull:
@@ -105,7 +105,7 @@ uint64_t value_hash(Value a);
 
 template<>
 struct std::hash<luna::runtime::Value> {
-    std::size_t operator()(const luna::runtime::Value& v) {
+    std::size_t operator()(const luna::runtime::Value& v) const {
         return value_hash(v);
     }
 };

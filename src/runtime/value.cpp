@@ -200,7 +200,7 @@ bool value_falsy(Value a) {
     }
 }
 
-uint64_t hash_value(Value a) {
+uint64_t value_hash(Value a) {
     switch (a.type) {
         case TypeNull:
             return 0;

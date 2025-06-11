@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include "runtime/bytecode.h"
+#include "runtime/heap.h"
 #include "runtime/value.h"
 #include "shared/environment.h"
 #include "shared/error.h"
@@ -107,12 +108,30 @@ void Runtime::exec(ref<Module> module) {
             }
             case OpcodeObjectSet: {
                 auto a = LOCAL_AT(inst.a);
-                 
+                auto key = LOCAL_AT(inst.b);
+                auto eq = LOCAL_AT(inst.c);
+                if (a.type == TypeObject) {
+                    auto cell = a.value_object;
+                    if (cell->kind != Cell::KindObject) {
+                        auto obj = static_cast<Object*>(cell);
+                        obj->set(key, eq);
+                    }
+                } 
                 break;
             } 
             case OpcodeObjectGet: {
-                printf("obj get %u = %u[%u]\n", inst.a, inst.b, inst.c);
-                break;
+                auto a = LOCAL_AT(inst.b);
+                auto key = LOCAL_AT(inst.c);
+                auto eq = Value();
+                if (a.type == TypeObject) {
+                    auto cell = a.value_object;
+                    if (cell->kind != Cell::KindObject) {
+                        auto obj = static_cast<Object*>(cell);
+                        eq = obj->get(key);
+                    }
+                } 
+                LOCAL_AT(inst.a) = eq;
+                break;  
             }
             case OpcodeMove: {
                 LOCAL_AT(inst.a) = LOCAL_AT(inst.b);
