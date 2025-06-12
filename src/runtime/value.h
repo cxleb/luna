@@ -22,6 +22,7 @@ const char* get_name_for_type(Type type);
 
 // forward declare Cell from heap
 struct Cell;
+struct Value;
 
 struct Value {
     Value() {
@@ -53,20 +54,11 @@ struct Value {
         Cell* value_object;
     };
 
+    bool eq(const Value& other) const;
+
     bool operator==(const Value& other) const {
-        if (type != other.type) return false;
-        switch (type) {
-        case TypeNull:
-            return true;
-        case TypeInt:
-            return value_int == other.value_int;
-        case TypeFloat:
-            return value_float == other.value_float;
-        case TypeBool:
-            return value_boolean == other.value_boolean;
-        case TypeObject:
-            return value_object == other.value_object;
-        }
+        //value_eq(this, &other);
+        return eq(other);
     }
 };
 
@@ -87,6 +79,7 @@ struct OpResult {
     Reason reason;
 };
 
+
 OpResult value_add(Value a, Value b);
 OpResult value_sub(Value a, Value b);
 OpResult value_mul(Value a, Value b);
@@ -100,6 +93,7 @@ OpResult value_less_eq(Value a, Value b);
 bool value_truthy(Value a);
 bool value_falsy(Value a);
 uint64_t value_hash(Value a);
+void value_print(Value a);
 
 }
 

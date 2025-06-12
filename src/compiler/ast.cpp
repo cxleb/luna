@@ -1,6 +1,5 @@
 #include "ast.h"
 #include <cstdio>
-#include <sys/syslimits.h>
 
 namespace luna::compiler {
 

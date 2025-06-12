@@ -4,7 +4,7 @@
 #include "runtime/value.h"
 #include "shared/environment.h"
 #include "shared/error.h"
-#include <_stdio.h>
+#include <stdio.h>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -23,7 +23,7 @@ void Runtime::op_result_error(OpResult result, Value a, Value b) {
 //#define LOCAL_AT(i) ({assert(base + i < top); locals[base + i];})
 
 void Runtime::exec(ref<Module> module) {
-    using namespace std::chrono_literals;
+    //using namespace std::chrono_literals;
 
     uint64_t base = 0;
     uint64_t top = 0;
@@ -77,7 +77,7 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeArg: {
-                auto needed_locals = top + inst.a;
+                auto needed_locals = top + inst.a + 1;
                 if(locals.size() < needed_locals) {
                     locals.resize(needed_locals);
                 }
@@ -112,7 +112,7 @@ void Runtime::exec(ref<Module> module) {
                 auto eq = LOCAL_AT(inst.c);
                 if (a.type == TypeObject) {
                     auto cell = a.value_object;
-                    if (cell->kind != Cell::KindObject) {
+                    if (cell->kind == Cell::KindObject) {
                         auto obj = static_cast<Object*>(cell);
                         obj->set(key, eq);
                     }
@@ -125,7 +125,7 @@ void Runtime::exec(ref<Module> module) {
                 auto eq = Value();
                 if (a.type == TypeObject) {
                     auto cell = a.value_object;
-                    if (cell->kind != Cell::KindObject) {
+                    if (cell->kind == Cell::KindObject) {
                         auto obj = static_cast<Object*>(cell);
                         eq = obj->get(key);
                     }

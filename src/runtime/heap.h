@@ -14,6 +14,7 @@ public:
         KindObject,
     } kind;
     virtual uint64_t hash() = 0;
+    virtual bool equal(Cell* other) = 0;
 };
 
 class String : public Cell {
@@ -21,6 +22,7 @@ public:
     String(const std::string& str);
     inline const char* c_str() { return m_string.c_str(); }
     virtual uint64_t hash() override;
+    virtual bool equal(Cell* other) override;
 private:
     std::string m_string;
 };
@@ -29,6 +31,7 @@ class Object : public Cell {
 public:
     Object();
     virtual uint64_t hash() override;
+    virtual bool equal(Cell* other) override;
     void set(Value key, Value eq);
     Value get(Value key);
 private:

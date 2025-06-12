@@ -1,3 +1,4 @@
+#include "runtime/value.h"
 #include "shared/environment.h"
 #include "shared/utils.h"
 
@@ -5,41 +6,12 @@
 #include "compiler/gen.h"
 
 #include "runtime/runtime.h"
-#include <_abort.h>
 #include <cstdio>
 
 void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     for(auto i = nargs; i > 0; i--) {
         auto value = args[i - 1];
-        switch (value.type) {    
-        case luna::runtime::TypeNull:
-            printf("Null ");
-            break;
-        case luna::runtime::TypeInt:
-            printf("%lld ", value.value_int);
-            break;
-        case luna::runtime::TypeFloat:
-            printf("%f ", value.value_float);
-            break;
-        case luna::runtime::TypeBool:
-            printf("%s ", value.value_boolean ? "true" : "false");
-            break;
-        case luna::runtime::TypeObject: {
-            auto* cell = value.value_object;
-            switch(cell->kind) {
-                case luna::runtime::Cell::KindString: {
-                    auto* str = static_cast<luna::runtime::String*>(cell);
-                    printf("%s ", str->c_str());
-                    break;
-                }
-                case luna::runtime::Cell::KindObject: {
-                    printf("<obj> ");
-                    break;
-                }
-            }
-            break;
-        }
-        }
+        luna::runtime::value_print(value);
     }
     printf("\n");
 }
