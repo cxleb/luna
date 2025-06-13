@@ -1,3 +1,4 @@
+#include <cstring>
 #include "testing.h"
 #include "compiler/lexer.h"
 

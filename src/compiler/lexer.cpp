@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include <cstring>
 #include "../shared/error.h"
 
 namespace luna::compiler {
