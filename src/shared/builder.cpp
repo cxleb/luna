@@ -353,6 +353,13 @@ uint16_t ModuleBuilder::get_func_name_id(const std::string& name) {
 }
 
 uint16_t ModuleBuilder::push_constant(runtime::Value value) {
+    uint16_t i = 0;
+    for (auto& c: module->constants) {
+        if (value == c) {
+            return i;
+        }
+        ++i;
+    }
     uint16_t idx = module->constants.size();
     module->constants.push_back(value);
     return idx;
