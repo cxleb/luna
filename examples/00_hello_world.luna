@@ -1,3 +1,10 @@
+// Unlike lua, python, javascript, etc, all luna code must run in a function
+//
+// Luna is designed to be embedded into a another program, there is a cli 
+// embedding which lets you run code from the command line for convience 
+//
+// the cli embedding will call the main function first.
 func main() {
+    // the cli embedding also implements "print" to output to stdout
     print("Hello, World!");
 }
