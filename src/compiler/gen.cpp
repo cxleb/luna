@@ -3,7 +3,6 @@
 #include "runtime/value.h"
 #include "shared/builder.h"
 #include "shared/environment.h"
-#include "shared/stack.h"
 #include <optional>
 #include <sys/types.h>
 
@@ -12,7 +11,6 @@ namespace luna::compiler {
 class GenVisitor {
     friend class Gen;
     bool is_assign;
-    luna::Stack<uint8_t> temp_stack;
 
     uint8_t visit(ref<Expr> expr, std::optional<uint8_t> into) {
         switch(expr->kind) {
@@ -295,8 +293,13 @@ ref<runtime::Module> Gen::generate(ref<Module> module, Environment* env) {
 
     for(auto func: module->funcs) {
         FunctionBuilder builder = module_builder.new_function(func->name);
+        builder.push_scope();
+        for(auto& param : func->params) {
+            builder.create_local(param.name);
+        }
         GenVisitor visitor(&builder, env);
         visitor.visit(func->root);
+        builder.pop_scope();
         module_builder.add_function(builder.build());
     }
 

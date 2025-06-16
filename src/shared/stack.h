@@ -113,7 +113,7 @@ private:
         if (new_size == 0) { new_size = 4; }
         auto new_data = new T[new_size];
         if (size != 0) {
-            std::memcpy(new_data, data, size);
+            std::memcpy(new_data, data, size * sizeof(T));
             remove();
         }
         size = new_size;

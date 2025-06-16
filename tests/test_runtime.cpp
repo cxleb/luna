@@ -3,7 +3,6 @@
 #include "shared/builder.h"
 #include "shared/environment.h"
 #include "testing.h"
-#include <cstdio>
 
 using namespace luna::runtime;
 
@@ -16,7 +15,6 @@ using namespace luna::runtime;
     Runtime runtime(&env); \
     runtime.exec(module_builder.get_module()); \
     auto last = runtime.return_value; \
-    printf("ret val = %lld\n", last.value_int); \
     TEST_ASSERT(last.type != expected_value.type); \
     TEST_ASSERT(last.value_int != expected_value.value_int); \
 } 

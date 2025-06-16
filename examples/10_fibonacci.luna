@@ -1,0 +1,15 @@
+func fibonacci(n) {
+    if n <= 1 {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    }
+}
+
+func main() {
+    let a = 0;
+    while a < 20 {
+        print(fibonacci(a));
+        a = a + 1;
+    }
+}

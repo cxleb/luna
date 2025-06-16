@@ -6,6 +6,18 @@ func maths() {
     return 10 / 3.333 > 2.5;
 }
 
+func add(a, b) {
+    return a + b;
+}
+
+func fibonacci(n) {
+    if n <= 1 {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    }
+}
+
 func main() {
     // integer math
     assert(10 + 10 == 20);
@@ -51,6 +63,8 @@ func main() {
 
     assert(returns10() == 10);
     assert(maths());
+    assert(add(10, 10) == 20);
+    assert(fibonacci(10) == 55)
 
     let a = 0;
     if a == 0 {
