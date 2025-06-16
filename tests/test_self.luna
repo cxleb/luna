@@ -64,7 +64,7 @@ func main() {
     assert(returns10() == 10);
     assert(maths());
     assert(add(10, 10) == 20);
-    assert(fibonacci(10) == 55)
+    assert(fibonacci(10) == 55);
 
     let a = 0;
     if a == 0 {
