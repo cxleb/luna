@@ -1,12 +1,16 @@
-func maths() {
-    return 10 / 3.333 > 2.5;
+func repeat(a, b) {
+    let c = 0;
+    while a > c {
+        print(b);
+        c = c + 1;
+    }
+}
+
+func add(a, b) {
+    return a + b;
 }
 
 func main() {
-    print(maths());
-    let a = 0;
-    while a < 10 {
-        a = a + 1;
-        print(a);
-    }
+    print(add(10, 20));
+    repeat(10, "Hello, World!");
 }
