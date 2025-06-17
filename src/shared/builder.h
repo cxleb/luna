@@ -34,6 +34,7 @@ public:
     void ret(uint8_t ret);
     void br(uint16_t label);
     void condbr(uint8_t reg, uint16_t label);
+    void move(uint8_t a, uint8_t b);
     void store(uint8_t reg, const std::string& name);
     void load(uint8_t reg, const std::string& name);
     void object_new(uint8_t reg);

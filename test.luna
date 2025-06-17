@@ -1,0 +1,8 @@
+func main() {
+    let va = 10;
+    let vb = va;
+    //b = a = 11;
+    print(va == 10);
+    print(vb);
+    print(vb == 10);
+}

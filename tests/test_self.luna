@@ -67,38 +67,45 @@ func main() {
     assert(add(10, 10) == 20);
     assert(fibonacci(10) == 55);
 
-    // some control flow
-    let a = 0;
-    if a == 0 {
-        a = 10;
-    } else {
-        a = 11;
-    }
-    assert(a == 10);
-
-    let b = 0;
-    if b != 0 {
-        b = 10;
-    } else {
-        b = 11;
-    }
+    // variables
+    let a = 10;
+    let b = va;
+    b = a = 11;
+    assert(a == 11);
     assert(b == 11);
 
-    // loops
+    // some control flow
     let c = 0;
-    while c < 10 {
-        c = c + 1;
+    if c == 0 {
+        c = 10;
+    } else {
+        c = 11;
     }
     assert(c == 10);
 
+    let d = 0;
+    if d != 0 {
+        d = 10;
+    } else {
+        d = 11;
+    }
+    assert(d == 11);
+
+    // loops
+    let e = 0;
+    while e < 10 {
+        e = e + 1;
+    }
+    assert(e == 10);
+
     // arrays
-    let d = [];
-    d[0] = 0;
-    d[1] = 10;
-    d[2] = 20;
-    d["thirty"] = 30;
-    assert(d[0] == 0);
-    assert(d[1] == 10);
-    assert(d[2] == 20);
-    assert(d["thirty"] == 30);
+    let f = [];
+    f[0] = 0;
+    f[1] = 10;
+    f[2] = 20;
+    f["thirty"] = 30;
+    assert(f[0] == 0);
+    assert(f[1] == 10);
+    assert(f[2] == 20);
+    assert(f["thirty"] == 30);
 }

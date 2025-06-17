@@ -41,6 +41,15 @@ class GenVisitor {
         return builder->alloc_temp();
     }
 
+    bool push_is_assign(bool new_is_assign) {
+        auto old_is_assign = is_assign;
+        is_assign = new_is_assign;
+        return old_is_assign;
+    }
+
+    void pop_is_assign(bool old_is_assign) {
+        is_assign = old_is_assign;
+    } 
 public:
     GenVisitor(FunctionBuilder* b, Environment* e): builder(b), env(e), is_assign(false) {}
 
@@ -55,10 +64,9 @@ public:
         auto end_label = builder->new_label();
         auto body_label = builder->new_label();
         
-        auto temp = builder->alloc_temp();
-        auto cond = visit(stmt->condition, temp);
+        auto cond = visit(stmt->condition, std::nullopt);
         builder->condbr(cond, body_label);
-        builder->free_temp(temp);
+        builder->free_temp(cond);
 
         if (stmt->else_stmt != nullptr) {
             visit(stmt->else_stmt);
@@ -96,10 +104,9 @@ public:
         auto end_label = builder->new_label();
         
         builder->mark_label(start_label);
-        auto temp = builder->alloc_temp();
-        auto cond = visit(stmt->condition, temp);
+        auto cond = visit(stmt->condition, std::nullopt);
         builder->condbr(cond, body_label);
-        builder->free_temp(temp);
+        builder->free_temp(cond);
         builder->br(end_label);
         builder->mark_label(body_label);
         visit(stmt->loop);
@@ -184,12 +191,11 @@ public:
         //printf("Visiting assign\n");
         //auto temp = builder->alloc_temp();
         auto into = maybe_alloc_temp(maybe_into);
-        visit(assign->value, into);
-        auto temp_is_assign = is_assign;
-        is_assign = true;
+        into = visit(assign->value, into);
+        auto old = push_is_assign(true);
         auto local = visit(assign->local, into);
-        is_assign = temp_is_assign;
-        builder->free_temp(local);
+        pop_is_assign(old);
+        builder->free_temp(into);
         return local;
     }
     
@@ -241,8 +247,13 @@ public:
             builder->store(*into, ident->name);
             return *into;
         } else {
-            auto id = builder->get_local_id(ident->name);
-            return *id;
+            if (into.has_value()) {
+                builder->load(*into, ident->name);
+                return *into;
+            } else {
+                auto id = builder->get_local_id(ident->name);
+                return *id;
+            }
         }
     }
 

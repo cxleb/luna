@@ -144,6 +144,15 @@ void FunctionBuilder::condbr(uint8_t reg, uint16_t label) {
     });
 }
 
+void FunctionBuilder::move(uint8_t a, uint8_t b) {
+    insert({
+        .opcode = runtime::OpcodeMove,
+        .a = a,
+        .b = b,
+    });
+}
+
+
 void FunctionBuilder::store(uint8_t reg, const std::string& name) {
     auto id = get_local_id(name);
     insert({
