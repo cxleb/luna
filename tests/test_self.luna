@@ -69,7 +69,7 @@ func main() {
 
     // variables
     let a = 10;
-    let b = va;
+    let b = a;
     b = a = 11;
     assert(a == 11);
     assert(b == 11);
@@ -121,4 +121,13 @@ func main() {
     assert(g[10] == 12);
     assert(h == 12);
     assert(g[10] == h);
+
+    // Assignments in control flow
+    a = 0;
+    b = 10;
+    if a = b {
+        b = 11;
+    }
+    assert(a == 10);
+    assert(b == 11);
 }

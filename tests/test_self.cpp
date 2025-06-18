@@ -10,23 +10,7 @@
 void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     for(auto i = nargs; i > 0; i--) {
         auto value = args[i - 1];
-        switch (value.type) {    
-        case luna::runtime::TypeNull:
-            printf("Null ");
-            break;    
-        case luna::runtime::TypeInt:
-            printf("%lld ", value.value_int);
-            break;
-        case luna::runtime::TypeFloat:
-            printf("%f ", value.value_float);
-            break;
-        case luna::runtime::TypeBool:
-            printf("%s ", value.value_boolean ? "true" : "false");
-            break;
-        case luna::runtime::TypeObject:
-            printf("<obj> ");
-            break;
-        }
+        luna::runtime::value_print(value);
     }
     printf("\n");
 }
