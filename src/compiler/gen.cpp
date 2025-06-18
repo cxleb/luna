@@ -201,15 +201,14 @@ public:
     
     uint8_t accept(ref<Call> call, std::optional<uint8_t> maybe_into) {
         //printf("Visiting call\n");
-        uint8_t temp = builder->alloc_temp();
         uint8_t n = 0;
         for(auto arg: call->args) {
             // this might use the temp
             // which is why we need to make the copy using the returned index
-            auto a = visit(arg, temp);
+            auto a = visit(arg, std::nullopt);
             builder->arg(n++, a);
+            builder->free_temp(a);
         }
-        builder->free_temp(temp);
         auto into = maybe_alloc_temp(maybe_into);
         builder->call(call->name, call->args.size(), into);
         return into;
