@@ -59,7 +59,7 @@ public:
 private:
     ModuleBuilder* builder;
     uint16_t label_counter;
-    std::vector<uint8_t> labels;
+    std::vector<uint16_t> labels;
     std::unordered_map<uint8_t, bool> temporaries;
     luna::Stack<std::unordered_map<std::string, uint64_t>> scopes;
     ref<runtime::Function> function;
