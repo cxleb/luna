@@ -77,7 +77,7 @@ int main(int argc, const char** argv) {
         // this time using a condbr
         builder.load_const(lhs, (int64_t)10);
         auto label = builder.new_label();
-        builder.load_const(rhs, true);
+        builder.load_const(rhs, false);
         builder.condbr(rhs, label);
         builder.load_const(rhs, (int64_t)10);
         builder.add(lhs, rhs, lhs);
@@ -95,7 +95,7 @@ int main(int argc, const char** argv) {
         // tests a condbr can fail
         builder.load_const(lhs, (int64_t)10);
         auto label = builder.new_label();
-        builder.load_const(rhs, false);
+        builder.load_const(rhs, true);
         builder.condbr(rhs, label);
         builder.load_const(rhs, (int64_t)10);
         builder.add(lhs, rhs, lhs);

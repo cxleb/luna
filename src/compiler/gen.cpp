@@ -67,13 +67,15 @@ public:
         auto cond = visit(stmt->condition, std::nullopt);
         builder->condbr(cond, body_label);
         builder->free_temp(cond);
-
-        if (stmt->else_stmt != nullptr) {
-            visit(stmt->else_stmt);
-        }
-        builder->br(end_label);
-        builder->mark_label(body_label);
         visit(stmt->then_stmt);
+        if (stmt->else_stmt != nullptr) {
+            // we only need this branch if we have an else statement
+            builder->br(end_label);
+            builder->mark_label(body_label);
+            visit(stmt->else_stmt);
+        } else {
+            builder->mark_label(body_label);
+        }
         builder->mark_label(end_label);
     }
     
@@ -95,20 +97,13 @@ public:
     }
     
     void accept(ref<While> stmt) {
-        //printf("Visiting while\n");
-
-        //printf("Visiting if\n");
-        //if (stmt->)
         auto start_label = builder->new_label();
-        auto body_label = builder->new_label();
         auto end_label = builder->new_label();
         
         builder->mark_label(start_label);
         auto cond = visit(stmt->condition, std::nullopt);
-        builder->condbr(cond, body_label);
+        builder->condbr(cond, end_label);
         builder->free_temp(cond);
-        builder->br(end_label);
-        builder->mark_label(body_label);
         visit(stmt->loop);
         builder->br(start_label);
         builder->mark_label(end_label);

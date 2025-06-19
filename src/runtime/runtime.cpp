@@ -63,7 +63,7 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeCondBr: {
-                if (value_truthy(LOCAL_AT(inst.a))) {
+                if (value_falsy(LOCAL_AT(inst.a))) {
                     frame.ip = inst.s;
                 }
                 break;
