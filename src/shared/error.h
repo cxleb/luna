@@ -28,13 +28,15 @@ private:
 Error error (const char* message, ...);
 Error verror (const char* message, va_list args);
 
-#define TRY(e) ({ \
-    auto v = e; \
-    if(v.is_error()) { \
-        return v.error(); \
-    } \
-    v.value(); \
-}) 
+//#define TRY(e) ({ \
+//    auto v = e; \
+//    if(v.is_error()) { \
+//        return v.error(); \
+//    } \
+//    v.value(); \
+//}) 
+
+#define CHECK(e) if(auto&& err = e; err.is_error()) { return err.error(); }
 
 template<typename T>
 class ErrorOr {

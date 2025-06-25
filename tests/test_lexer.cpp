@@ -6,13 +6,13 @@ using namespace luna::compiler;
 
 #define ASSERT_TOKEN(token, string, ki) \
     TEST_ASSERT(token.kind != ki); \
-    TEST_ASSERT(lexer.token_to_string(token).value() != string); \
+    TEST_ASSERT(lexer.token_to_string(token) != string); \
 
 #define TEST_SINGLE_TOKEN(string, ty) { \
     auto len = strlen(string); \
     Lexer lexer(to_source(string)); \
     auto token = lexer.next(); \
-    ASSERT_TOKEN(token.value(), string, ty); \
+    ASSERT_TOKEN(token, string, ty); \
     TEST_ASSERT(lexer.at != len); \
     TEST_ASSERT(lexer.col != len); \
 }
@@ -58,29 +58,29 @@ int main(const int argc, const char** argv) {
     // sequence of tokens is correct
     {
         Lexer lexer(to_source("ident1;1234"));
-        auto token = lexer.next().value();
+        auto token = lexer.next();
         ASSERT_TOKEN(token, "ident1", TokenIdentifier);
-        token = lexer.next().value();
+        token = lexer.next();
         ASSERT_TOKEN(token, ";", TokenSemiColon);
-        token = lexer.next().value();
+        token = lexer.next();
         ASSERT_TOKEN(token, "1234", TokenNumber);
     }
 
     // whitespace is correctly ignored
     {
         Lexer lexer(to_source(" \t\n\t  ident1  \t\t\t  ;   "));
-        auto token = lexer.next().value();
+        auto token = lexer.next();
         ASSERT_TOKEN(token, "ident1", TokenIdentifier);
-        token = lexer.next().value();
+        token = lexer.next();
         ASSERT_TOKEN(token, ";", TokenSemiColon);
     }
 
     // comments are correctly ignored
     {
         Lexer lexer(to_source("//this is a comment\nident1 // ident1 here is an identifier\n;"));
-        auto token = lexer.next().value();
+        auto token = lexer.next();
         ASSERT_TOKEN(token, "ident1", TokenIdentifier);
-        token = lexer.next().value();
+        token = lexer.next();
         ASSERT_TOKEN(token, ";", TokenSemiColon);
     }
 

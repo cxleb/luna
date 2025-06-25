@@ -7,6 +7,7 @@
 namespace luna::compiler {
 
 #define TOKENS(A) \
+    A(Unknown) \
     A(EndOfFile) \
     A(Caret) \
     A(Ampersand) \
@@ -62,16 +63,16 @@ struct Lexer {
 
     Lexer(std::vector<char>&& source);
     void eat_whitespace();
-    ErrorOr<Token> peek();
-    ErrorOr<Token> next();
+    Token peek();
+    Token next();
     // Returns true if the token is a float
     bool is_token_int_or_float(Token token);
-    ErrorOr<int> copy_token(char* buf, uint32_t size, Token token);
-    ErrorOr<double> token_to_float(Token token);
-    ErrorOr<uint64_t> token_to_int(Token token);
-    ErrorOr<std::string> token_to_string(Token token);
-    ErrorOr<bool> test(TokenKind kind);
-    ErrorOr<bool> test(const std::string& str);
+    int copy_token(char* buf, uint32_t size, Token token);
+    double token_to_float(Token token);
+    uint64_t token_to_int(Token token);
+    std::string token_to_string(Token token);
+    bool test(TokenKind kind);
+    bool test(const std::string& str);
     ErrorOr<Token> expect(TokenKind kind);
 };
 
