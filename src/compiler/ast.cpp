@@ -3,6 +3,22 @@
 
 namespace luna::compiler {
 
+
+Type::Type() {
+    is_unknown = true;
+}
+
+Type::Type(TypeKind k) {
+    is_unknown = false;
+    kind = k;
+}
+
+Type::Type(const std::string& str) {
+    is_unknown = false;
+    kind = TypeIdentifier;
+    name = str;
+}
+
 If::If() {
     kind = KindIf;
 }
@@ -57,14 +73,17 @@ Identifier::Identifier() {
 
 Integer::Integer() {
     kind = KindInteger;
+    type = Type(TypeIdentifier);
 }
 
 Float::Float() {
     kind = KindFloat;
+    type = Type(TypeNumber);
 }
 
 String::String() {
     kind = KindString;
+    type = Type(TypeString);
 }
 
 ArrayLiteral::ArrayLiteral() {

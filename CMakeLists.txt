@@ -15,6 +15,7 @@ set(luna_sources
     src/compiler/lexer.cpp
     src/compiler/ast.cpp
     src/compiler/parser.cpp
+    src/compiler/sema.cpp
     src/compiler/gen.cpp
     src/runtime/bytecode.cpp
     src/runtime/value.cpp

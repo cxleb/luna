@@ -426,19 +426,19 @@ ErrorOr<Type> Parser::parse_type() {
     token = lexer.next();
     if (token.kind == TokenIdentifier) {
         type.name = lexer.token_to_string(token);
-        type.kind = Type::TypeIdentifier;
+        type.kind = TypeIdentifier;
     } else {
         return parser_error(token, "Expected identifier when defining a type");
     }
 
     if (type.name == "string") {
-        type.kind = Type::TypeString;
+        type.kind = TypeString;
     } else if (type.name == "bool") {
-        type.kind = Type::TypeBool;
+        type.kind = TypeBool;
     } else if (type.name == "int") {
-        type.kind = Type::TypeInteger;
+        type.kind = TypeInteger;
     } else if (type.name == "number") {
-        type.kind = Type::TypeNumber;
+        type.kind = TypeNumber;
     }
 
     return type;

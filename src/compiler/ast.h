@@ -36,16 +36,20 @@ public:
 private:
 };
 
+enum TypeKind {
+    TypeNumber,
+    TypeInteger,
+    TypeString,
+    TypeBool,
+    TypeIdentifier,
+};
+
 class Type {
 public:
-    enum Kind {
-        TypeNumber,
-        TypeInteger,
-        TypeString,
-        TypeBool,
-        TypeIdentifier,
-    };
-    Kind kind;
+    Type();
+    Type(TypeKind);
+    Type(const std::string& str);
+    TypeKind kind;
     uint32_t array_count;
     std::string name;
     bool is_unknown;
@@ -67,7 +71,7 @@ public:
         EXPR_NODES(NAME)
         #undef NAME
     } kind;
-    //Type type;
+    Type type;
 };
 
 // Statements

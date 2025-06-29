@@ -22,7 +22,7 @@ int main(const int argc, const char** argv) {
         Parser parser(to_source("int"));
         auto type = parser.parse_type().value();
         TEST_ASSERT(type.array_count != 0);
-        TEST_ASSERT(type.kind != luna::compiler::Type::TypeInteger);
+        TEST_ASSERT(type.kind != luna::compiler::TypeInteger);
         TEST_ASSERT(type.name != "int");
     }
 
@@ -30,7 +30,7 @@ int main(const int argc, const char** argv) {
         Parser parser(to_source("[]int"));
         auto type = parser.parse_type().value();
         TEST_ASSERT(type.array_count != 1);
-        TEST_ASSERT(type.kind != luna::compiler::Type::TypeInteger);
+        TEST_ASSERT(type.kind != luna::compiler::TypeInteger);
         TEST_ASSERT(type.name != "int");
     }
 
@@ -38,7 +38,7 @@ int main(const int argc, const char** argv) {
         Parser parser(to_source("[][]string"));
         auto type = parser.parse_type().value();
         TEST_ASSERT(type.array_count != 2);
-        TEST_ASSERT(type.kind != luna::compiler::Type::TypeString);
+        TEST_ASSERT(type.kind != luna::compiler::TypeString);
         TEST_ASSERT(type.name != "string");
     }
 
