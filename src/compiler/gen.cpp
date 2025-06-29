@@ -190,7 +190,7 @@ public:
         auto old = push_is_assign(true);
         auto local = visit(assign->local, into);
         pop_is_assign(old);
-        builder->free_temp(into);
+        //builder->free_temp(into);
         return local;
     }
     

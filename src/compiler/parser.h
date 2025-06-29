@@ -31,7 +31,7 @@ public:
     ErrorOr<BinaryExpr::Kind> parse_bin_op_kind(Token token);
     ErrorOr<ref<Expr>> parse_bin_expr(u8 prec);
     ErrorOr<ref<Expr>> parse_left_hand_side_expr();
-    //ast::Type parse_type(Lexer& lexer);
+    ErrorOr<Type> parse_type();
 private:
     Lexer lexer;
 };

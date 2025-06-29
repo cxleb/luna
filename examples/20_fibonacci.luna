@@ -1,4 +1,4 @@
-func fibonacci(n) {
+func fibonacci(n: int) {
     if n <= 1 {
         return n;
     } else {

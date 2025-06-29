@@ -36,24 +36,20 @@ public:
 private:
 };
 
-// class Type {
-// public:
-//     enum Kind {
-//         Pointer,
-//         Reference,
-//         Array
-//     };
-//     struct Spec {
-//         Kind kind;
-//         // used when the type is Kind::Array
-//         bool specified; 
-//         uint64_t size;
-//     };
-
-//     std::vector<Spec> specs;
-//     std::string name;
-//     bool is_unknown;
-// };
+class Type {
+public:
+    enum Kind {
+        TypeNumber,
+        TypeInteger,
+        TypeString,
+        TypeBool,
+        TypeIdentifier,
+    };
+    Kind kind;
+    uint32_t array_count;
+    std::string name;
+    bool is_unknown;
+};
 
 class Stmt : public Node {
 public:  
@@ -71,6 +67,7 @@ public:
         EXPR_NODES(NAME)
         #undef NAME
     } kind;
+    //Type type;
 };
 
 // Statements
@@ -94,7 +91,7 @@ public:
     VarDecl();
     std::string name;
     bool is_const;
-    //Type type;
+    std::optional<Type> type;
     ref<Expr> value;
 };
 
@@ -212,14 +209,14 @@ public:
 
 struct Parameter {
     std::string name;
-    //Type type;
+    Type type;
 };
 
 class Func : public Node {
 public:
     std::string name;
     std::vector<Parameter> params;
-    //Type return_type;
+    std::optional<Type> return_type;
     ref<Stmt> root;
 };
 

@@ -49,8 +49,10 @@ ErrorOr<ref<Func>> Parser::parse_func() {
         auto param_name = lexer.expect(TokenIdentifier);
         CHECK(param_name);
         param.name = lexer.token_to_string(param_name.value());
-        //lexer.expect(TokenColon);
-        //param.type = parse_type();
+        CHECK(lexer.expect(TokenColon));
+        auto type = parse_type();
+        CHECK(type)
+        param.type = type.value(); 
         func->params.push_back(param);
         token = lexer.peek();
         if (token.kind == TokenComma) {
@@ -58,8 +60,13 @@ ErrorOr<ref<Func>> Parser::parse_func() {
             token = lexer.peek();
         }
     }
-    lexer.expect(TokenRightParen);
-    //func->return_type = parse_type();
+    CHECK(lexer.expect(TokenRightParen));
+    // If the next token is not a curly then its a type
+    if (!lexer.test(TokenLeftCurly)) {
+        auto type = parse_type();
+        CHECK(type);
+        func->return_type = type.value();
+    }
     auto block = parse_block();
     CHECK(block);
     func->root = block.value();
@@ -166,6 +173,12 @@ ErrorOr<ref<Stmt>> Parser::parse_var() {
     auto name = lexer.expect(TokenIdentifier);
     CHECK(name);
     stmt->name = lexer.token_to_string(name.value());
+    if (lexer.test(TokenColon)) {
+        lexer.next();
+        auto type = parse_type();
+        CHECK(type);
+        stmt->type = type.value();
+    }
     CHECK(lexer.expect(TokenEquals));
     auto expr = parse_expr();
     CHECK(expr);
@@ -179,7 +192,7 @@ ErrorOr<ref<Stmt>> Parser::parse_expr_stmt() {
     auto expr = parse_expr();
     CHECK(expr);
     expr_stmt->expr = expr.value();
-    lexer.expect(TokenSemiColon);
+    CHECK(lexer.expect(TokenSemiColon));
     return static_ref_cast<Stmt>(expr_stmt);
 }
 
@@ -397,57 +410,38 @@ ErrorOr<ref<Expr>> Parser::parse_left_hand_side_expr() {
 }
 
 
-// Type Parser::parse_type(s) {
-//     Type type;
-//     type.is_unknown = false;
-//     Token token;
+ErrorOr<Type> Parser::parse_type() {
+    Type type{};
+    type.is_unknown = false;
+    Token token;
 
-//     bool working = true;
-//     while (working)
-//     {
-//         token = lexer.next();
-//         uint64_t size = 0;
-//         bool specified = false;
-//         switch(token.kind) {
-//         case TokenAstericks:
-//             type.specs.push_back(Type::Spec{
-//                 .kind = Type::Pointer,
-//             });
-//             break;
-//         case TokenAmpersand:
-//             type.specs.push_back(Type::Spec{
-//                 .kind = Type::Reference,
-//             });
-//             break;
-//         case TokenLeftBracket:
-//             token = lexer.next();
-//             if (token.kind == TokenNumber) {
-//                 size = lexer.token_to_int(token);
-//                 token = lexer.next();
-//                 specified = true;
-//             }
-//             if (token.kind != TokenRightBracket) {
-//                 parser_error(token, "For array, you need close with ']'");
-//             }            
-//             type.specs.push_back(Type::Spec{
-//                 .kind = Type::Array,
-//                 .specified = specified,
-//                 .size = size,
-//             });
-//             break;
-//         default:
-//             working = false;
-//             break;
-//         }
-//     }
+    bool working = true;
+    while (lexer.test(TokenLeftBracket))
+    {
+        lexer.next();
+        CHECK(lexer.expect(TokenRightBracket));
+        type.array_count += 1;
+    }
 
-//     if (token.kind == TokenIdentifier) {
-//         type.name = lexer.token_to_string(token);
-//     } else {
-//         parser_error(token, "Expected identifier when defining a type");
-//     }
+    token = lexer.next();
+    if (token.kind == TokenIdentifier) {
+        type.name = lexer.token_to_string(token);
+        type.kind = Type::TypeIdentifier;
+    } else {
+        return parser_error(token, "Expected identifier when defining a type");
+    }
 
-//     return type;
-// }
+    if (type.name == "string") {
+        type.kind = Type::TypeString;
+    } else if (type.name == "bool") {
+        type.kind = Type::TypeBool;
+    } else if (type.name == "int") {
+        type.kind = Type::TypeInteger;
+    } else if (type.name == "number") {
+        type.kind = Type::TypeNumber;
+    }
+
+    return type;
+}
 
 }

@@ -18,64 +18,29 @@ using namespace luna::compiler;
 //};
 
 int main(const int argc, const char** argv) {
-    // {
-    //     Lexer lexer(to_source("u32"));
-    //     Parser parser;
-    //     auto type = parser.parse_type(lexer);
-    //     TEST_ASSERT(type.specs.size() != 0);
-    //     TEST_ASSERT(type.name != "u32");
-    // }
+    {
+        Parser parser(to_source("int"));
+        auto type = parser.parse_type().value();
+        TEST_ASSERT(type.array_count != 0);
+        TEST_ASSERT(type.kind != luna::compiler::Type::TypeInteger);
+        TEST_ASSERT(type.name != "int");
+    }
 
-    // {
-    //     Lexer lexer(to_source("*u32"));
-    //     Parser parser;
-    //     auto type = parser.parse_type(lexer);
-    //     TEST_ASSERT(type.specs.size() != 1);
-    //     TEST_ASSERT(type.specs[0].kind != Type::Pointer);
-    //     TEST_ASSERT(type.name != "u32");
-    // }
+    {
+        Parser parser(to_source("[]int"));
+        auto type = parser.parse_type().value();
+        TEST_ASSERT(type.array_count != 1);
+        TEST_ASSERT(type.kind != luna::compiler::Type::TypeInteger);
+        TEST_ASSERT(type.name != "int");
+    }
 
-    // {
-    //     Lexer lexer(to_source("[]u32"));
-    //     Parser parser;
-    //     auto type = parser.parse_type(lexer);
-    //     TEST_ASSERT(type.specs.size() != 1);
-    //     TEST_ASSERT(type.specs[0].kind != Type::Array);
-    //     TEST_ASSERT(type.specs[0].specified != false);
-    //     TEST_ASSERT(type.name != "u32");
-    // }
-
-    // {
-    //     Lexer lexer(to_source("[32]u32"));
-    //     Parser parser;
-    //     auto type = parser.parse_type(lexer);
-    //     TEST_ASSERT(type.specs.size() != 1);
-    //     TEST_ASSERT(type.specs[0].kind != Type::Array);
-    //     TEST_ASSERT(type.specs[0].specified != true);
-    //     TEST_ASSERT(type.specs[0].size != 32);
-    //     TEST_ASSERT(type.name != "u32");
-    // }
-
-    // {
-    //     Lexer lexer(to_source("&u32"));
-    //     Parser parser;
-    //     auto type = parser.parse_type(lexer);
-    //     TEST_ASSERT(type.specs.size() != 1);
-    //     TEST_ASSERT(type.specs[0].kind != Type::Reference);
-    //     TEST_ASSERT(type.name != "u32");
-    // }
-    
-    // {
-    //     Lexer lexer(to_source("[32]&u32"));
-    //     Parser parser;
-    //     auto type = parser.parse_type(lexer);
-    //     TEST_ASSERT(type.specs.size() != 2);
-    //     TEST_ASSERT(type.specs[0].kind != Type::Array);
-    //     TEST_ASSERT(type.specs[0].specified != true);
-    //     TEST_ASSERT(type.specs[0].size != 32);
-    //     TEST_ASSERT(type.specs[1].kind != Type::Reference);
-    //     TEST_ASSERT(type.name != "u32");
-    // }
+    {
+        Parser parser(to_source("[][]string"));
+        auto type = parser.parse_type().value();
+        TEST_ASSERT(type.array_count != 2);
+        TEST_ASSERT(type.kind != luna::compiler::Type::TypeString);
+        TEST_ASSERT(type.name != "string");
+    }
 
     {
         Parser parser(to_source("func test() { }"));
@@ -85,7 +50,7 @@ int main(const int argc, const char** argv) {
     }
 
     {
-        Parser parser(to_source("func test(a, b) { }"));
+        Parser parser(to_source("func test(a: int, b: int) { }"));
         auto func = parser.parse_func().value();
         TEST_ASSERT(func->name != "test");
         TEST_ASSERT(func->params.size() != 2);

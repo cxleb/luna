@@ -1,4 +1,4 @@
-func repeat(a, b) {
+func repeat(a: int, b: int) {
     let c = 0;
     while a > c {
         print(b);
@@ -6,7 +6,7 @@ func repeat(a, b) {
     }
 }
 
-func add(a, b) {
+func add(a: int, b: int) {
     return a + b;
 }
 
