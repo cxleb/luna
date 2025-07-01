@@ -16,9 +16,9 @@ Error error(const char* message, ...) {
 
 Error verror (const char* message, va_list args) {
     char buf[500];
-    fprintf(stderr, "Error: ");
+    //fprintf(stderr, "Error: ");
     auto count = vsnprintf (buf, 500, message, args);
-    vfprintf (stderr, message, args);
+    //vfprintf (stderr, message, args);
     return std::string(buf, count);
 }
 

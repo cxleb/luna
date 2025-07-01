@@ -1,3 +1,4 @@
+#include "compiler/sema.h"
 #include "runtime/value.h"
 #include "shared/environment.h"
 #include "shared/utils.h"
@@ -34,11 +35,19 @@ int main(int argc, const char** argv) {
     env.add_host_func("print", print);
     
     luna::compiler::Parser parser(std::move(*maybe_file));
+    luna::compiler::Sema sema;
     luna::compiler::Gen gen;
+    
     printf("done\nparsing... "); fflush(stdout);
     auto module = parser.parse_module();
     if (module.is_error()) {
         printf("Error compiling: %s\n", module.error().msg().c_str());
+        return 1;
+    }
+    auto error = sema.check(module.value(), &env);
+    if (error.has_value()) {
+        printf("Error: %s\n", error.value().msg().c_str());
+        return 1;
     }
     printf("done\ngenerating byte code... "); fflush(stdout);
     auto runtime_module = gen.generate(module.value(), &env);

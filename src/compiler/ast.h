@@ -49,6 +49,23 @@ public:
     Type();
     Type(TypeKind);
     Type(const std::string& str);
+
+    bool is_numeric() {
+        return kind == TypeNumber || kind == TypeInteger;
+    }
+
+    bool compare(const Type& other) {
+        if (is_unknown || other.is_unknown)
+            return false;
+        if (kind != other.kind)
+            return false;
+        if (array_count != other.array_count)
+            return false;
+        if (name != other.name)
+            return false;
+        return true;
+    }
+
     TypeKind kind;
     uint32_t array_count;
     std::string name;

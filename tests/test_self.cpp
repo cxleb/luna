@@ -2,6 +2,7 @@
 #include "compiler/parser.h"
 #include "compiler/gen.h"
 
+#include "compiler/sema.h"
 #include "runtime/bytecode.h"
 #include "runtime/runtime.h"
 #include "runtime/value.h"
@@ -40,11 +41,17 @@ int main(int argc, const char** argv) {
     env.add_host_func("assert", _assert);
     
     luna::compiler::Parser parser(std::move(*maybe_file));
+    luna::compiler::Sema sema;
     luna::compiler::Gen gen;
     auto module = parser.parse_module();
     if (module.is_error()) {
         printf("Error compiling: %s\n", module.error().msg().c_str());
         return 1;
+    }
+    auto err = sema.check(module.value(), &env);
+    if (err.has_value()) {
+        printf("Error: %s\n", err.value().msg().c_str());
+        return 1;    
     }
     auto runtime_module = gen.generate(module.value(), &env);
     luna::runtime::Runtime runtime(&env);
