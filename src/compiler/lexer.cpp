@@ -325,7 +325,6 @@ bool Lexer::test(TokenKind kind) {
     return token.kind == kind;
 }
 
-
 bool Lexer::test(const std::string& str) {
     auto token = peek();
     if (token.kind != TokenIdentifier) {

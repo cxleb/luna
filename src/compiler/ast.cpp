@@ -10,6 +10,7 @@ Type::Type() {
 
 Type::Type(TypeKind k) {
     is_unknown = false;
+    array_count = 0;
     kind = k;
 }
 
@@ -17,6 +18,7 @@ Type::Type(const std::string& str) {
     is_unknown = false;
     kind = TypeIdentifier;
     name = str;
+    array_count = 0;
 }
 
 If::If() {
@@ -73,7 +75,7 @@ Identifier::Identifier() {
 
 Integer::Integer() {
     kind = KindInteger;
-    type = Type(TypeIdentifier);
+    type = Type(TypeInteger);
 }
 
 Float::Float() {

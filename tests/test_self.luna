@@ -99,18 +99,18 @@ func main() {
     assert(e == 10);
 
     // arrays
-    let f = [];
+    let f = [0];
     f[0] = 0;
     f[1] = 10;
     f[2] = 20;
-    f["thirty"] = 30;
+    f[30] = 30;
     assert(f[0] == 0);
     assert(f[1] == 10);
     assert(f[2] == 20);
-    assert(f["thirty"] == 30);
+    assert(f[30] == 30);
 
     // assignments with arrays
-    let g = [];
+    let g = [0];
     g[10] = 10;
     let h = g[10];
     assert(g[10] == 10);

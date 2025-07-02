@@ -61,7 +61,7 @@ public:
             return false;
         if (array_count != other.array_count)
             return false;
-        if (name != other.name)
+        if (kind == TypeIdentifier && name != other.name)
             return false;
         return true;
     }

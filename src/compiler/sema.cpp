@@ -191,8 +191,9 @@ class Inference {
         STD_OPT_CHECK(visit(assign->local));
         STD_OPT_CHECK(visit(assign->value));
         if (!assign->local->type.compare(assign->value->type)) {
-            return sema_error(assign, "Attempting to assign invalid type");
+            return sema_error(assign, "Incompatible types in assignment");
         }
+        assign->type = assign->local->type;
         return std::nullopt;
     }
     
@@ -253,7 +254,7 @@ class Inference {
 
     std::optional<Error> accept(ref<Lookup> lookup) {
         STD_OPT_CHECK(visit(lookup->expr));
-        if (lookup->expr->type.array_count != 0) {
+        if (lookup->expr->type.array_count == 0) {
             return sema_error(lookup, "Attempting to index non-array");
         }
         STD_OPT_CHECK(visit(lookup->index));
@@ -269,6 +270,22 @@ class Inference {
     }
 
     std::optional<Error> accept(ref<ArrayLiteral> literal) {
+        auto prev_type = Type();
+        for(auto expr: literal->elements) {
+            STD_OPT_CHECK(visit(expr));
+            if (prev_type.is_unknown) {
+                prev_type = expr->type;
+            }
+            if (!prev_type.compare(expr->type)) {
+                return sema_error(literal, "Incompatible types in array literal");
+            }
+        }
+        if (prev_type.is_unknown) {
+            return sema_error(literal, "Cannot determine array literal type, specify a value so it"
+                " can be determined. TODO: Fix this by using the var type or further statements");
+        }
+        literal->type = Type(prev_type.kind);
+        literal->type.array_count = 1;
         return std::nullopt;
     }
 };
