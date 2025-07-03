@@ -20,7 +20,7 @@ FunctionBuilder::FunctionBuilder(const std::string& name, ModuleBuilder* builder
 }
 
 void FunctionBuilder::push_scope() {
-    scopes.push(std::unordered_map<std::string, uint64_t>());
+    scopes.push(std::unordered_map<std::string, uint8_t>());
 }
 
 void FunctionBuilder::pop_scope() {

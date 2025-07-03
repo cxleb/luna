@@ -34,6 +34,7 @@ class Inference {
         EXPR_NODES(VISITOR_SWITCH)
 #undef VISITOR_SWITCH
         }
+        return std::nullopt;
     }
 
     std::optional<Error> visit(ref<Stmt> stmt) {
@@ -45,6 +46,7 @@ class Inference {
         STMT_NODES(VISITOR_SWITCH)
 #undef VISITOR_SWITCH
         }
+        return std::nullopt;
     }
 
     void push_scope() {

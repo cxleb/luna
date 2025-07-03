@@ -4,7 +4,7 @@
 namespace luna {
     
 void Environment::add_host_func(const std::string& name, host_function func) {
-    uint64_t id = host_funcs.size();
+    uint16_t id = (uint16_t)host_funcs.size();
     name_mapping.insert({name, id});
     host_funcs.push_back(func);
 }

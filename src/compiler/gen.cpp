@@ -21,6 +21,7 @@ class GenVisitor {
         EXPR_NODES(VISITOR_SWITCH)
 #undef VISITOR_SWITCH
         }
+        return 0;
     }
 
     void visit(ref<Stmt> stmt) {

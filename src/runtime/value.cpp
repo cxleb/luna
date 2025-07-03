@@ -30,6 +30,7 @@ bool Value::eq(const Value& b) const {
     case TypeObject:
         return value_object->equal(b.value_object);
     }
+    return false;
 }
 
 OpResult value_add(Value a, Value b) {
@@ -204,6 +205,7 @@ bool value_falsy(Value a) {
         case TypeObject:
             return a.value_object == nullptr;
     }
+    return false;
 }
 
 uint64_t value_hash(Value a) {

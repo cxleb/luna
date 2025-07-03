@@ -61,7 +61,7 @@ private:
     uint16_t label_counter;
     std::vector<uint16_t> labels;
     std::unordered_map<uint8_t, bool> temporaries;
-    luna::Stack<std::unordered_map<std::string, uint64_t>> scopes;
+    luna::Stack<std::unordered_map<std::string, uint8_t>> scopes;
     ref<runtime::Function> function;
 };
 
