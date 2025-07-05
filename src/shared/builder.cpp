@@ -196,90 +196,180 @@ void FunctionBuilder::object_get(uint8_t reg, uint8_t idx, uint8_t eq) {
     });
 }
 
-void FunctionBuilder::add(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::add_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeAdd,
+        .opcode = runtime::OpcodeNumberAdd,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::sub(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::sub_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeSub,
+        .opcode = runtime::OpcodeNumberSub,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::mul(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::mul_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeMul,
+        .opcode = runtime::OpcodeNumberMul,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::div(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::div_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeDiv,
+        .opcode = runtime::OpcodeNumberDiv,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::eq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::eq_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeEq,
+        .opcode = runtime::OpcodeNumberEq,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::noteq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::noteq_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNotEq,
+        .opcode = runtime::OpcodeNumberNotEq,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::gr(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::gr_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeGr,
+        .opcode = runtime::OpcodeNumberGr,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::gr_eq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::gr_eq_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeGrEq,
+        .opcode = runtime::OpcodeNumberGrEq,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::less(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::less_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeLess,
+        .opcode = runtime::OpcodeNumberLess,
         .a = lhs,
         .b = rhs,
         .c = eq
     });
 }
 
-void FunctionBuilder::less_eq(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+void FunctionBuilder::less_eq_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeLessEq,
+        .opcode = runtime::OpcodeNumberLessEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::add_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberAdd,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::sub_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberSub,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::mul_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberMul,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::div_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberDiv,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::noteq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberNotEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::gr_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberGr,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::gr_eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberGrEq,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::less_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberLess,
+        .a = lhs,
+        .b = rhs,
+        .c = eq
+    });
+}
+
+void FunctionBuilder::less_eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
+    insert({
+        .opcode = runtime::OpcodeNumberLessEq,
         .a = lhs,
         .b = rhs,
         .c = eq

@@ -20,6 +20,9 @@ void Runtime::op_result_error(OpResult result, Value a, Value b) {
 }
 
 #define LOCAL_AT(i) locals[base + i]
+#define LOCAL_AT_NUMBER(i) locals[base + i].value_number
+#define LOCAL_AT_INT(i) locals[base + i].value_int
+#define LOCAL_AT_CELL(i) locals[base + i].value_cell
 //#define LOCAL_AT(i) ({assert(base + i < top); locals[base + i];})
 
 void Runtime::exec(ref<Module> module) {
@@ -63,7 +66,7 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeCondBr: {
-                if (value_falsy(LOCAL_AT(inst.a))) {
+                if (LOCAL_AT_INT(inst.a) == 0) {
                     frame.ip = inst.s;
                 }
                 break;
@@ -107,154 +110,142 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeObjectSet: {
-                auto a = LOCAL_AT(inst.a);
+                auto a = LOCAL_AT_CELL(inst.a);
                 auto key = LOCAL_AT(inst.b);
                 auto eq = LOCAL_AT(inst.c);
-                if (a.type == TypeObject) {
-                    auto cell = a.value_object;
-                    if (cell->kind == Cell::KindObject) {
-                        auto obj = static_cast<Object*>(cell);
-                        obj->set(key, eq);
-                    }
-                } 
+                auto obj = static_cast<Object*>(a);
+                obj->set(key, eq);
                 break;
             } 
             case OpcodeObjectGet: {
-                auto a = LOCAL_AT(inst.b);
+                auto a = LOCAL_AT_CELL(inst.b);
                 auto key = LOCAL_AT(inst.c);
-                auto eq = Value();
-                if (a.type == TypeObject) {
-                    auto cell = a.value_object;
-                    if (cell->kind == Cell::KindObject) {
-                        auto obj = static_cast<Object*>(cell);
-                        eq = obj->get(key);
-                    }
-                } 
-                LOCAL_AT(inst.a) = eq;
+                auto obj = static_cast<Object*>(a);
+                LOCAL_AT(inst.a) = obj->get(key);
                 break;  
             }
             case OpcodeMove: {
                 LOCAL_AT(inst.a) = LOCAL_AT(inst.b);
                 break;
             }
-            case OpcodeAdd: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_add(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberAdd: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a + b;
                 break;
             }
-            case OpcodeSub: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_sub(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberSub: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a - b;
                 break;
             }
-            case OpcodeMul: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_mul(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberMul: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a * b;
                 break;
             }
-            case OpcodeDiv: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_div(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberDiv: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a / b;
                 break;
             }
-            case OpcodeEq: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_eq(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberEq: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a == b;
                 break;
             }
-            case OpcodeNotEq: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_neq(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberNotEq: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a != b;
                 break;
             }
-            case OpcodeGr: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_gr(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberGr: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a > b;
                 break;
             }
-            case OpcodeLess: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_less(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberLess: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a < b;
                 break;
             }
-            case OpcodeGrEq: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_gr_eq(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberGrEq: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a >= b;
                 break;
             }
-            case OpcodeLessEq: {
-                auto a = LOCAL_AT(inst.a);
-                auto b = LOCAL_AT(inst.b);
-
-                auto result = value_less_eq(a, b);
-                if (result.not_valid) {
-                    op_result_error(result, a, b);
-                } 
-                LOCAL_AT(inst.c) = result.value;
-
+            case OpcodeNumberLessEq: {
+                auto a = LOCAL_AT_NUMBER(inst.a);
+                auto b = LOCAL_AT_NUMBER(inst.b);
+                LOCAL_AT(inst.c) = a <= b;
+                break;
+            }
+            case OpcodeIntAdd: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a + b;
+                break;
+            }
+            case OpcodeIntSub: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a - b;
+                break;
+            }
+            case OpcodeIntMul: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a * b;
+                break;
+            }
+            case OpcodeIntDiv: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a / b;
+                break;
+            }
+            case OpcodeIntEq: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a == b;
+                break;
+            }
+            case OpcodeIntNotEq: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a != b;
+                break;
+            }
+            case OpcodeIntGr: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a > b;
+                break;
+            }
+            case OpcodeIntGrEq: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a >= b;
+                break;
+            }
+            case OpcodeIntLess: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a < b;
+                break;
+            }
+            case OpcodeIntLessEq: {
+                auto a = LOCAL_AT_INT(inst.a);
+                auto b = LOCAL_AT_INT(inst.b);
+                LOCAL_AT(inst.c) = a <= b;
                 break;
             }
             case OpcodeLoadConst: {

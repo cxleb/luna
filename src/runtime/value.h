@@ -1,6 +1,5 @@
 #pragma once
 
-#include <functional>
 #include <cstdint>
 
 namespace luna::runtime {
@@ -26,40 +25,41 @@ struct Value;
 
 struct Value {
     Value() {
-        type = TypeNull;
+        //type = TypeNull;
+        value_number = 0;
     }
     Value(Cell* cell) {
-        value_object = cell;
-        type = TypeObject;
+        value_cell = cell;
+        //type = TypeObject;
     }
     Value(int64_t value) {
         value_int = value;
-        type = TypeInt;
+        //type = TypeInt;
     }
     Value(double value) {
-        value_float = value;
-        type = TypeFloat;
+        value_number = value;
+        //type = TypeFloat;
     }
     Value(bool value) {
         value_int = 0;
         value_boolean = value;
-        type = TypeBool;
+        //type = TypeBool;
     }
-    Type type;
+    //Type type;
     union {
         int64_t value_int;
-        double value_float;
+        double value_number;
         bool value_boolean;
         // not used yet
-        Cell* value_object;
+        Cell* value_cell;
     };
 
-    bool eq(const Value& other) const;
+    //bool eq(const Value& other) const;
 
-    bool operator==(const Value& other) const {
-        //value_eq(this, &other);
-        return eq(other);
-    }
+    //bool operator==(const Value& other) const {
+    //    //value_eq(this, &other);
+    //    return eq(other);
+    //}
 };
 
 struct OpResult {
@@ -80,26 +80,26 @@ struct OpResult {
 };
 
 
-OpResult value_add(Value a, Value b);
-OpResult value_sub(Value a, Value b);
-OpResult value_mul(Value a, Value b);
-OpResult value_div(Value a, Value b);
-OpResult value_eq(Value a, Value b);
-OpResult value_neq(Value a, Value b);
-OpResult value_gr(Value a, Value b);
-OpResult value_gr_eq(Value a, Value b);
-OpResult value_less(Value a, Value b);
-OpResult value_less_eq(Value a, Value b);
-bool value_truthy(Value a);
-bool value_falsy(Value a);
-uint64_t value_hash(Value a);
-void value_print(Value a);
+// OpResult value_add(Value a, Value b);
+// OpResult value_sub(Value a, Value b);
+// OpResult value_mul(Value a, Value b);
+// OpResult value_div(Value a, Value b);
+// OpResult value_eq(Value a, Value b);
+// OpResult value_neq(Value a, Value b);
+// OpResult value_gr(Value a, Value b);
+// OpResult value_gr_eq(Value a, Value b);
+// OpResult value_less(Value a, Value b);
+// OpResult value_less_eq(Value a, Value b);
+// bool value_truthy(Value a);
+// bool value_falsy(Value a);
+// uint64_t value_hash(Value a);
+// void value_print(Value a);
 
 }
 
-template<>
-struct std::hash<luna::runtime::Value> {
-    std::size_t operator()(const luna::runtime::Value& v) const {
-        return value_hash(v);
-    }
-};
+// template<>
+// struct std::hash<luna::runtime::Value> {
+//     std::size_t operator()(const luna::runtime::Value& v) const {
+//         return value_hash(v);
+//     }
+// };

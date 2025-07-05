@@ -49,44 +49,92 @@ void dump_inst(Inst inst) {
         printf("move %u %u\n", inst.a, inst.b);
         break;
     }
-    case OpcodeAdd: {
-        printf("add %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberAdd: {
+        printf("add.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeSub: {
-        printf("add %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberSub: {
+        printf("sub.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeMul: {
-        printf("mul %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberMul: {
+        printf("mul.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeDiv: {
-        printf("add %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberDiv: {
+        printf("div.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeEq: {
-        printf("eq %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberEq: {
+        printf("eq.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeNotEq: {
-        printf("not eq %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberNotEq: {
+        printf("noteq.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeGr: {
-        printf("gr %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberGr: {
+        printf("gr.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeLess: {
-        printf("less %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberLess: {
+        printf("less.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeGrEq: {
-        printf("gr eq %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberGrEq: {
+        printf("greq.n %u %u %u\n", inst.a, inst.b, inst.c);
         break;
     }
-    case OpcodeLessEq: {
-        printf("less eq %u %u %u\n", inst.a, inst.b, inst.c);
+    case OpcodeNumberLessEq: {
+        printf("lesseq.n %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntAdd: {
+        printf("add.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntSub: {
+        printf("sub.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntMul: {
+        printf("mul.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntDiv: {
+        printf("div.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntEq: {
+        printf("eq.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntNotEq: {
+        printf("noteq.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntGr: {
+        printf("gr.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntLess: {
+        printf("less.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntGrEq: {
+        printf("greq.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeIntLessEq: {
+        printf("lesseq.i %u %u %u\n", inst.a, inst.b, inst.c);
+        break;
+    }
+    case OpcodeConvert: {
+        printf("conv %u %u\n", inst.a, inst.b);
+        break;
+    }
+    case OpcodeTruncate: {
+        printf("trunc %u %u\n", inst.a, inst.b);
         break;
     }
     case OpcodeLoadConst: {

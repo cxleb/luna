@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 #include "../shared/utils.h"
 #include "../shared/stack.h"
 #include "bytecode.h"
