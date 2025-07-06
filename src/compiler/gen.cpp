@@ -140,37 +140,72 @@ public:
 
         auto lhs = visit(expr->lhs, std::nullopt);
         auto rhs = visit(expr->rhs, std::nullopt);
-        switch(expr->bin_kind) {
-            case BinaryExpr::KindAdd:
-                builder->add(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindSubtract:
-                builder->sub(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindMultiply:
-                builder->mul(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindDivide:
-                builder->div(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindEqual:
-                builder->eq(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindNotEqual:
-                builder->noteq(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindLessThan:
-                builder->less(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindGreaterThan:
-                builder->gr(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindLessThanEqual:
-                builder->less_eq(lhs, rhs, into);
-                break;
-            case BinaryExpr::KindGreaterThanEqual:
-                builder->gr_eq(lhs, rhs, into);
-                break;
+        if (expr->type.compare(TypeInteger)) {  
+            switch(expr->bin_kind) {
+                case BinaryExpr::KindAdd:
+                    builder->add_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindSubtract:
+                    builder->sub_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindMultiply:
+                    builder->mul_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindDivide:
+                    builder->div_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindEqual:
+                    builder->eq_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindNotEqual:
+                    builder->noteq_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindLessThan:
+                    builder->less_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindGreaterThan:
+                    builder->gr_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindLessThanEqual:
+                    builder->less_eq_i(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindGreaterThanEqual:
+                    builder->gr_eq_i(lhs, rhs, into);
+                    break;
+            }
+        } else if (expr->type.compare(TypeNumber)) {
+            switch(expr->bin_kind) {
+                case BinaryExpr::KindAdd:
+                    builder->add_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindSubtract:
+                    builder->sub_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindMultiply:
+                    builder->mul_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindDivide:
+                    builder->div_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindEqual:
+                    builder->eq_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindNotEqual:
+                    builder->noteq_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindLessThan:
+                    builder->less_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindGreaterThan:
+                    builder->gr_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindLessThanEqual:
+                    builder->less_eq_n(lhs, rhs, into);
+                    break;
+                case BinaryExpr::KindGreaterThanEqual:
+                    builder->gr_eq_n(lhs, rhs, into);
+                    break;
+            }
         }
         builder->free_temp(lhs);
         builder->free_temp(rhs);

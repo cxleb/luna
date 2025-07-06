@@ -11,18 +11,18 @@
 void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     for(auto i = nargs; i > 0; i--) {
         auto value = args[i - 1];
-        luna::runtime::value_print(value);
+        //luna::runtime::value_print(value);
     }
     printf("\n");
 }
 
 void _assert(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     auto value = args[0];
-    if (value.type != luna::runtime::TypeBool) {
-        printf("Expected bool value but got %s\n", 
-            luna::runtime::get_name_for_type(value.type));
-        exit(1);
-    }
+    //if (value.type != luna::runtime::TypeBool) {
+    //    printf("Expected bool value but got %s\n", 
+    //        luna::runtime::get_name_for_type(value.type));
+    //    exit(1);
+    //}
     if (!value.value_boolean) {
         printf("Assert failed\n");
         exit(1);

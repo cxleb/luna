@@ -12,7 +12,7 @@
 void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     for(auto i = nargs; i > 0; i--) {
         auto value = args[i - 1];
-        luna::runtime::value_print(value);
+        //luna::runtime::value_print(value);
     }
     printf("\n");
 }

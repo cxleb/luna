@@ -114,14 +114,14 @@ void Runtime::exec(ref<Module> module) {
                 auto key = LOCAL_AT(inst.b);
                 auto eq = LOCAL_AT(inst.c);
                 auto obj = static_cast<Object*>(a);
-                obj->set(key, eq);
+                obj->set(key.value_int, eq);
                 break;
             } 
             case OpcodeObjectGet: {
                 auto a = LOCAL_AT_CELL(inst.b);
                 auto key = LOCAL_AT(inst.c);
                 auto obj = static_cast<Object*>(a);
-                LOCAL_AT(inst.a) = obj->get(key);
+                LOCAL_AT(inst.a) = obj->get(key.value_int);
                 break;  
             }
             case OpcodeMove: {

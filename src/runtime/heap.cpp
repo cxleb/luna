@@ -1,6 +1,5 @@
 #include "heap.h"
 #include "runtime/value.h"
-#include <functional>
 
 namespace luna::runtime {
 
@@ -8,10 +7,10 @@ String::String(const std::string& str) : m_string(str) {
     kind = Cell::KindString;
 }
 
-uint64_t String::hash() {
-    auto hash = std::hash<std::string>()(m_string); 
-    return hash;
-}
+// uint64_t String::hash() {
+//     auto hash = std::hash<std::string>()(m_string); 
+//     return hash;
+// }
 
 bool String::equal(Cell* other) {
     if (other->kind != KindString) return false;
@@ -23,27 +22,28 @@ Object::Object() {
     kind = Cell::KindObject;
 }
 
-uint64_t Object::hash() {
-    uint64_t hash = 0;
-    for(auto& a : map) {
-        auto val_hash = value_hash(a.second);
-        hash = hash ^ (val_hash << 1);
-    }
-    return hash;
-}
+//uint64_t Object::hash() {
+//    uint64_t hash = 0;
+//    for(auto& a : map) {
+//        auto val_hash = value_hash(a.second);
+//        hash = hash ^ (val_hash << 1);
+//    }
+//    return hash;
+//}
 
 bool Object::equal(Cell* other) {
-    if (other->kind != KindObject) return false;
-    auto* obj = static_cast<Object*>(other);
-    return obj->map == map;
+    //if (other->kind != KindObject) return false;
+    //auto* obj = static_cast<Object*>(other);
+    // if the pointers are the same?
+    return this == other;
 }
 
 
-void Object::set(Value key, Value eq) {
+void Object::set(int64_t key, Value eq) {
     map.insert_or_assign(key, eq);
 }
 
-Value Object::get(Value key) {
+Value Object::get(int64_t key) {
     return map[key];
 }
 

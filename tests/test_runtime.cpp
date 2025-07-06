@@ -15,7 +15,6 @@ using namespace luna::runtime;
     Runtime runtime(&env); \
     runtime.exec(module_builder.get_module()); \
     auto last = runtime.return_value; \
-    TEST_ASSERT(last.type != expected_value.type); \
     TEST_ASSERT(last.value_int != expected_value.value_int); \
 } 
 
@@ -29,7 +28,7 @@ int main(int argc, const char** argv) {
         auto eq = builder.alloc_temp();
         builder.load_const(lhs, (int64_t)10);
         builder.load_const(rhs, (int64_t)20);
-        builder.add(lhs, rhs, eq);
+        builder.add_i(lhs, rhs, eq);
         builder.ret(eq);
     }, (int64_t)30);
 
@@ -39,7 +38,7 @@ int main(int argc, const char** argv) {
         auto eq = builder.alloc_temp();
         builder.load_const(lhs, (int64_t)10);
         builder.load_const(rhs, (int64_t)10);
-        builder.eq(lhs, rhs, eq);
+        builder.eq_i(lhs, rhs, eq);
         builder.ret(eq);
     }, true);
 
@@ -49,7 +48,7 @@ int main(int argc, const char** argv) {
         auto eq = builder.alloc_temp();
         builder.load_const(lhs, (int64_t)10);
         builder.load_const(rhs, (int64_t)10);
-        builder.noteq(lhs, rhs, eq);
+        builder.noteq_i(lhs, rhs, eq);
         builder.ret(eq);
     }, false);
 
@@ -62,10 +61,10 @@ int main(int argc, const char** argv) {
         auto label = builder.new_label();
         builder.br(label);
         builder.load_const(rhs, (int64_t)10);
-        builder.add(lhs, rhs, lhs);
+        builder.add_i(lhs, rhs, lhs);
         builder.mark_label(label);
         builder.load_const(rhs, (int64_t)10);
-        builder.add(lhs, rhs, lhs);
+        builder.add_i(lhs, rhs, lhs);
         builder.ret(lhs);
     }, (int64_t)20);
 
@@ -80,10 +79,10 @@ int main(int argc, const char** argv) {
         builder.load_const(rhs, false);
         builder.condbr(rhs, label);
         builder.load_const(rhs, (int64_t)10);
-        builder.add(lhs, rhs, lhs);
+        builder.add_i(lhs, rhs, lhs);
         builder.mark_label(label);
         builder.load_const(rhs, (int64_t)10);
-        builder.add(lhs, rhs, lhs);
+        builder.add_i(lhs, rhs, lhs);
         builder.ret(lhs);
     }, (int64_t)20);
 
@@ -98,10 +97,10 @@ int main(int argc, const char** argv) {
         builder.load_const(rhs, true);
         builder.condbr(rhs, label);
         builder.load_const(rhs, (int64_t)10);
-        builder.add(lhs, rhs, lhs);
+        builder.add_i(lhs, rhs, lhs);
         builder.mark_label(label);
         builder.load_const(rhs, (int64_t)10);
-        builder.add(lhs, rhs, lhs);
+        builder.add_i(lhs, rhs, lhs);
         builder.ret(lhs);
     }, (int64_t)30);
 

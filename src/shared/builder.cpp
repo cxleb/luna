@@ -288,7 +288,7 @@ void FunctionBuilder::less_eq_n(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::add_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberAdd,
+        .opcode = runtime::OpcodeIntAdd,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -297,7 +297,7 @@ void FunctionBuilder::add_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::sub_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberSub,
+        .opcode = runtime::OpcodeIntSub,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -306,7 +306,7 @@ void FunctionBuilder::sub_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::mul_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberMul,
+        .opcode = runtime::OpcodeIntMul,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -315,7 +315,7 @@ void FunctionBuilder::mul_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::div_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberDiv,
+        .opcode = runtime::OpcodeIntDiv,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -324,7 +324,7 @@ void FunctionBuilder::div_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberEq,
+        .opcode = runtime::OpcodeIntEq,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -333,7 +333,7 @@ void FunctionBuilder::eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::noteq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberNotEq,
+        .opcode = runtime::OpcodeIntNotEq,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -342,7 +342,7 @@ void FunctionBuilder::noteq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::gr_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberGr,
+        .opcode = runtime::OpcodeIntGr,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -351,7 +351,7 @@ void FunctionBuilder::gr_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::gr_eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberGrEq,
+        .opcode = runtime::OpcodeIntGrEq,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -360,7 +360,7 @@ void FunctionBuilder::gr_eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::less_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberLess,
+        .opcode = runtime::OpcodeIntLess,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -369,7 +369,7 @@ void FunctionBuilder::less_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 
 void FunctionBuilder::less_eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
     insert({
-        .opcode = runtime::OpcodeNumberLessEq,
+        .opcode = runtime::OpcodeIntLessEq,
         .a = lhs,
         .b = rhs,
         .c = eq
@@ -454,7 +454,9 @@ uint16_t ModuleBuilder::get_func_name_id(const std::string& name) {
 uint16_t ModuleBuilder::push_constant(runtime::Value value) {
     uint16_t i = 0;
     for (auto& c: module->constants) {
-        if (value == c) {
+        // This isnt type safe, but a value is 64-bits and if theyre the same
+        // integer value does it matter?? I guess we will find out.
+        if (value.value_int == c.value_int) {
             return i;
         }
         ++i;
