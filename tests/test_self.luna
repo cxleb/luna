@@ -1,16 +1,16 @@
-func returns10() {
+func returns10() int {
     return 10;
 }
 
-func maths() {
-    return 10 / 3.333 > 2.5;
+func maths() bool {
+    return 10.0 / 3.333 > 2.5;
 }
 
-func add(a: int, b: int) {
+func add(a: int, b: int) int {
     return a + b;
 }
 
-func fibonacci(n: int) {
+func fibonacci(n: int) int {
     if n <= 1 {
         return n;
     } else {
