@@ -140,7 +140,7 @@ public:
 
         auto lhs = visit(expr->lhs, std::nullopt);
         auto rhs = visit(expr->rhs, std::nullopt);
-        if (expr->type.compare(TypeInteger)) {  
+        if (expr->lhs->type.compare(TypeInteger)) {  
             switch(expr->bin_kind) {
                 case BinaryExpr::KindAdd:
                     builder->add_i(lhs, rhs, into);
@@ -173,7 +173,7 @@ public:
                     builder->gr_eq_i(lhs, rhs, into);
                     break;
             }
-        } else if (expr->type.compare(TypeNumber)) {
+        } else if (expr->lhs->type.compare(TypeNumber)) {
             switch(expr->bin_kind) {
                 case BinaryExpr::KindAdd:
                     builder->add_n(lhs, rhs, into);

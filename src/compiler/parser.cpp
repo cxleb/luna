@@ -413,7 +413,7 @@ ErrorOr<ref<Expr>> Parser::parse_left_hand_side_expr() {
 ErrorOr<Type> Parser::parse_type() {
     Type type{};
     type.array_count = 0;
-    type.is_unknown = false;
+    type.kind = TypeUnknown;
     Token token;
 
     bool working = true;

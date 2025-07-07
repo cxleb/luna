@@ -10,7 +10,7 @@ func add(a: int, b: int) int {
     return a + b;
 }
 
-func fibonacci(n: int) int {
+func fibonacci(n: int) int{
     if n <= 1 {
         return n;
     } else {
@@ -32,16 +32,16 @@ func main() {
     assert(10.0 / 2.0 == 5.0);
 
     // integer-float math
-    assert(10 + 10.0 == 20.0);
-    assert(10 - 10.0 == 0.0);
-    assert(10 * 3.0 == 30.0);
-    assert(10 / 2.0 == 5.0);
+    //assert(10 + 10.0 == 20.0);
+    //assert(10 - 10.0 == 0.0);
+    //assert(10 * 3.0 == 30.0);
+    //assert(10 / 2.0 == 5.0);
 
     // float-integer math
-    assert(10.0 + 10 == 20.0);
-    assert(10.0 - 10 == 0.0);
-    assert(10.0 * 3 == 30.0);
-    assert(10.0 / 2 == 5.0);
+    //assert(10.0 + 10 == 20.0);
+    //assert(10.0 - 10 == 0.0);
+    //assert(10.0 * 3 == 30.0);
+    //assert(10.0 / 2 == 5.0);
 
     // integer comparisons
     assert(0 == 0);

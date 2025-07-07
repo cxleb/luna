@@ -59,6 +59,14 @@ int main(const int argc, const char** argv) {
         //TEST_ASSERT(func->return_type.name != "u32");
     }
 
+    {
+        Parser parser(to_source("func test() int { }"));
+        auto func = parser.parse_func().value();
+        TEST_ASSERT(func->name != "test");
+        TEST_ASSERT(func->params.size() != 0);
+        TEST_ASSERT(func->return_type->kind != TypeInteger);
+    }
+
     // Primary expression tests
 
     {

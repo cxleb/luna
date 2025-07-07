@@ -94,9 +94,13 @@ class Inference {
             if (!ret->value.has_value())
                 return sema_error(ret, "Expecting return value");
             auto return_value = *ret->value;
-            STD_OPT_CHECK(visit(ret));
+            STD_OPT_CHECK(visit(*ret->value));
             if (!return_value->type.compare(*func->return_type)) {
                 return sema_error(ret, "Return type is incompatiable");
+            }
+        } else {
+            if(ret->value.has_value()) {
+                return sema_error(ret, "%s should not return value", func->name.c_str());
             }
         }
         return std::nullopt;
@@ -164,6 +168,9 @@ class Inference {
                 if (!expr->rhs->type.is_numeric()) {
                     return sema_error(expr, "Trying to do a binary operation on a non-numeric number");
                 }
+                if (!expr->lhs->type.compare(expr->rhs->type)) {
+                    return sema_error(expr, "Trying to do a binary expression on indifferent types");
+                }
                 if (expr->lhs->type.kind == TypeNumber || expr->rhs->type.kind == TypeNumber) {
                     expr->type = Type(TypeNumber);
                 } else {
@@ -223,6 +230,9 @@ class Inference {
         }
         auto host_func_id = env->get_func_id(call->name);
         if (host_func_id.has_value()) {
+            for (auto arg: call->args) {
+                STD_OPT_CHECK(visit(arg));
+            }
             // no return type
             call->type = Type();
             return std::nullopt;
@@ -275,14 +285,14 @@ class Inference {
         auto prev_type = Type();
         for(auto expr: literal->elements) {
             STD_OPT_CHECK(visit(expr));
-            if (prev_type.is_unknown) {
+            if (prev_type.kind == TypeUnknown) {
                 prev_type = expr->type;
             }
             if (!prev_type.compare(expr->type)) {
                 return sema_error(literal, "Incompatible types in array literal");
             }
         }
-        if (prev_type.is_unknown) {
+        if (prev_type.kind == TypeUnknown) {
             return sema_error(literal, "Cannot determine array literal type, specify a value so it"
                 " can be determined. TODO: Fix this by using the var type or further statements");
         }

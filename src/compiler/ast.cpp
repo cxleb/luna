@@ -5,17 +5,15 @@ namespace luna::compiler {
 
 
 Type::Type() {
-    is_unknown = true;
+    kind = TypeUnknown;
 }
 
 Type::Type(TypeKind k) {
-    is_unknown = false;
     array_count = 0;
     kind = k;
 }
 
 Type::Type(const std::string& str) {
-    is_unknown = false;
     kind = TypeIdentifier;
     name = str;
     array_count = 0;
