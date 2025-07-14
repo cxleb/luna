@@ -3,18 +3,9 @@
 #include "compiler/gen.h"
 
 #include "compiler/sema.h"
-#include "runtime/bytecode.h"
+#include "runtime/builtins.h"
 #include "runtime/runtime.h"
 #include "runtime/value.h"
-
-
-void print(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
-    for(auto i = nargs; i > 0; i--) {
-        auto value = args[i - 1];
-        //luna::runtime::value_print(value);
-    }
-    printf("\n");
-}
 
 void _assert(luna::runtime::Runtime* rt, luna::runtime::Value* args, uint64_t nargs) {
     auto value = args[0];
@@ -37,7 +28,7 @@ int main(int argc, const char** argv) {
     }
 
     luna::Environment env;
-    env.add_host_func("print", print);
+    luna::load_builtins(&env);
     env.add_host_func("assert", _assert);
     
     luna::compiler::Parser parser(std::move(*maybe_file));
@@ -55,7 +46,7 @@ int main(int argc, const char** argv) {
     }
     auto runtime_module = gen.generate(module.value(), &env);
     luna::runtime::Runtime runtime(&env);
-    luna::runtime::dump_module(runtime_module);
+    //luna::runtime::dump_module(runtime_module);
     runtime.exec(runtime_module);
     
     return 0;

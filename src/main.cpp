@@ -1,4 +1,5 @@
 #include "compiler/sema.h"
+#include "runtime/builtins.h"
 #include "runtime/value.h"
 #include "shared/environment.h"
 #include "shared/utils.h"
@@ -32,7 +33,7 @@ int main(int argc, const char** argv) {
     }
 
     luna::Environment env;
-    env.add_host_func("print", print);
+    luna::load_builtins(&env);
     
     luna::compiler::Parser parser(std::move(*maybe_file));
     luna::compiler::Sema sema;
@@ -51,7 +52,7 @@ int main(int argc, const char** argv) {
     }
     printf("done\ngenerating byte code... "); fflush(stdout);
     auto runtime_module = gen.generate(module.value(), &env);
-    luna::runtime::dump_module(runtime_module);
+    //luna::runtime::dump_module(runtime_module);
     printf("done\nstarting runtime... "); fflush(stdout);
     luna::runtime::Runtime runtime(&env);
     printf("done\nexecuting.\n"); fflush(stdout);
