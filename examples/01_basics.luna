@@ -11,12 +11,12 @@ func main() {
         a = 10;
     }
 
-    print(a);
-    print(a == 10); // is it 10?
+    print_int(a);
+    print_bool(a == 10); // is it 10?
 
     let b = 0;
     while b < 10 {
-        print(b);
+        print_int(b);
         b = b + 1;
     }
 }
