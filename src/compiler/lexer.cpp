@@ -5,7 +5,7 @@
 namespace luna::compiler {
 
 Error lexer_error (Token token, const char* message, ...) {
-    fprintf(stderr, "%llu:%llu: ", token.line + 1, token.col + 1);
+    fprintf(stderr, "%llu:%llu: ", token.loc.line + 1, token.loc.col + 1);
     va_list args;
     va_start(args, message);
     auto err = verror(message, args);
@@ -82,10 +82,10 @@ Token Lexer::next() {
     eat_whitespace();
     
     Token token;
-    token.offset = at;
-    token.line = line;
-    token.col = col;
-    token.size = 0;
+    token.loc.offset = at;
+    token.loc.line = line;
+    token.loc.col = col;
+    token.loc.size = 0;
     token.kind = TokenEndOfFile;
     
     if (at >= source.size()) {
@@ -108,14 +108,14 @@ Token Lexer::next() {
                     token.kind = TokenPlusPlus;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 }
                 if (at + 1 < source.size() && source[at + 1] == '=') {
                     token.kind = TokenPlusEquals;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 } else {
                     token.kind = TokenPlus;
@@ -128,14 +128,14 @@ Token Lexer::next() {
                     token.kind = TokenMinusMinus;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 }
                 if (at + 1 < source.size() && source[at + 1] == '=') {
                     token.kind = TokenMinusEquals;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 } else {
                     token.kind = TokenMinus;
@@ -148,7 +148,7 @@ Token Lexer::next() {
                     token.kind = TokenEqualsEquals;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 } else {
                     token.kind = TokenEquals;
@@ -194,7 +194,7 @@ Token Lexer::next() {
                     token.kind = TokenLessThenEquals;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 } else {
                     token.kind = TokenLessThen;
@@ -207,7 +207,7 @@ Token Lexer::next() {
                     token.kind = TokenGreaterThenEquals;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 } else {
                     token.kind = TokenGreaterThen;
@@ -220,7 +220,7 @@ Token Lexer::next() {
                     token.kind = TokenExclamationEquals;
                     at += 2;
                     col += 2;
-                    token.size = 2;
+                    token.loc.size = 2;
                     goto end;
                 } else {
                     token.kind = TokenExclamation;
@@ -238,7 +238,7 @@ Token Lexer::next() {
             at++;
             col++;
         }
-        token.size = at - token.offset;
+        token.loc.size = at - token.loc.offset;
         goto end;
     } else if (isdigit(source[at]) || source[at] == '.') {
         token.kind = TokenNumber;
@@ -247,7 +247,7 @@ Token Lexer::next() {
             at++;
             col++;
         }
-        token.size = at - token.offset;
+        token.loc.size = at - token.loc.offset;
         goto end;
     } else if (source[at] == '"') {
         token.kind = TokenString;
@@ -261,7 +261,7 @@ Token Lexer::next() {
             at++;
             col++;
         }
-        token.size = at - token.offset;
+        token.loc.size = at - token.loc.offset;
         goto end;
     } else {
         // Unknown character
@@ -273,27 +273,27 @@ Token Lexer::next() {
 single_char:
     at++;
     col++;
-    token.size = 1;
+    token.loc.size = 1;
 end:
     return token;
 }
 
 int Lexer::copy_token(char* buf, uint32_t size, Token token) {
-    uint64_t sz = token.size;
+    uint64_t sz = token.loc.size;
     if (size < sz) {
         sz = size;
     }
     for (uint64_t i = 0; i < sz; i++) {
-        buf[i] = source[token.offset + i];
+        buf[i] = source[token.loc.offset + i];
     }
-    buf[token.size] = '\0';
+    buf[token.loc.size] = '\0';
     return 0;
 }
 
 bool Lexer::is_token_int_or_float(Token token) {
     if (token.kind == TokenNumber) {
-        auto start = token.offset;
-        auto end = token.offset + token.size;
+        auto start = token.loc.offset;
+        auto end = token.loc.offset + token.loc.size;
         bool has_dot = false;
         for (uint64_t i = start; i < end; i++) {
             if (source[i] == '.') {
@@ -317,7 +317,7 @@ uint64_t Lexer::token_to_int(Token token) {
 }
 
 std::string Lexer::token_to_string(Token token) {
-    return std::string(source.data() + token.offset, token.size);
+    return std::string(source.data() + token.loc.offset, token.loc.size);
 }
 
 bool Lexer::test(TokenKind kind) {

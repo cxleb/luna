@@ -11,6 +11,7 @@ set(luna_sources
     src/shared/utils.cpp
     src/shared/error.cpp
     src/shared/builder.cpp
+    src/shared/type.cpp
     src/shared/environment.cpp
     src/compiler/lexer.cpp
     src/compiler/ast.cpp

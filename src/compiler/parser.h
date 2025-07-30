@@ -31,7 +31,30 @@ public:
     ErrorOr<BinaryExpr::Kind> parse_bin_op_kind(Token token);
     ErrorOr<ref<Expr>> parse_bin_expr(u8 prec);
     ErrorOr<ref<Expr>> parse_left_hand_side_expr();
-    ErrorOr<Type> parse_type();
+    ErrorOr<ref<Type>> parse_type();
+private:
+    template<typename T>
+    ref<T> make_node() {
+        return make_node<T>(lexer.peek().loc);
+    }
+    template<typename T>
+    ref<T> make_node(Token token) {
+        return make_node<T>(token.loc);
+    }
+    template<typename T>
+    ref<T> make_node(SourceLoc loc) {
+        auto node = make_ref<T>();
+        node->loc = loc;
+        return node;
+    }
+    template<typename T>
+    ref<Expr> finish_expr(ref<T> expr) {
+        return static_ref_cast<Expr>(expr);
+    }
+    template<typename T>
+    ref<Stmt> finish_stmt(ref<T> expr) {
+        return static_ref_cast<Stmt>(expr);
+    }
 private:
     Lexer lexer;
 };

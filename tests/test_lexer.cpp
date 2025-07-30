@@ -5,16 +5,16 @@
 using namespace luna::compiler;
 
 #define ASSERT_TOKEN(token, string, ki) \
-    TEST_ASSERT(token.kind != ki); \
-    TEST_ASSERT(lexer.token_to_string(token) != string); \
+    TEST_ASSERT(token.kind == ki); \
+    TEST_ASSERT(lexer.token_to_string(token) == string); \
 
 #define TEST_SINGLE_TOKEN(string, ty) { \
     auto len = strlen(string); \
     Lexer lexer(to_source(string)); \
     auto token = lexer.next(); \
     ASSERT_TOKEN(token, string, ty); \
-    TEST_ASSERT(lexer.at != len); \
-    TEST_ASSERT(lexer.col != len); \
+    TEST_ASSERT(lexer.at == len); \
+    TEST_ASSERT(lexer.col == len); \
 }
 
 int main(const int argc, const char** argv) {

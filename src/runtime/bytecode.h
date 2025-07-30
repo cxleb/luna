@@ -76,6 +76,12 @@ struct Function {
     uint64_t locals;
 };
 
+struct Constant {
+    std::optional<std::string> name;
+    Type type;
+    Value value;
+};
+
 struct Module {
     std::unordered_map<std::string, uint64_t> name_mapping;
     std::vector<ref<Function>> functions;

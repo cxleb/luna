@@ -2,6 +2,8 @@
 #include "compiler/ast.h"
 #include "shared/environment.h"
 #include "shared/stack.h"
+#include "shared/type.h"
+#include "shared/utils.h"
 #include <optional>
 #include <unordered_map>
 
@@ -10,6 +12,8 @@
 namespace luna::compiler {
 
 Error sema_error(ref<Node> node, const char* message, ...) {
+    //std::string name = node->name();
+    fprintf(stderr, "%llu:%llu: ", node->loc.line + 1, node->loc.col + 1);
     va_list args;
     va_start(args, message);
     auto err = verror(message, args);
@@ -23,7 +27,7 @@ class Inference {
     Environment* env;
     ref<Module> module;
     ref<Func> func;
-    luna::Stack<std::unordered_map<std::string, Type>> locals; 
+    luna::Stack<std::unordered_map<std::string, ref<Type>>> locals; 
 
     std::optional<Error> visit(ref<Expr> expr) {
         switch(expr->kind) {
@@ -50,21 +54,21 @@ class Inference {
     }
 
     void push_scope() {
-        locals.push(std::unordered_map<std::string, Type>());
+        locals.push(std::unordered_map<std::string, ref<Type>>());
     }
 
     void pop_scope() {
         locals.pop();
     }
 
-    void create_variable(const std::string& name, Type type) {
+    void create_variable(const std::string& name, ref<Type> type) {
         locals.peek().insert({
             name,
             type
         });
     }
 
-    std::optional<Type> get_variable(const std::string& name) {
+    std::optional<ref<Type>> get_variable(const std::string& name) {
         for(auto it = locals.rbegin(); it != locals.rend(); it+=1) {
             if ((*it).contains(name)) {
                 return (*it)[name];
@@ -95,7 +99,7 @@ class Inference {
                 return sema_error(ret, "Expecting return value");
             auto return_value = *ret->value;
             STD_OPT_CHECK(visit(*ret->value));
-            if (!return_value->type.compare(*func->return_type)) {
+            if (!return_value->type->compare(*func->return_type)) {
                 return sema_error(ret, "Return type is incompatiable");
             }
         } else {
@@ -112,7 +116,7 @@ class Inference {
         
         auto type = decl->value->type;
         if (decl->type.has_value())
-            if (!type.compare(*decl->type))
+            if (!type->compare(*decl->type))
                 return sema_error(decl, "Type is not compatible to assignment");
         
         if (get_variable(decl->name).has_value()) {
@@ -162,19 +166,19 @@ class Inference {
             case BinaryExpr::KindDivide:
             case BinaryExpr::KindMultiply:
             case BinaryExpr::KindSubtract:
-                if (!expr->lhs->type.is_numeric()) {
+                if (!expr->lhs->type->is_numeric()) {
                     return sema_error(expr, "Trying to do a binary operation on a non-numeric number");
                 }
-                if (!expr->rhs->type.is_numeric()) {
+                if (!expr->rhs->type->is_numeric()) {
                     return sema_error(expr, "Trying to do a binary operation on a non-numeric number");
                 }
-                if (!expr->lhs->type.compare(expr->rhs->type)) {
+                if (!expr->lhs->type->compare(expr->rhs->type)) {
                     return sema_error(expr, "Trying to do a binary expression on indifferent types");
                 }
-                if (expr->lhs->type.kind == TypeNumber || expr->rhs->type.kind == TypeNumber) {
-                    expr->type = Type(TypeNumber);
+                if (expr->lhs->type->compare(number_type()) || expr->rhs->type->compare(number_type())) {
+                    expr->type = number_type();
                 } else {
-                    expr->type = Type(TypeInteger);
+                    expr->type = int_type();
                 }
                 break;
             case BinaryExpr::KindEqual:
@@ -183,23 +187,23 @@ class Inference {
             case BinaryExpr::KindGreaterThan:
             case BinaryExpr::KindLessThanEqual:
             case BinaryExpr::KindGreaterThanEqual:
-                if (!expr->lhs->type.compare(expr->rhs->type)) {
+                if (!expr->lhs->type->compare(expr->rhs->type)) {
                     return sema_error(expr, "Trying to do a comparison on indifferent types");
                 }
-                expr->type = Type(TypeBool);
+                expr->type = bool_type();
                 break;
         }
         return std::nullopt;
     }
     
-    std::optional<Error> accept(ref<Unary> expr, std::optional<uint8_t> into) {
+    std::optional<Error> accept(ref<Unary> expr) {
         return std::nullopt;
     }
 
     std::optional<Error> accept(ref<Assign> assign) {
         STD_OPT_CHECK(visit(assign->local));
         STD_OPT_CHECK(visit(assign->value));
-        if (!assign->local->type.compare(assign->value->type)) {
+        if (!assign->local->type->compare(assign->value->type)) {
             return sema_error(assign, "Incompatible types in assignment");
         }
         assign->type = assign->local->type;
@@ -215,7 +219,7 @@ class Inference {
                 uint32_t i = 0;
                 for (auto arg: call->args) {
                     STD_OPT_CHECK(visit(arg));
-                    if(!arg->type.compare(f->params[i].type)) {
+                    if(!arg->type->compare(f->params[i].type)) {
                         return sema_error(call, "Invalid type for param %d", i);
                     }
                     i+=1;
@@ -223,7 +227,7 @@ class Inference {
                 if (f->return_type.has_value()) {
                     call->type = *f->return_type;
                 } else {
-                    call->type = Type();
+                    call->type = nullptr;
                 }                
                 return std::nullopt;
             }
@@ -234,7 +238,7 @@ class Inference {
                 STD_OPT_CHECK(visit(arg));
             }
             // no return type
-            call->type = Type();
+            call->type = nullptr;
             return std::nullopt;
         }
         return sema_error(call, "Attempting to call unknown function");
@@ -266,14 +270,15 @@ class Inference {
 
     std::optional<Error> accept(ref<Lookup> lookup) {
         STD_OPT_CHECK(visit(lookup->expr));
-        if (lookup->expr->type.array_count == 0) {
+        if (!lookup->expr->type->is_array()) {
             return sema_error(lookup, "Attempting to index non-array");
         }
         STD_OPT_CHECK(visit(lookup->index));
-        if (lookup->index->type.kind != TypeInteger) {
+        if (!lookup->index->type->is_numeric()) {
             return sema_error(lookup, "Attempting to index array with non-integer index");
         }
-        lookup->type = Type(lookup->expr->type.kind);
+        auto array_type = static_ref_cast<ArrayType>(lookup->expr->type);
+        lookup->type = array_type->element_type;
         return std::nullopt;
     }
 
@@ -282,29 +287,26 @@ class Inference {
     }
 
     std::optional<Error> accept(ref<ArrayLiteral> literal) {
-        auto prev_type = Type();
+        ref<Type> prev_type = unknown_type();
         for(auto expr: literal->elements) {
             STD_OPT_CHECK(visit(expr));
-            if (prev_type.kind == TypeUnknown) {
+            if (prev_type->is_unknown()) {
                 prev_type = expr->type;
             }
-            if (!prev_type.compare(expr->type)) {
+            if (!prev_type->compare(expr->type)) {
                 return sema_error(literal, "Incompatible types in array literal");
             }
         }
-        if (prev_type.kind == TypeUnknown) {
+        if (prev_type->is_unknown()) {
             return sema_error(literal, "Cannot determine array literal type, specify a value so it"
                 " can be determined. TODO: Fix this by using the var type or further statements");
         }
-        literal->type = Type(prev_type.kind);
-        literal->type.array_count = 1;
+        literal->type = array_type(prev_type);
         return std::nullopt;
     }
 };
 
-
 std::optional<Error> Sema::check(ref<Module> module, Environment* env) {
-    
     for(auto func: module->funcs) {
         Inference inference;
         inference.env = env;    

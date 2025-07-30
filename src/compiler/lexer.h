@@ -49,12 +49,16 @@ enum TokenKind {
 
 const char* get_token_name(TokenKind kind);
 
-struct Token {
-    TokenKind kind;
+struct SourceLoc {
     uint64_t offset;
     uint64_t size;
     uint64_t line;
     uint64_t col;
+};
+
+struct Token {
+    TokenKind kind;
+    SourceLoc loc;
 };
 
 struct Lexer {

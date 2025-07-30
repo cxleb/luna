@@ -15,7 +15,7 @@ using namespace luna::runtime;
     Runtime runtime(&env); \
     runtime.exec(module_builder.get_module()); \
     auto last = runtime.return_value; \
-    TEST_ASSERT(last.value_int != expected_value.value_int); \
+    TEST_ASSERT(last.value_int == expected_value.value_int); \
 } 
 
 int main(int argc, const char** argv) {

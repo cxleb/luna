@@ -1,22 +1,23 @@
 #include "ast.h"
+#include "shared/type.h"
 #include <cstdio>
 
 namespace luna::compiler {
 
+std::string Expr::name() {
+    switch(kind) {
+        #define NAME(name) case Kind##name: return #name;
+        EXPR_NODES(NAME)
+        #undef NAME
+    }
+} 
 
-Type::Type() {
-    kind = TypeUnknown;
-}
-
-Type::Type(TypeKind k) {
-    array_count = 0;
-    kind = k;
-}
-
-Type::Type(const std::string& str) {
-    kind = TypeIdentifier;
-    name = str;
-    array_count = 0;
+std::string Stmt::name(){
+    switch(kind) {
+        #define NAME(name) case Kind##name: return #name;
+        STMT_NODES(NAME)
+        #undef NAME
+    }
 }
 
 If::If() {
@@ -73,17 +74,17 @@ Identifier::Identifier() {
 
 Integer::Integer() {
     kind = KindInteger;
-    type = Type(TypeInteger);
+    type = int_type();
 }
 
 Float::Float() {
     kind = KindFloat;
-    type = Type(TypeNumber);
+    type = number_type();
 }
 
 String::String() {
     kind = KindString;
-    type = Type(TypeString);
+    type = string_type();
 }
 
 ArrayLiteral::ArrayLiteral() {

@@ -3,6 +3,7 @@
 #include <vector>
 #include <optional>
 #include "../shared/utils.h"
+#include "../shared/type.h"
 #include "lexer.h"
 
 namespace luna::compiler {
@@ -31,43 +32,9 @@ namespace luna::compiler {
 
 class Node {
 public:
-    // The underlying token, can be used to get the source locations
-    Token token;
+    SourceLoc loc;
+    //virtual std::string name() = 0;
 private:
-};
-
-enum TypeKind {
-    TypeUnknown,
-    TypeNumber,
-    TypeInteger,
-    TypeString,
-    TypeBool,
-    TypeIdentifier,
-};
-
-class Type {
-public:
-    Type();
-    Type(TypeKind);
-    Type(const std::string& str);
-
-    bool is_numeric() {
-        return kind == TypeNumber || kind == TypeInteger;
-    }
-
-    bool compare(const Type& other) {
-        if (kind != other.kind)
-            return false;
-        if (array_count != other.array_count)
-            return false;
-        if (kind == TypeIdentifier && name != other.name)
-            return false;
-        return true;
-    }
-
-    TypeKind kind;
-    uint32_t array_count;
-    std::string name;
 };
 
 class Stmt : public Node {
@@ -77,6 +44,7 @@ public:
         STMT_NODES(NAME)
         #undef NAME
     } kind;
+    std::string name();
 };
 
 class Expr : public Node {
@@ -86,7 +54,8 @@ public:
         EXPR_NODES(NAME)
         #undef NAME
     } kind;
-    Type type;
+    ref<Type> type;
+    std::string name();
 };
 
 // Statements
@@ -110,7 +79,7 @@ public:
     VarDecl();
     std::string name;
     bool is_const;
-    std::optional<Type> type;
+    std::optional<ref<Type>> type;
     ref<Expr> value;
 };
 
@@ -228,14 +197,14 @@ public:
 
 struct Parameter {
     std::string name;
-    Type type;
+    ref<Type> type;
 };
 
 class Func : public Node {
 public:
     std::string name;
     std::vector<Parameter> params;
-    std::optional<Type> return_type;
+    std::optional<ref<Type>> return_type;
     ref<Stmt> root;
 };
 

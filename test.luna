@@ -1,0 +1,11 @@
+func main() {
+    let a = 3.0;
+    let b = 10.0;
+    let c = a + b;
+    if a == b {
+        b = 11.0;
+    }
+    print_number(a);
+    print_number(b);
+    print_number(c);
+}
