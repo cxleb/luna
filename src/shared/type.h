@@ -19,7 +19,16 @@ public:
     virtual bool compare(const ref<Type> other) const {
         return other->kind == kind;
     }
-    inline bool is_unknown() const { return kind == TypeKindUnknown; }
+    // Checks if the other type has the same shape as this type, `this` is not
+    // supposed to have unknown in it, and the `other` type is supposed to be 
+    // the one with the unknown type somewhere.
+    virtual bool are_compatible(const ref<Type> other) const {
+        if (other->kind == TypeKindUnknown) {
+            return true;
+        }
+        return this->kind == other->kind;
+    }
+    virtual bool is_unknown() const { return kind == TypeKindUnknown; }
     inline bool is_integer() const { return kind == TypeKindInteger; }
     inline bool is_array() const { return kind == TypeKindArray; }
     TypeKind kind;
@@ -58,6 +67,9 @@ class ArrayType : public Type {
 public:
     ArrayType() : Type(TypeKindArray) {}
     bool compare(const ref<Type> other) const override;
+    bool is_unknown() const override;
+    bool are_compatible(const ref<Type> other) const override;
+
     ref<Type> element_type;
 };
 
@@ -75,4 +87,6 @@ ref<Type> number_type();
 ref<Type> string_type();
 ref<Type> bool_type();
 ref<Type> array_type(ref<Type> element_type);
+
+bool are_types_compatible(ref<Type> a, ref<Type> b);
 

@@ -99,7 +99,7 @@ func main() {
     assert(e == 10);
 
     // arrays
-    let f = [0];
+    let f: []int = [];
     f[0] = 0;
     f[1] = 10;
     f[2] = 20;
@@ -110,7 +110,7 @@ func main() {
     assert(f[30] == 30);
 
     // assignments with arrays
-    let g = [0];
+    let g: []int = [];
     g[10] = 10;
     let h = g[10];
     assert(g[10] == 10);

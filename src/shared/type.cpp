@@ -7,6 +7,19 @@ bool ArrayType::compare(const ref<Type> other) const {
     return element_type->compare(array_other->element_type);
 } 
 
+bool ArrayType::is_unknown() const {
+    return element_type->is_unknown();
+}
+
+bool ArrayType::are_compatible(const ref<Type> other) const {
+    if (other->kind == TypeKindUnknown) {
+        return true;
+    }
+    if (other->kind != TypeKindArray) return false;
+    auto array_other = static_ref_cast<ArrayType>(other);
+    return element_type->are_compatible(array_other->element_type);
+}
+
 bool FunctionType::compare(const ref<Type> other) const {
     if (other->kind != TypeKindFunction) return false;
     auto other_ = static_ref_cast<FunctionType>(other);

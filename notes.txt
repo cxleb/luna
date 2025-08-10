@@ -1,6 +1,4 @@
-- Fix type system
-- Fix array types
-- Adding source locations to AST
+- Bug in AST source location
 - Debug information is generated alongside bytecode
 - Make functions a const value
 - Builtin functions have function signatures
@@ -13,3 +11,8 @@
 - Implement multiple modules (import and export syntax?)
 - Templates
 - Casting types
+
+done:
+- Fix array types
+- Adding source locations to AST
+- Fix type system

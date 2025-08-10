@@ -54,6 +54,12 @@ if(BUILD_TESTS)
         NAME luna-test-runtime
         COMMAND luna-test-runtime
     )
+    add_executable(luna-test-sema tests/test_sema.cpp  ${luna_sources})
+    target_include_directories(luna-test-sema PRIVATE src)
+    add_test(
+        NAME luna-test-sema
+        COMMAND luna-test-sema 
+    )
     add_executable(luna-test-self tests/test_self.cpp  ${luna_sources})
     target_include_directories(luna-test-self PRIVATE src)
     add_test(

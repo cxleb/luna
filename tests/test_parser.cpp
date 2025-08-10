@@ -287,6 +287,16 @@ int main(const int argc, const char** argv) {
     }
 
     {
+        Parser parser(to_source("let a: int = 10;"));
+        auto stmt = parser.parse_stmt().value();
+        TEST_ASSERT(stmt->kind == Stmt::KindVarDecl);
+        auto var_stmt = static_ref_cast<VarDecl>(stmt);
+        TEST_ASSERT(var_stmt->name == "a");
+        TEST_ASSERT(var_stmt->is_const == false);
+        TEST_ASSERT(var_stmt->value->kind == Expr::KindInteger);
+    }
+
+    {
         Parser parser(to_source("const a = 10;"));
         auto stmt = parser.parse_stmt().value();
         TEST_ASSERT(stmt->kind == Stmt::KindVarDecl);

@@ -461,7 +461,10 @@ ErrorOr<ref<Type>> Parser::parse_type() {
         lexer.next();
         return number_type();
     } else {
-        return parser_error(lexer.next(), "Unexpected token when defining a type");
+        auto token = lexer.next();
+        auto str = lexer.token_to_string(token);
+        return parser_error(token, "Unexpected %s(%s) when defining a type", 
+            get_token_name(token.kind), str.c_str());
     }
 }
 

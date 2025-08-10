@@ -114,15 +114,27 @@ class Inference {
         luna_assert(locals.count() != 0);
         STD_OPT_CHECK(visit(decl->value));
         
-        auto type = decl->value->type;
-        if (decl->type.has_value())
-            if (!type->compare(*decl->type))
+        if (decl->value->type->is_unknown() && !decl->type.has_value()) {
+            return sema_error(decl, "Value has unknown type, must declare type in definition");
+        }
+
+        if (decl->type.has_value()) {
+            //if (decl->type->is_unknown()) {
+            //    decl->value->type = *decl->type;
+            //}
+            if (!decl->type.value()->are_compatible(decl->value->type)) {
                 return sema_error(decl, "Type is not compatible to assignment");
+            }
+            if (decl->value->type->is_unknown()) {
+                decl->value->type = *decl->type;
+            }
+        }
         
         if (get_variable(decl->name).has_value()) {
             return sema_error(decl, "%s already defined", decl->name.c_str());
         }
-        create_variable(decl->name, type);
+
+        create_variable(decl->name, decl->value->type);
 
         return std::nullopt;
     }
@@ -297,10 +309,10 @@ class Inference {
                 return sema_error(literal, "Incompatible types in array literal");
             }
         }
-        if (prev_type->is_unknown()) {
-            return sema_error(literal, "Cannot determine array literal type, specify a value so it"
-                " can be determined. TODO: Fix this by using the var type or further statements");
-        }
+        //if (prev_type->is_unknown()) {
+        //    return sema_error(literal, "Cannot determine array literal type, specify a value so it"
+        //        " can be determined. TODO: Fix this by using the var type or further statements");
+        //}
         literal->type = array_type(prev_type);
         return std::nullopt;
     }
