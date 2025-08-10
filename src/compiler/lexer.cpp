@@ -49,6 +49,7 @@ void Lexer::eat_whitespace() {
                 while (at < source.size() && source[at] != '\n') {
                     at++;
                 }
+                at++;
                 col = 0;
                 line++;
             } else {

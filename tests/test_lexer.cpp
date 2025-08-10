@@ -84,5 +84,14 @@ int main(const int argc, const char** argv) {
         ASSERT_TOKEN(token, ";", TokenSemiColon);
     }
 
+    // newlines after comments are counted correctly
+    {
+        Lexer lexer(to_source("//this is a comment\nident1 // ident1 here is an identifier\n;"));
+        auto token = lexer.next();
+        TEST_ASSERT(token.loc.line == 1);
+        token = lexer.next();
+        TEST_ASSERT(token.loc.line == 2);
+    }
+
     return 0;
 }
