@@ -76,3 +76,10 @@ ref<Type> array_type(ref<Type> element_type) {
     type->element_type = element_type;
     return static_ref_cast<Type>(type);
 }
+
+ref<Type> function_type(std::optional<ref<Type>> return_type, const std::vector<ref<Type>>& params) {
+    auto type = make_ref<FunctionType>();
+    type->return_type = return_type;
+    type->parameters = params;
+    return static_ref_cast<Type>(type);
+}

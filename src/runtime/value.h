@@ -4,20 +4,20 @@
 
 namespace luna::runtime {
 
-#define TYPES(A) \
-    A(Null) \
-    A(Int) \
-    A(Float) \
-    A(Bool) \
-    A(Object) \
+// #define TYPES(A) \
+//     A(Null) \
+//     A(Int) \
+//     A(Float) \
+//     A(Bool) \
+//     A(Object) \
 
-enum Type {
-#define A(name) Type##name,
-    TYPES(A)
-#undef A
-};
+// enum Type {
+// #define A(name) Type##name,
+//     TYPES(A)
+// #undef A
+// };
 
-const char* get_name_for_type(Type type);
+// const char* get_name_for_type(Type type);
 
 // forward declare Cell from heap
 struct Cell;

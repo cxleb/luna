@@ -377,7 +377,7 @@ void FunctionBuilder::less_eq_i(uint8_t lhs, uint8_t rhs, uint8_t eq) {
 }
 
 void FunctionBuilder::load_const(uint8_t reg, runtime::Value value) {
-    auto idx = builder->push_constant(value);
+    auto idx = builder->unnamed_constant(value);
     insert({
         .opcode = runtime::OpcodeLoadConst,
         .a = reg,
@@ -451,21 +451,58 @@ uint16_t ModuleBuilder::get_func_name_id(const std::string& name) {
     return id;
 }
 
-uint16_t ModuleBuilder::push_constant(runtime::Value value) {
+// uint16_t ModuleBuilder::push_constant(runtime::Value value) {
+//     uint16_t i = 0;
+//     for (auto& c: module->constants) {
+//         // This isnt type safe, but a value is 64-bits and if theyre the same
+//         // integer value does it matter?? I guess we will find out.
+//         if (value.value_int == c.value_int) {
+//             return i;
+//         }
+//         ++i;
+//     }
+//     uint16_t idx = module->constants.size();
+//     module->constants.push_back(value);
+//     return idx;
+// }
+
+uint16_t ModuleBuilder::unnamed_constant(ref<Type> type, runtime::Value value) {
     uint16_t i = 0;
     for (auto& c: module->constants) {
         // This isnt type safe, but a value is 64-bits and if theyre the same
         // integer value does it matter?? I guess we will find out.
-        if (value.value_int == c.value_int) {
+        if (c.type->compare(type) && value.value_int == c.value.value_int) {
             return i;
         }
         ++i;
     }
     uint16_t idx = module->constants.size();
-    module->constants.push_back(value);
+    module->constants.push_back({
+        .name = "",
+        .type = type,
+        .value = value,
+    });
     return idx;
 }
 
+uint16_t ModuleBuilder::named_constant(std::string name, ref<Type> type, runtime::Value value) {
+    uint16_t i = 0;
+    for (auto& c: module->constants) {
+        // This isnt type safe, but a value is 64-bits and if theyre the same
+        // integer value does it matter?? I guess we will find out.
+        if (c.name == name && c.type->compare(type) && c.value.value_int == value.value_int) {
+            return i;
+        }
+        ++i;
+    }
+    uint16_t idx = module->constants.size();
+    module->constants.push_back({
+        .name = name,
+        .type = type,
+        .value = value,
+    });
+    return idx;
+}
 
 ref<runtime::Module> ModuleBuilder::link() {
     return module;

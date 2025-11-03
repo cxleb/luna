@@ -2,16 +2,15 @@
 
 namespace luna::runtime {
 
+// const char* TypeKindNames[] = {
+// #define A(name) #name,
+//     TYPES(A)
+// #undef A
+// };
 
-const char* TypeKindNames[] = {
-#define A(name) #name,
-    TYPES(A)
-#undef A
-};
-
-const char* get_name_for_type(Type type) {
-    return TypeKindNames[type];
-}
+// const char* get_name_for_type(Type type) {
+//     return TypeKindNames[type];
+// }
 
 // bool Value::eq(const Value& b) const {
 //     if (type != b.type) return false;

@@ -1,5 +1,6 @@
 #pragma once
 #include "utils.h"
+#include <vector>
 
 enum TypeKind {
     TypeKindUnknown,
@@ -87,6 +88,6 @@ ref<Type> number_type();
 ref<Type> string_type();
 ref<Type> bool_type();
 ref<Type> array_type(ref<Type> element_type);
+ref<Type> function_type(std::optional<ref<Type>> return_type, const std::vector<ref<Type>>& params);
 
 bool are_types_compatible(ref<Type> a, ref<Type> b);
-

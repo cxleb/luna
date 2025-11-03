@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../shared/utils.h"
+#include "../shared/type.h"
 #include "runtime/value.h"
 
 #include <cstdint>
@@ -78,14 +79,14 @@ struct Function {
 
 struct Constant {
     std::optional<std::string> name;
-    Type type;
+    ref<Type> type;
     Value value;
 };
 
 struct Module {
     std::unordered_map<std::string, uint64_t> name_mapping;
     std::vector<ref<Function>> functions;
-    std::vector<Value> constants;
+    std::vector<Constant> constants;
 };
 
 void dump_inst(Inst inst);

@@ -81,7 +81,8 @@ public:
     FunctionBuilder new_function(const std::string& name);
     void add_function(ref<runtime::Function> function);
     uint16_t get_func_name_id(const std::string& name);
-    uint16_t push_constant(runtime::Value value);
+    uint16_t unnamed_constant(ref<Type> type, runtime::Value value);
+    uint16_t named_constant(std::string name, ref<Type> type, runtime::Value value);
     inline ref<runtime::Module> link();
     inline ref<runtime::Module> get_module() { return module; }
     inline Environment* get_env() { return environment; }

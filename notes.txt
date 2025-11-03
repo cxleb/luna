@@ -1,4 +1,3 @@
-- Bug in AST source location
 - Debug information is generated alongside bytecode
 - Make functions a const value
 - Builtin functions have function signatures
@@ -13,6 +12,7 @@
 - Casting types
 
 done:
+- Bug in AST source location
 - Fix array types
 - Adding source locations to AST
 - Fix type system

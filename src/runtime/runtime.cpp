@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <cassert>
 #include <cstdint>
-#include <cstdio>
 
 namespace luna::runtime {
 
@@ -53,7 +52,7 @@ void Runtime::exec(ref<Module> module) {
     auto main_func_id = module->name_mapping["main"];
     load_function(main_func_id, 0);
 
-    printf("constants %zu\n", module->constants.size());
+    //printf("constants %zu\n", module->constants.size());
 
     while(true) {
         auto& frame = frames.peek();
@@ -249,7 +248,7 @@ void Runtime::exec(ref<Module> module) {
                 break;
             }
             case OpcodeLoadConst: {
-                LOCAL_AT(inst.a) = module->constants[inst.s];
+                LOCAL_AT(inst.a) = module->constants[inst.s].value;
                 break;
             }
         }
