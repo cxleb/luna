@@ -1,0 +1,95 @@
+use cranelift_codegen::{ir::types::{F64, I64}, isa::{OwnedTargetIsa, TargetIsa}};
+use cranelift_jit::{JITBuilder, JITModule};
+use cranelift_module::{FuncId, Module};
+use target_lexicon::triple;
+
+use crate::runtime::translate::TranslateSignature;
+
+mod translate;
+
+pub struct CompiledFunc {
+    id: FuncId,
+    name: String,
+    code: *const u8,
+}
+
+pub struct JitContext {
+    isa: OwnedTargetIsa,
+    module: JITModule,
+    compiled_funcs: Vec<CompiledFunc>
+}
+
+impl JitContext {
+    pub fn new() -> Self {
+        let shared_builder = cranelift_codegen::settings::builder();
+        let shared_flags = cranelift_codegen::settings::Flags::new(shared_builder);
+        let triple = triple!("arm64-apple-macosx");
+        let isa = cranelift_codegen::isa::lookup(triple)
+            .unwrap()
+            .finish(shared_flags)
+            .unwrap();
+
+        let builder = 
+            JITBuilder::new(cranelift_module::default_libcall_names())
+            .unwrap();
+
+        Self {
+            isa,
+            module: JITModule::new(builder),
+            compiled_funcs: Vec::new()
+        }
+    }
+
+    fn isa(&self) -> &dyn TargetIsa {
+        &*self.isa
+    }
+
+    fn translate_type(&self, ty: &crate::types::Type) -> cranelift_codegen::ir::Type {
+        match ty {
+            crate::types::Type::Integer => I64,
+            crate::types::Type::Number => F64,
+            _ => cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple()), // pointer?
+        }
+    }
+
+    pub fn compile_ir_module(&mut self, module: &crate::ir::Module) {
+        let mut context = self.module.make_context();
+        let signatures = module.funcs.iter().map(|f| TranslateSignature {
+            id: f.id.clone(),
+            signature: f.signature.clone()
+        }).collect::<Vec<_>>();
+        let translated = module.funcs.iter().map(|func| {
+            translate::translate_function(self, &func, &mut context, &signatures);
+            let id = self.module.declare_function(&func.id, cranelift_module::Linkage::Local, &context.func.signature).unwrap();
+            self.module.define_function(id, &mut context).unwrap();
+            self.module.clear_context(&mut context);
+            (id, func.id.clone())
+        }).collect::<Vec<_>>();
+
+        self.module.finalize_definitions().unwrap();
+
+        for (id, name) in translated {
+            self.compiled_funcs.push(CompiledFunc { 
+                id, 
+                name, 
+                code: self.module.get_finalized_function(id)
+            });
+        }
+    }
+
+    pub fn call_function_no_params_no_return(&self, name: &str) {
+        let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name).unwrap();
+        unsafe {
+            let code_fn = core::mem::transmute::<_, fn()>(compiled_func.code);
+            code_fn();
+        }    
+    }
+
+    pub fn call_function_no_params<Returns>(&self, name: &str) -> Returns {
+        let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name).unwrap();
+        unsafe {
+            let code_fn = core::mem::transmute::<_, fn() -> Returns>(compiled_func.code);
+            code_fn()
+        }    
+    }
+}
