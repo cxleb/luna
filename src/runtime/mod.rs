@@ -3,7 +3,7 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{FuncId, Module};
 use target_lexicon::triple;
 
-use crate::runtime::translate::TranslateSignature;
+use crate::{builtins::Builtins, ir::Signature, runtime::translate::TranslateSignature};
 
 mod translate;
 
@@ -16,11 +16,12 @@ pub struct CompiledFunc {
 pub struct JitContext {
     isa: OwnedTargetIsa,
     module: JITModule,
+    builtins: Builtins,
     compiled_funcs: Vec<CompiledFunc>
 }
 
 impl JitContext {
-    pub fn new() -> Self {
+    pub fn new(builtins: Builtins) -> Self {
         let shared_builder = cranelift_codegen::settings::builder();
         let shared_flags = cranelift_codegen::settings::Flags::new(shared_builder);
         let triple = triple!("arm64-apple-macosx");
@@ -29,14 +30,20 @@ impl JitContext {
             .finish(shared_flags)
             .unwrap();
 
-        let builder = 
+        let mut builder = 
             JITBuilder::new(cranelift_module::default_libcall_names())
             .unwrap();
+
+        // add the builtins as look up symbols
+        for func in &builtins.functions {
+            builder.symbol(&func.id, func.implementation);
+        }
 
         Self {
             isa,
             module: JITModule::new(builder),
-            compiled_funcs: Vec::new()
+            compiled_funcs: Vec::new(),
+            builtins
         }
     }
 
@@ -54,10 +61,25 @@ impl JitContext {
 
     pub fn compile_ir_module(&mut self, module: &crate::ir::Module) {
         let mut context = self.module.make_context();
-        let signatures = module.funcs.iter().map(|f| TranslateSignature {
-            id: f.id.clone(),
-            signature: f.signature.clone()
-        }).collect::<Vec<_>>();
+        let mut signatures = Vec::new();
+        for func in module.funcs.iter() {
+            signatures.push(TranslateSignature {
+                id: func.id.clone(),
+                signature: func.signature.clone()
+            });
+        }
+        for func in self.builtins.functions.iter() {
+            signatures.push(TranslateSignature {
+                id: func.id.clone(),
+                signature: Signature {
+                    parameters: func.parameters.clone(),
+                    ret_types: match &func.returns {
+                        Some(ret) => vec![ret.clone()],
+                        None => vec![]
+                    }
+                }
+            });
+        }
         let translated = module.funcs.iter().map(|func| {
             translate::translate_function(self, &func, &mut context, &signatures);
             let id = self.module.declare_function(&func.id, cranelift_module::Linkage::Local, &context.func.signature).unwrap();

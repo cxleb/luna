@@ -6,8 +6,11 @@ mod compiler;
 mod ir;
 mod runtime;
 mod types;
+mod builtins;
 
 fn main() {
+    let builtins = builtins::default_builtins();
+
     let src = include_str!("../example.luna");
     print!("parsing... ");  std::io::stdout().flush().unwrap();
     let mut parser = compiler::parser::Parser::new(src);
@@ -29,7 +32,7 @@ fn main() {
 
     //runtime::start(&module);
 
-    let mut jit = runtime::JitContext::new();
+    let mut jit = runtime::JitContext::new(builtins);
     print!("compiling... ");  std::io::stdout().flush().unwrap();
     jit.compile_ir_module(&module);
     println!("done.");

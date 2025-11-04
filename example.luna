@@ -1,13 +1,4 @@
-func add(a: int, b: int): int {
-    return a + b;
-}
-
-func bung(a: int): int {
-    return a * 20 + 2;
-}
-
 func main(): int {
-    let a: int = 10.0;
-    a = a + 10;
-    return add(10, 20) + bung(a);
+    print(120);
+    return 10;
 }

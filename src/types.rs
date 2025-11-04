@@ -26,3 +26,7 @@ pub fn compare(a: &Type, b: &Type) -> ComparisonResult {
         ComparisonResult::Incompatible
     }
 }
+
+pub fn integer() -> Box<Type> {
+    Box::new(Type::Integer)
+}
