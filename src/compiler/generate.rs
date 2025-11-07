@@ -7,20 +7,55 @@ struct FuncGen {
 }
 
 impl FuncGen {
-    fn binary_expr(&mut self, b: &Box<ast::BinaryExpr>) {
+    fn binary_expr(&mut self, e: &ast::Expr, b: &Box<ast::BinaryExpr>) {
         self.expr(&b.lhs);
         self.expr(&b.rhs);
-        match b.kind {
-            ast::BinaryExprKind::Add => self.bld.add_int(),
-            ast::BinaryExprKind::Subtract => self.bld.sub_int(),
-            ast::BinaryExprKind::Multiply => self.bld.mul_int(),
-            ast::BinaryExprKind::Divide => self.bld.div_int(),
-            ast::BinaryExprKind::Equal => self.bld.eq_int(),
-            ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
-            ast::BinaryExprKind::LessThan => self.bld.lt_int(),
-            ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
-            ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
-            ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
+        match e.typ.as_ref() {
+            crate::types::Type::Number => {
+                match b.kind {
+                    ast::BinaryExprKind::Add => self.bld.add_number(),
+                    ast::BinaryExprKind::Subtract => self.bld.sub_number(),
+                    ast::BinaryExprKind::Multiply => self.bld.mul_number(),
+                    ast::BinaryExprKind::Divide => self.bld.div_number(),
+                    ast::BinaryExprKind::Equal => self.bld.eq_number(),
+                    ast::BinaryExprKind::NotEqual => self.bld.neq_number(),
+                    ast::BinaryExprKind::LessThan => self.bld.lt_number(),
+                    ast::BinaryExprKind::GreaterThan => self.bld.gt_number(),
+                    ast::BinaryExprKind::LessThanEqual => self.bld.leq_number(),
+                    ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_number(),
+                }
+            },
+            crate::types::Type::Integer => {
+                match b.kind {
+                    ast::BinaryExprKind::Add => self.bld.add_int(),
+                    ast::BinaryExprKind::Subtract => self.bld.sub_int(),
+                    ast::BinaryExprKind::Multiply => self.bld.mul_int(),
+                    ast::BinaryExprKind::Divide => self.bld.div_int(),
+                    ast::BinaryExprKind::Equal => self.bld.eq_int(),
+                    ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
+                    ast::BinaryExprKind::LessThan => self.bld.lt_int(),
+                    ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
+                    ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
+                    ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
+                }
+            },
+            crate::types::Type::Bool => {
+                match b.kind {
+                    ast::BinaryExprKind::Equal => self.bld.eq_int(),
+                    ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
+                    ast::BinaryExprKind::LessThan => self.bld.lt_int(),
+                    ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
+                    ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
+                    ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
+                    _ => panic!("Invalid binary operation for bool type"),
+                }
+            },
+            _ => {panic!("Cant generate IR for {:?}", e.typ);}
+            //crate::types::Type::Unknown => todo!(),
+            //crate::types::Type::String => todo!(),
+            //crate::types::Type::Bool => todo!(),
+            //crate::types::Type::Array(_) => todo!(),
+            //crate::types::Type::Identifier(_) => todo!(),
         }
     }
 
@@ -38,7 +73,6 @@ impl FuncGen {
             self.expr(arg);
         }
         if let ast::ExprKind::Identifier(name) = &c.function.kind {
-            //self.
             self.bld.call(name.id.clone());
         } else {
             self.expr(&c.function);
@@ -80,7 +114,7 @@ impl FuncGen {
 
     fn expr(&mut self, e: &ast::Expr) {
         match &e.kind {
-            ast::ExprKind::BinaryExpr(b) => self.binary_expr(b),
+            ast::ExprKind::BinaryExpr(b) => self.binary_expr(e, b),
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u),
             ast::ExprKind::Assign(a) => self.assign(a),
             ast::ExprKind::Call(c) => self.call(c),

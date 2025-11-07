@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ir::{self};
-use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, Signature, condcodes::IntCC, types::I64}, isa::CallConv, verify_function};
+use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, Signature, condcodes::{FloatCC, IntCC}, types::I64}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use cranelift_module::{Linkage, Module};
 
@@ -81,7 +81,9 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let res = builder.ins().sdiv(lhs, rhs);
                     stack.push(res);
                 }
-                ir::Inst::EquInt =>{
+                ir::Inst::ModInt => todo!(),
+                ir::Inst::EquInt => {
+                    println!("EquInt");
                     let rhs = stack.pop().unwrap();
                     let lhs = stack.pop().unwrap();
                     let res = builder.ins().icmp(IntCC::Equal, lhs, rhs);
@@ -141,6 +143,42 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let res = builder.ins().fdiv(lhs, rhs);
                     stack.push(res);
                 }
+                ir::Inst::EquNumber => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().fcmp(FloatCC::Equal, lhs, rhs);
+                    stack.push(res);
+                },
+                ir::Inst::NeqNumber => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().fcmp(FloatCC::NotEqual, lhs, rhs);
+                    stack.push(res);
+                },
+                ir::Inst::LtNumber => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().fcmp(FloatCC::LessThan, lhs, rhs);
+                    stack.push(res);
+                },
+                ir::Inst::GtNumber => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
+                    stack.push(res);
+                },
+                ir::Inst::LeqNumber => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().fcmp(FloatCC::LessThanOrEqual, lhs, rhs);
+                    stack.push(res);
+                },
+                ir::Inst::GeqNumber => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().fcmp(FloatCC::GreaterThanOrEqual, lhs, rhs);
+                    stack.push(res);
+                },
                 ir::Inst::LoadConstInt(value) => {
                     let val = builder.ins().iconst(I64, *value);
                     stack.push(val);
@@ -192,7 +230,7 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                 ir::Inst::IndirectCall => {
 
                 }
-                _ => {}
+                //ir::Inst::Br(_) => todo!(),
             }
         }
     }

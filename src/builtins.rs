@@ -35,8 +35,15 @@ pub fn builtin_print(value: i64) {
     println!("{}", value);
 }
 
+pub fn builtin_assert(cond: i8) {
+    if cond == 0 {
+        panic!("Assertion failed");
+    }
+}
+
 pub fn default_builtins() -> Builtins {
     let mut builtins = Builtins::new();
     builtins.push_function("print", vec![types::integer()], None, builtin_print);
+    builtins.push_function("assert", vec![types::bool()], None, builtin_assert); 
     builtins
 }

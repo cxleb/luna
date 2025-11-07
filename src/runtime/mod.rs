@@ -1,4 +1,4 @@
-use cranelift_codegen::{ir::types::{F64, I64}, isa::{OwnedTargetIsa, TargetIsa}};
+use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}};
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{FuncId, Module};
 use target_lexicon::triple;
@@ -54,7 +54,9 @@ impl JitContext {
     fn translate_type(&self, ty: &crate::types::Type) -> cranelift_codegen::ir::Type {
         match ty {
             crate::types::Type::Integer => I64,
+            crate::types::Type::Bool => I8,
             crate::types::Type::Number => F64,
+
             _ => cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple()), // pointer?
         }
     }

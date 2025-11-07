@@ -7,8 +7,13 @@ use crate::types::{self, Type};
 pub enum SemaErrorReason {
     GenericError, // todo(caleb): Remove me!
     VariableNotFound,
-    IncompatibleTypeInVariableDefinition,
-    CannotUseExpressionInLeftHandExpression
+    NonNumericTypeInBinaryExpression,
+    IncompatibleTypesInBinaryExpression,
+    IncompatibleTypesInVariableDefinition,
+    CannotUseExpressionInLeftHandExpression,
+    UnexpectedReturnValue,
+    MissingReturnValue,
+    IncompatibleTypesInReturnValue,
 }
 
 #[derive(Debug)]
@@ -19,13 +24,15 @@ pub struct SemaError {
 type SemaResult<X> = Result<X, SemaError>;
 
 struct FuncTypeInference<'a> {
+    own_signature:&'a ast::FuncSignature,
     signatures: &'a Vec<ast::FuncSignature>,
     variable_scopes: Vec<HashMap<String, Box<Type>>>,
 }
 
 impl<'a> FuncTypeInference<'a> {
-    fn new(signatures: &'a Vec<ast::FuncSignature>) -> Self {
+    fn new(own_signature: &'a ast::FuncSignature, signatures: &'a Vec<ast::FuncSignature>) -> Self {
         Self {
+            own_signature,
             signatures,
             variable_scopes: Vec::new(),
         }
@@ -60,21 +67,41 @@ impl<'a> FuncTypeInference<'a> {
         Err(SemaError { reason })
     }
 
-    fn binary_expr(&mut self, b: &mut Box<ast::BinaryExpr>) -> SemaResult<()> {
+    fn binary_expr(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
+        let b = match &mut e.kind {
+            ast::ExprKind::BinaryExpr(b) => b,
+            _ => panic!()
+        };
+        
         self.expr(&mut b.lhs)?;
         self.expr(&mut b.rhs)?;
-        //match b.kind {
-        //    ast::BinaryExprKind::Add => self.bld.add_int(),
-        //    ast::BinaryExprKind::Subtract => self.bld.sub_int(),
-        //    ast::BinaryExprKind::Multiply => self.bld.mul_int(),
-        //    ast::BinaryExprKind::Divide => self.bld.div_int(),
-        //    ast::BinaryExprKind::Equal => self.bld.eq_int(),
-        //    ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
-        //    ast::BinaryExprKind::LessThan => self.bld.lt_int(),
-        //    ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
-        //    ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
-        //    ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
-        //}
+        
+        if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
+            return self.error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
+        }
+
+        match b.kind {
+            ast::BinaryExprKind::Add |
+            ast::BinaryExprKind::Subtract |
+            ast::BinaryExprKind::Multiply |
+            ast::BinaryExprKind::Divide => {
+                if !types::is_numeric(&b.rhs.typ) {
+                    return self.error(SemaErrorReason::NonNumericTypeInBinaryExpression);
+                }
+                if !types::is_numeric(&b.lhs.typ) {
+                    return self.error(SemaErrorReason::NonNumericTypeInBinaryExpression);
+                }
+                e.typ = b.lhs.typ.clone();
+            }
+            ast::BinaryExprKind::Equal |
+            ast::BinaryExprKind::NotEqual |
+            ast::BinaryExprKind::LessThan |
+            ast::BinaryExprKind::GreaterThan |
+            ast::BinaryExprKind::LessThanEqual |
+            ast::BinaryExprKind::GreaterThanEqual => {
+                e.typ = types::bool();
+            }
+        }
         self.ok()
     }
 
@@ -88,7 +115,17 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn call(&mut self, _c: &mut Box<ast::Call>) -> SemaResult<()> {
+    fn call(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
+        let c = match &mut e.kind {
+            ast::ExprKind::Call(c) => c,
+            _ => panic!()
+        };
+
+        for arg in c.parameters.iter_mut() {
+            self.expr(arg)?;
+        }
+
+        e.typ = types::unknown();
         self.ok()
     }
 
@@ -131,10 +168,10 @@ impl<'a> FuncTypeInference<'a> {
 
     fn expr(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
         match &mut e.kind {
-            ast::ExprKind::BinaryExpr(b) => self.binary_expr(b),
+            ast::ExprKind::BinaryExpr(_) => self.binary_expr(e),
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u),
             ast::ExprKind::Assign(a) => self.assign(a),
-            ast::ExprKind::Call(c) => self.call(c),
+            ast::ExprKind::Call(_) => self.call(e),
             ast::ExprKind::Integer(i) => self.integer(i),
             ast::ExprKind::Number(f) => self.number(f),
             ast::ExprKind::StringLiteral(s) => self.string_literal(s),
@@ -204,8 +241,19 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     fn return_stmt(&mut self, r: &mut Box<ast::ReturnStmt>) -> SemaResult<()> {
-        if let Some(r) = &mut r.value {
-            self.expr(r)?;
+        if let Some(return_type) = &self.own_signature.return_type {
+            if let Some(r) = &mut r.value {
+                self.expr(r)?;
+                if types::compare(&r.typ, return_type) == types::ComparisonResult::Incompatible {
+                    return self.error(SemaErrorReason::IncompatibleTypesInReturnValue);
+                }
+            } else {
+                return self.error(SemaErrorReason::MissingReturnValue);
+            }
+        } else {
+            if r.value.is_some() {
+                return self.error(SemaErrorReason::UnexpectedReturnValue);
+            }
         }
         self.ok()
     }
@@ -215,7 +263,7 @@ impl<'a> FuncTypeInference<'a> {
         let ret = &v.value.typ;
         if let Some(annotation) = &v.type_annotation {
             if types::compare(&annotation, ret) == types::ComparisonResult::Incompatible {
-                return self.error(SemaErrorReason::IncompatibleTypeInVariableDefinition);
+                return self.error(SemaErrorReason::IncompatibleTypesInVariableDefinition);
             }
         } else {
             v.type_annotation = Some(ret.clone());
@@ -254,7 +302,8 @@ impl<'a> FuncTypeInference<'a> {
 }
 
 pub fn sema_function(signatures: &Vec<ast::FuncSignature>, func: & mut ast::Func) -> SemaResult<()> {
-    FuncTypeInference::new(signatures).check(func)?;
+    let own_signature = signatures.iter().find(|s| s.id == func.signature.id).unwrap();
+    FuncTypeInference::new(own_signature, signatures).check(func)?;
     Ok(())
 }
 

@@ -27,6 +27,18 @@ pub fn compare(a: &Type, b: &Type) -> ComparisonResult {
     }
 }
 
+pub fn is_numeric(ty: &Type) -> bool {
+    matches!(ty, Type::Integer | Type::Number)
+}
+
+pub fn unknown() -> Box<Type> {
+    Box::new(Type::Unknown)
+}
+
 pub fn integer() -> Box<Type> {
     Box::new(Type::Integer)
+}
+
+pub fn bool() -> Box<Type> {
+    Box::new(Type::Bool)
 }

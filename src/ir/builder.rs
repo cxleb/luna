@@ -136,6 +136,30 @@ impl FuncBuilder {
         self.append_inst(super::Inst::DivNumber);
     }
 
+    pub fn eq_number(&mut self) {
+        self.append_inst(super::Inst::EquNumber);
+    }
+
+    pub fn neq_number(&mut self) {
+        self.append_inst(super::Inst::NeqNumber);
+    }
+
+    pub fn lt_number(&mut self) {
+        self.append_inst(super::Inst::LtNumber);
+    }
+
+    pub fn gt_number(&mut self) {
+        self.append_inst(super::Inst::GtNumber);
+    }
+
+    pub fn leq_number(&mut self) {
+        self.append_inst(super::Inst::LeqNumber);
+    }
+
+    pub fn geq_number(&mut self) {
+        self.append_inst(super::Inst::GeqNumber);
+    }
+
     pub fn load_const_int(&mut self, i: i64) {
         self.append_inst(super::Inst::LoadConstInt(i));
     }
