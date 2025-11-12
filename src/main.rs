@@ -11,9 +11,15 @@ mod builtins;
 fn main() {
     let builtins = builtins::default_builtins();
 
-    let src = include_str!("../example.luna");
+    // read file from cli args
+    let mut args = std::env::args();
+    args.next();
+    let name = args.next().expect("Expected file");
+    print!("Loading file: {}...", name);  std::io::stdout().flush().unwrap();
+    let src = std::fs::read_to_string(name).expect("Could not load file");
+    println!("done.");
     print!("parsing... ");  std::io::stdout().flush().unwrap();
-    let mut parser = compiler::parser::Parser::new(src);
+    let mut parser = compiler::parser::Parser::new(&src);
     let mut ast_module = parser.parse_module().unwrap();
     println!("done.");
     print!("type checking... ");  std::io::stdout().flush().unwrap();
@@ -27,10 +33,7 @@ fn main() {
     print!("generating ir... ");  std::io::stdout().flush().unwrap();
     let module = compiler::generate::gen_module(ast_module);
     println!("done.");
-    println!("{:?}", module);
-    //runtime::run();
-
-    //runtime::start(&module);
+    //println!("{:?}", module);
 
     let mut jit = runtime::JitContext::new(builtins);
     print!("compiling... ");  std::io::stdout().flush().unwrap();

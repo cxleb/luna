@@ -6,6 +6,7 @@ use target_lexicon::triple;
 use crate::{builtins::Builtins, ir::Signature, runtime::translate::TranslateSignature};
 
 mod translate;
+mod gc;
 
 pub struct CompiledFunc {
     id: FuncId,

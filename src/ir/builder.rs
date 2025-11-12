@@ -168,6 +168,10 @@ impl FuncBuilder {
         self.append_inst(super::Inst::LoadConstNumber(n));
     }
 
+    pub fn load_const_bool(&mut self, b: bool) {
+        self.append_inst(super::Inst::LoadConstBool(b));
+    }
+
     pub fn load(&mut self, v: VariableRef) {
         self.append_inst(super::Inst::Load(v));
     }
@@ -175,14 +179,6 @@ impl FuncBuilder {
     pub fn store(&mut self, v: VariableRef) {
         self.append_inst(super::Inst::Store(v));
     }
-
-    // pub fn load_number(&mut self, v: u64) {
-    //     self.append_inst(super::Inst::LoadNumber(v));
-    // }
-
-    // pub fn store_number(&mut self, v: u64) {
-    //     self.append_inst(super::Inst::StoreNumber(v));
-    // }
 
     pub fn nop(&mut self) {
         self.append_inst(super::Inst::Nop);

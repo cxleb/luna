@@ -14,6 +14,7 @@ pub enum SemaErrorReason {
     UnexpectedReturnValue,
     MissingReturnValue,
     IncompatibleTypesInReturnValue,
+    ExpectedBooleanInTestCondition,
 }
 
 #[derive(Debug)]
@@ -137,6 +138,10 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
+    fn boolean(&mut self, _b: &mut Box<ast::Bool>) -> SemaResult<()> {
+        self.ok()
+    }
+
     fn string_literal(&mut self, _s: &mut Box<ast::StringLiteral>) -> SemaResult<()> {
         self.ok()
     }
@@ -174,6 +179,7 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Call(_) => self.call(e),
             ast::ExprKind::Integer(i) => self.integer(i),
             ast::ExprKind::Number(f) => self.number(f),
+            ast::ExprKind::Boolean(b) => self.boolean(b),
             ast::ExprKind::StringLiteral(s) => self.string_literal(s),
             ast::ExprKind::Identifier(_) => self.identifier(e),
             ast::ExprKind::Lookup(l) => self.lookup(l),
@@ -233,6 +239,9 @@ impl<'a> FuncTypeInference<'a> {
 
     fn if_stmt(&mut self, f: &mut Box<ast::IfStmt>) -> SemaResult<()> {
         self.expr(&mut f.test)?;
+        if types::compare(&f.test.typ, &Type::Bool) != types::ComparisonResult::Same {
+            return self.error(SemaErrorReason::ExpectedBooleanInTestCondition);
+        }
         self.stmt(&mut f.consequent)?;
         if let Some(a) = &mut f.alternate{
             self.stmt(a)?;

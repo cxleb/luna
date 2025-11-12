@@ -395,6 +395,20 @@ impl<'a> Parser<'a> {
             let token = self.next()?;
             let id = token.get_string();
             return Ok(self.expr(ExprKind::Identifier(Box::new(Identifier { id })), token.loc));
+        } else if self.test(TokenKind::Keyword(Keywords::True)) {
+            let token = self.next()?;
+            return Ok(Expr {
+                kind: ExprKind::Boolean(Box::new(Bool { value: true })),
+                loc: token.loc,
+                typ: Box::new(Type::Bool),
+            });
+        } else if self.test(TokenKind::Keyword(Keywords::False)) {
+            let token = self.next()?;
+            return Ok(Expr {
+                kind: ExprKind::Boolean(Box::new(Bool { value: false })),
+                loc: token.loc,
+                typ: Box::new(Type::Bool),
+            });
         } else {
             return self.error(ParserErrorReason::ExpectedExpression);
         }

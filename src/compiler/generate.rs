@@ -88,6 +88,10 @@ impl FuncGen {
         self.bld.load_const_number(f.value);
     }
 
+    fn boolean(&mut self, b: &Box<ast::Bool>) {
+        self.bld.load_const_bool(b.value);
+    }
+
     fn string_literal(&mut self, _s: &Box<ast::StringLiteral>) {
         todo!()
     }
@@ -120,6 +124,7 @@ impl FuncGen {
             ast::ExprKind::Call(c) => self.call(c),
             ast::ExprKind::Integer(i) => self.integer(i),
             ast::ExprKind::Number(f) => self.number(f),
+            ast::ExprKind::Boolean(b) => self.boolean(b),
             ast::ExprKind::StringLiteral(s) => self.string_literal(s),
             ast::ExprKind::Identifier(i) => self.identifier(i),
             ast::ExprKind::Lookup(l) => self.lookup(l),

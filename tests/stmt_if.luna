@@ -1,0 +1,13 @@
+func main() {
+    if true {
+        assert(true);
+    } else {
+        assert(false);
+    }
+
+    if false {
+        assert(false);
+    } else {
+        assert(true);
+    }
+}

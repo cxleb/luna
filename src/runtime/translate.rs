@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ir::{self};
-use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, Signature, condcodes::{FloatCC, IntCC}, types::I64}, isa::CallConv, verify_function};
+use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, Signature, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use cranelift_module::{Linkage, Module};
 
@@ -50,6 +50,8 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
     let mut stack = Vec::new();
     for (i, block) in func.blocks.iter().enumerate() {
         builder.switch_to_block(blocks[i]);
+        let mut did_block_terminate = false;
+        
         for inst in block.ins.iter() {
             match inst {
                 ir::Inst::Nop => {}
@@ -187,6 +189,10 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let val = builder.ins().f64const(*value);
                     stack.push(val);
                 }
+                ir::Inst::LoadConstBool(value) => {
+                    let val = builder.ins().iconst(I8, if *value { 1 } else { 0 } );
+                    stack.push(val);
+                }
                 ir::Inst::Load(var) => {
                     stack.push(builder.use_var(variables[*var]));
                 }
@@ -197,17 +203,18 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                 ir::Inst::CondBr(c, a) => {
                     let cond = stack.pop().unwrap();
                     builder.ins().brif(cond, blocks[*c], &[], blocks[*a], &[]);
-                    break;
+                    println!("yep");
+                    did_block_terminate = true;
                 }
                 &ir::Inst::Br(target) => {
                     builder.ins().jump(blocks[target], &[]);
-                    break;
+                    did_block_terminate = true;
                 }
                 ir::Inst::Ret => {
                     let ret_vals = stack.iter().rev().take(func.signature.ret_types.len()).cloned().collect::<Vec<_>>();
                     stack.truncate(stack.len() - ret_vals.len());
                     builder.ins().return_(&ret_vals);
-                    break;
+                    did_block_terminate = true;
                 }
                 ir::Inst::Call(id) => {
                     let sig = signatures.iter().find(|s| s.id == *id).unwrap();
@@ -218,8 +225,6 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                         declared_signatures.insert(id.clone(), func_ref);
                     }
 
-                    println!("Taking {}", sig.signature.parameters.len());
-
                     let args = stack.iter().rev().take(sig.signature.parameters.len()).cloned().collect::<Vec<_>>();
                     stack.truncate(stack.len() - args.len());
                     let call = builder.ins().call(declared_signatures[id], &args);
@@ -227,10 +232,16 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                         stack.push(*r);
                     }
                 }
-                ir::Inst::IndirectCall => {
+                ir::Inst::IndirectCall => todo!()
+            }
+        }
 
-                }
-                //ir::Inst::Br(_) => todo!(),
+        // it is perfectly fine for the last block to not have a return
+        if !did_block_terminate {
+            if i == func.blocks.len() - 1 {
+                builder.ins().return_(&[]);
+            } else {
+                panic!("Block {i} did not terminate");
             }
         }
     }

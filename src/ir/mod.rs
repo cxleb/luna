@@ -32,6 +32,7 @@ pub enum Inst {
     GeqNumber,
     LoadConstInt(i64),
     LoadConstNumber(f64),
+    LoadConstBool(bool),
     Load(VariableRef),
     Store(VariableRef),
     //LoadNumber(u64),

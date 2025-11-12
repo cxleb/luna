@@ -47,6 +47,11 @@ pub struct Number {
 }
 
 #[derive(Debug, Clone)]
+pub struct Bool {
+    pub value: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct StringLiteral {
     pub value: String,
 }
@@ -81,6 +86,7 @@ pub enum ExprKind {
     Integer(Box<Integer>),
     Number(Box<Number>),
     StringLiteral(Box<StringLiteral>),
+    Boolean(Box<Bool>),
     Identifier(Box<Identifier>),
     Lookup(Box<Lookup>),
     ArrayLiteral(Box<ArrayLiteral>),

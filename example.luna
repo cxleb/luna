@@ -1,5 +1,5 @@
 func main(): int {
-    assert(10 == 11.0);
+    assert(10 == 11);
     //assert(10.0 == 10.0);
     return 0;
 }
