@@ -10,4 +10,20 @@ func main() {
     } else {
         assert(true);
     }
+
+    let a = 0;
+    if a == 0 {
+        a = 10;
+    } else {
+        a = 11;
+    }
+    assert(a == 10);
+
+    let b = 0;
+    if b != 0 {
+        b = 10;
+    } else {
+        b = 11;
+    }
+    assert(b == 11);
 }

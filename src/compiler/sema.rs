@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use crate::compiler::ast;
+use crate::builtins::Builtins;
+use crate::compiler::{SourceLoc, ast};
 use crate::types::{self, Type};
 
 #[derive(Debug)]
@@ -15,11 +16,16 @@ pub enum SemaErrorReason {
     MissingReturnValue,
     IncompatibleTypesInReturnValue,
     ExpectedBooleanInTestCondition,
+    FunctionNotFound,
+    CallNotEnoughArguments,
+    CallTooManyArguments,
+    CallArgumentTypeMismatch,
 }
 
 #[derive(Debug)]
 pub struct SemaError {
     reason: SemaErrorReason,
+    loc: SourceLoc,
 }
 
 type SemaResult<X> = Result<X, SemaError>;
@@ -65,7 +71,11 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     pub fn error<T>(&self, reason: SemaErrorReason) -> SemaResult<T> {
-        Err(SemaError { reason })
+        Err(SemaError { reason, loc: SourceLoc::default() })
+    }
+
+    pub fn error_loc<T>(&self, reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
+        Err(SemaError { reason, loc })
     }
 
     fn binary_expr(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
@@ -76,23 +86,34 @@ impl<'a> FuncTypeInference<'a> {
         
         self.expr(&mut b.lhs)?;
         self.expr(&mut b.rhs)?;
-        
-        if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
-            return self.error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
-        }
 
         match b.kind {
             ast::BinaryExprKind::Add |
             ast::BinaryExprKind::Subtract |
             ast::BinaryExprKind::Multiply |
             ast::BinaryExprKind::Divide => {
+                let mut typ = b.lhs.typ.clone();
+                
+                if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
+                    // If we are doing something with an int and number, promote the int to a number
+                    if types::is_numeric(&b.lhs.typ) && types::is_numeric(&b.rhs.typ) {
+                        if types::is_number(&b.lhs.typ) || types::is_number(&b.rhs.typ) {
+                            typ = types::number();
+                        } else {
+                            typ = types::integer();
+                        }
+                    } else {
+                        return self.error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
+                    }
+                }
+
                 if !types::is_numeric(&b.rhs.typ) {
-                    return self.error(SemaErrorReason::NonNumericTypeInBinaryExpression);
+                    return self.error_loc(SemaErrorReason::NonNumericTypeInBinaryExpression, e.loc);
                 }
                 if !types::is_numeric(&b.lhs.typ) {
-                    return self.error(SemaErrorReason::NonNumericTypeInBinaryExpression);
+                    return self.error_loc(SemaErrorReason::NonNumericTypeInBinaryExpression, e.loc);
                 }
-                e.typ = b.lhs.typ.clone();
+                e.typ = typ;
             }
             ast::BinaryExprKind::Equal |
             ast::BinaryExprKind::NotEqual |
@@ -100,6 +121,10 @@ impl<'a> FuncTypeInference<'a> {
             ast::BinaryExprKind::GreaterThan |
             ast::BinaryExprKind::LessThanEqual |
             ast::BinaryExprKind::GreaterThanEqual => {
+                if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
+                    return self.error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
+                }
+
                 e.typ = types::bool();
             }
         }
@@ -122,11 +147,43 @@ impl<'a> FuncTypeInference<'a> {
             _ => panic!()
         };
 
-        for arg in c.parameters.iter_mut() {
-            self.expr(arg)?;
+        // load the function call name if its an identifier
+        // (for now, we only support direct calls)
+        let name = match &c.function.kind {
+            ast::ExprKind::Identifier(i) => &i.id,
+            _ => unimplemented!("Function calls must be direct(by name) for now"),
+        };
+
+        // find the called function
+        //println!("Looking for function: {}", name);
+        //println!("Available functions: {}", self.signatures.iter().map(|s| s.id.clone()).collect::<Vec<_>>().join(", "));
+        let func_signature = match self.signatures.iter().find(|s| s.id == *name) {
+            Some(s) => s,
+            None => return self.error_loc(SemaErrorReason::FunctionNotFound, e.loc),
+        };
+
+        // Do some basic argument count checking
+        if func_signature.params.len() < c.parameters.len() {
+            return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
+        }
+        if func_signature.params.len() > c.parameters.len() {
+            return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
         }
 
-        e.typ = types::unknown();
+        // Sema check arguements, then check argument types
+        for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
+            self.expr(arg)?;
+            if types::compare(&arg.typ, &param.type_annotation) == types::ComparisonResult::Incompatible {
+                return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
+            }
+        }
+
+        // Assign this expr the return type of the function
+        if let Some(typ) = &func_signature.return_type {
+            e.typ = typ.clone();
+        } else {
+            e.typ = types::unknown();
+        }
         self.ok()
     }
 
@@ -316,8 +373,24 @@ pub fn sema_function(signatures: &Vec<ast::FuncSignature>, func: & mut ast::Func
     Ok(())
 }
 
-pub fn sema_module(module: &mut Box<ast::Module>) -> SemaResult<()> {
-    let signatures = module.functions.iter().map(|f| f.signature.clone()).collect::<Vec<_>>();
+pub fn sema_module(module: &mut Box<ast::Module>, builtins: &Builtins) -> SemaResult<()> {
+    let mut signatures = module.functions.iter().map(|f| f.signature.clone()).collect::<Vec<_>>();
+    // add builtin signatures
+    for builtin in builtins.functions.iter() {
+        let signature = ast::FuncSignature {
+            id: builtin.id.clone(),
+            params: builtin.parameters.iter().enumerate().map(|(i, p)| ast::Param {
+                id: format!("arg{}", i),
+                type_annotation: p.clone(),
+            }).collect(),
+            return_type: builtin.returns.clone(),
+        };
+        signatures.push(signature);
+        //// avoid duplicates
+        //if !signatures.iter().any(|s| s.id == signature.id) {
+        //    // println!("Adding builtin function signature: {:?}", signature);
+        //}
+    }
     for func in module.functions.iter_mut() {
         sema_function(&signatures, func)?;
     }

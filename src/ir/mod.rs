@@ -33,8 +33,11 @@ pub enum Inst {
     LoadConstInt(i64),
     LoadConstNumber(f64),
     LoadConstBool(bool),
+    Truncate, // Convert number to integer
+    Promote,   // Convert integer to number
     Load(VariableRef),
     Store(VariableRef),
+    Tee(VariableRef),
     //LoadNumber(u64),
     //StoreNumber(u64),
     CondBr(BlockRef, BlockRef), // branch if 0

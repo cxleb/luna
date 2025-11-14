@@ -1,6 +1,7 @@
 use crate::compiler::ast;
 use crate::ir::builder::FuncBuilder;
 use crate::ir::{self};
+use crate::types;
 
 struct FuncGen {
     bld: FuncBuilder,
@@ -8,54 +9,69 @@ struct FuncGen {
 
 impl FuncGen {
     fn binary_expr(&mut self, e: &ast::Expr, b: &Box<ast::BinaryExpr>) {
-        self.expr(&b.lhs);
-        self.expr(&b.rhs);
         match e.typ.as_ref() {
             crate::types::Type::Number => {
+                self.expr(&b.lhs);
+                // auto cast to number
+                if types::is_integer(&b.lhs.typ) {
+                    self.bld.promote();
+                }
+                self.expr(&b.rhs);
+                // auto cast to number
+                if types::is_integer(&b.rhs.typ) {
+                    self.bld.promote();
+                }
                 match b.kind {
                     ast::BinaryExprKind::Add => self.bld.add_number(),
                     ast::BinaryExprKind::Subtract => self.bld.sub_number(),
                     ast::BinaryExprKind::Multiply => self.bld.mul_number(),
                     ast::BinaryExprKind::Divide => self.bld.div_number(),
-                    ast::BinaryExprKind::Equal => self.bld.eq_number(),
-                    ast::BinaryExprKind::NotEqual => self.bld.neq_number(),
-                    ast::BinaryExprKind::LessThan => self.bld.lt_number(),
-                    ast::BinaryExprKind::GreaterThan => self.bld.gt_number(),
-                    ast::BinaryExprKind::LessThanEqual => self.bld.leq_number(),
-                    ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_number(),
+                    _ => { panic!("Invalid condition for type"); }
                 }
             },
             crate::types::Type::Integer => {
+                // auto cast to integer is not supported
+                self.expr(&b.lhs);
+                self.expr(&b.rhs);
                 match b.kind {
                     ast::BinaryExprKind::Add => self.bld.add_int(),
                     ast::BinaryExprKind::Subtract => self.bld.sub_int(),
                     ast::BinaryExprKind::Multiply => self.bld.mul_int(),
                     ast::BinaryExprKind::Divide => self.bld.div_int(),
-                    ast::BinaryExprKind::Equal => self.bld.eq_int(),
-                    ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
-                    ast::BinaryExprKind::LessThan => self.bld.lt_int(),
-                    ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
-                    ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
-                    ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
+                    _ => { panic!("Invalid condition for type"); }
                 }
             },
             crate::types::Type::Bool => {
-                match b.kind {
-                    ast::BinaryExprKind::Equal => self.bld.eq_int(),
-                    ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
-                    ast::BinaryExprKind::LessThan => self.bld.lt_int(),
-                    ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
-                    ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
-                    ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
-                    _ => panic!("Invalid binary operation for bool type"),
+                self.expr(&b.lhs);
+                self.expr(&b.rhs);
+                match b.lhs.typ.as_ref() {
+                    crate::types::Type::Integer => {
+                        match b.kind {
+                            ast::BinaryExprKind::Equal => self.bld.eq_int(),
+                            ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
+                            ast::BinaryExprKind::LessThan => self.bld.lt_int(),
+                            ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
+                            ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
+                            ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
+                            _ => panic!("Invalid binary operation for bool type"),
+                        }
+                    },
+                    crate::types::Type::Number => {
+                        match b.kind {
+                            ast::BinaryExprKind::Equal => self.bld.eq_number(),
+                            ast::BinaryExprKind::NotEqual => self.bld.neq_number(),
+                            ast::BinaryExprKind::LessThan => self.bld.lt_number(),
+                            ast::BinaryExprKind::GreaterThan => self.bld.gt_number(),
+                            ast::BinaryExprKind::LessThanEqual => self.bld.leq_number(),
+                            ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_number(),
+                            _ => panic!("Invalid binary operation for bool type"),
+                        }
+                    },
+                    _ => { panic!("Invalid lhs type for bool binary expr"); }
                 }
+                
             },
-            _ => {panic!("Cant generate IR for {:?}", e.typ);}
-            //crate::types::Type::Unknown => todo!(),
-            //crate::types::Type::String => todo!(),
-            //crate::types::Type::Bool => todo!(),
-            //crate::types::Type::Array(_) => todo!(),
-            //crate::types::Type::Identifier(_) => todo!(),
+            _ => { panic!("Cant generate IR for {:?}", e.typ); }
         }
     }
 
@@ -133,27 +149,26 @@ impl FuncGen {
         }
     }
 
-    fn store_lookup(&mut self, _e: &ast::Expr, _l: &Box<ast::Lookup>) {}
+    fn store_lookup(&mut self, _e: &ast::Expr, _l: &Box<ast::Lookup>) {
+        unimplemented!()
+    }
 
     fn store_identifier(&mut self, _e: &ast::Expr, i: &Box<ast::Identifier>) {
         if let Some(var_id) = self.bld.find_var(&i.id) {
-            self.bld.store(var_id);
+            self.bld.tee(var_id);
         } else {
             panic!("Undefined variable {}", i.id);
         }
     }
 
-    fn store_assign(&mut self, _e: &ast::Expr, _a: &Box<ast::Assign>) {
-        unimplemented!()
-    }
-
     // These are expressions which are going to be used to "store" a value
     // aka l values
     fn store_expr(&mut self, e: &ast::Expr) {
+        //println!("here {:?}", e);
         match &e.kind {
             ast::ExprKind::Lookup(l) => self.store_lookup(e, l),
             ast::ExprKind::Identifier(i) => self.store_identifier(e, i),
-            ast::ExprKind::Assign(a) => self.store_assign(e, a),
+            //ast::ExprKind::Assign(a) => self.store_assign(e, a),
             //ast::Expr::BinaryExpr(b)
             //ast::Expr::UnaryExpr(u)
             //ast::Expr::Call(c)
@@ -166,36 +181,55 @@ impl FuncGen {
         }
     }
 
-    fn block_stmt(&mut self, b: &Box<ast::BlockStmt>) {
+    fn block_stmt(&mut self, b: &Box<ast::BlockStmt>) -> bool {
+        let mut did_return = false;
         self.bld.push_scope();
         for s in b.stmts.iter() {
-            self.stmt(&s);
+            if self.stmt(&s) {
+                did_return = true;
+                break;
+            }
         }
         self.bld.pop_scope();
+        did_return
     }
 
-    fn expr_stmt(&mut self, e: &Box<ast::ExprStmt>) {
+    fn expr_stmt(&mut self, e: &Box<ast::ExprStmt>) -> bool {
         self.expr(&e.expr);
+        // todo: pop value off stack if not used, there may be multiple values on stack
+        false
     }
 
-    fn for_stmt(&mut self, _f: &Box<ast::ForStmt>) {
+    fn for_stmt(&mut self, _f: &Box<ast::ForStmt>) -> bool {
         unimplemented!()
     }
 
-    fn if_stmt(&mut self, f: &Box<ast::IfStmt>) {
+    fn if_stmt(&mut self, f: &Box<ast::IfStmt>) -> bool {
         if let Some(alternate) = &f.alternate {
             let consequent_block = self.bld.new_block();
             let alternate_block = self.bld.new_block();
-            let finish_block = self.bld.new_block();
             self.expr(&f.test);
             self.bld.condbr(consequent_block, alternate_block);
             self.bld.switch_to_block(consequent_block);
-            self.stmt(&f.consequent);
-            self.bld.br(finish_block);
+            let consequent_returned = self.stmt(&f.consequent);
             self.bld.switch_to_block(alternate_block);
-            self.stmt(alternate);
-            self.bld.br(finish_block);
-            self.bld.switch_to_block(finish_block);
+            let alternate_returned = self.stmt(alternate);
+            let needs_finish = !(consequent_returned && alternate_returned);
+            if needs_finish {
+                let finish_block = self.bld.new_block();
+                if !consequent_returned {
+                    self.bld.switch_to_block(consequent_block);
+                    self.bld.br(finish_block);
+                }
+                if !alternate_returned {
+                    self.bld.switch_to_block(alternate_block);
+                    self.bld.br(finish_block)
+                };
+                self.bld.switch_to_block(finish_block);
+                false
+            } else {
+                true
+            }
         } else {
             let consequent_block = self.bld.new_block();
             let finish_block = self.bld.new_block();
@@ -203,27 +237,31 @@ impl FuncGen {
             self.bld.condbr(consequent_block, finish_block);
             self.bld.switch_to_block(consequent_block);
             self.stmt(&f.consequent);
+            // In this situation, we always need to branch to finish
             self.bld.br(finish_block);
             self.bld.switch_to_block(finish_block);
+            false
         }
     }
 
-    fn return_stmt(&mut self, r: &Box<ast::ReturnStmt>) {
+    fn return_stmt(&mut self, r: &Box<ast::ReturnStmt>) -> bool {
         if let Some(r) = &r.value {
             self.expr(r);
         }
         self.bld.ret();
+        true
     }
 
-    fn var_decl_stmt(&mut self, v: &Box<ast::VarDeclStmt>) {
+    fn var_decl_stmt(&mut self, v: &Box<ast::VarDeclStmt>) -> bool {
         let id = self
             .bld
             .create_var(v.id.clone(), v.type_annotation.clone().unwrap());
         self.expr(&v.value);
         self.bld.store(id);
+        false
     }
 
-    fn while_stmt(&mut self, w: &Box<ast::WhileStmt>) {
+    fn while_stmt(&mut self, w: &Box<ast::WhileStmt>) -> bool {
         let condition_block = self.bld.new_block();
         let body_block = self.bld.new_block();
         let finish_block = self.bld.new_block();
@@ -233,12 +271,17 @@ impl FuncGen {
         self.expr(&w.condition);
         self.bld.condbr(body_block, finish_block);
         self.bld.switch_to_block(body_block);
-        self.stmt(&w.consequent);
-        self.bld.br(condition_block);
-        self.bld.switch_to_block(finish_block);
+        let did_return = self.stmt(&w.consequent);
+        if did_return {
+            true
+        } else {
+            self.bld.br(condition_block);
+            self.bld.switch_to_block(finish_block);
+            false
+        }
     }
 
-    fn stmt(&mut self, s: &ast::Stmt) {
+    fn stmt(&mut self, s: &ast::Stmt) -> bool {
         match s {
             ast::Stmt::Block(b) => self.block_stmt(&b),
             ast::Stmt::ExprStmt(e) => self.expr_stmt(&e),
@@ -266,7 +309,9 @@ impl FuncGen {
         for p in func.signature.params.iter() {
             s.bld.create_var(p.id.clone(), p.type_annotation.clone());
         }
-        s.block_stmt(&func.body);
+        if !s.block_stmt(&func.body) {
+            s.bld.ret();
+        }
         s.bld.pop_scope();
         s
     }

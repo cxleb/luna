@@ -15,7 +15,7 @@ fn main() {
     let mut args = std::env::args();
     args.next();
     let name = args.next().expect("Expected file");
-    print!("Loading file: {}...", name);  std::io::stdout().flush().unwrap();
+    print!("Loading file: {}... ", name);  std::io::stdout().flush().unwrap();
     let src = std::fs::read_to_string(name).expect("Could not load file");
     println!("done.");
     print!("parsing... ");  std::io::stdout().flush().unwrap();
@@ -23,17 +23,17 @@ fn main() {
     let mut ast_module = parser.parse_module().unwrap();
     println!("done.");
     print!("type checking... ");  std::io::stdout().flush().unwrap();
-    let sema_error = compiler::sema::sema_module(&mut ast_module);
+    let sema_error = compiler::sema::sema_module(&mut ast_module, &builtins);
     if let Err(error) = sema_error  {
         println!("error: {:?}", error);
         return;
     }
     println!("done.");
-    //println!("{:?}", ast_module);
+    //println!("{:#?}", ast_module);
     print!("generating ir... ");  std::io::stdout().flush().unwrap();
     let module = compiler::generate::gen_module(ast_module);
     println!("done.");
-    //println!("{:?}", module);
+    //println!("{:#?}", module);
 
     let mut jit = runtime::JitContext::new(builtins);
     print!("compiling... ");  std::io::stdout().flush().unwrap();

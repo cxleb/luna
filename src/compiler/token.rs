@@ -180,7 +180,7 @@ pub enum TokenData {
 pub struct Token {
     pub kind: TokenKind,
     pub loc: SourceLoc,
-    data: Option<TokenData>,
+    pub data: Option<TokenData>,
 }
 
 impl Token {

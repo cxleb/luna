@@ -36,7 +36,7 @@ pub fn builtin_print(value: i64) {
 }
 
 pub fn builtin_assert(cond: i8) {
-    if cond == 1 {
+    if cond == 0 {
         // todo: handle this correctly instead of fucking panicing lol
         panic!("Assertion failed");    
     }

@@ -1,0 +1,10 @@
+func main() {
+    // Assignments in control flow
+    let a = 0;
+    let b = 10;
+    if a = b {
+        b = 11;
+    }
+    assert(a == 10);
+    assert(b == 11);
+}

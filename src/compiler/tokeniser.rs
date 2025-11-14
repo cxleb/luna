@@ -94,8 +94,8 @@ impl<'a> Tokeniser<'a> {
         self.eat_whitespace()?;
 
         let loc = SourceLoc {
-            col: 0,
-            line: 0,
+            col: self.col_no(),
+            line: self.line_no(),
             len: 0,
         };
         let c = self.source.peek_char()?;
@@ -129,8 +129,20 @@ impl<'a> Tokeniser<'a> {
                     i64::from_str_radix(str, 8).unwrap(),
                 ))
             } else {
-                self.source.next();
-                Some(Token::new_int(loc, TokenKind::IntegerLiteral, 0))
+                let str = self.source.accum(|c, _| c.is_numeric() || c == '.');
+                if str.contains('.') {
+                    Some(Token::new_float(
+                        loc,
+                        TokenKind::NumberLiteral,
+                        str.parse().unwrap(),
+                    ))
+                } else {
+                    Some(Token::new_int(
+                        loc,
+                        TokenKind::IntegerLiteral,
+                        i64::from_str_radix(str, 10).unwrap(),
+                    ))
+                }
             }
         } else if c.is_numeric() {
             let str = self.source.accum(|c, _| c.is_numeric() || c == '.');
@@ -483,7 +495,7 @@ mod test {
     fn whitespace() {
         let js = " \t     \nident\t   \n ident";
         let mut file = Tokeniser::new(js);
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -491,7 +503,7 @@ mod test {
                 String::from("ident")
             ))
         );
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -505,7 +517,7 @@ mod test {
     fn comments() {
         let js = "//comment\nident/* comment\n* */ident";
         let mut file = Tokeniser::new(js);
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -513,7 +525,7 @@ mod test {
                 String::from("ident")
             ))
         );
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -539,6 +551,10 @@ mod test {
                 Token::new_float(SourceLoc::default(), TokenKind::NumberLiteral, 100.10),
             ),
             (
+                "0.10",
+                Token::new_float(SourceLoc::default(), TokenKind::NumberLiteral, 0.10),
+            ),
+            (
                 "0x100",
                 Token::new_int(SourceLoc::default(), TokenKind::IntegerLiteral, 256),
             ),
@@ -561,7 +577,7 @@ mod test {
         ];
         for test in token_tests {
             let mut file = Tokeniser::new(test.0);
-            assert_eq!(file.next(TokeniserMode::Div), Some(test.1));
+            assert_token(file.next(TokeniserMode::Div), Some(test.1));
             assert_eq!(file.next(TokeniserMode::Div), None);
         }
     }
@@ -571,7 +587,7 @@ mod test {
         let nosubstitutiontemplate = "`template`";
         let template = "`head${ident}middle${ident}tail`";
         let mut file = Tokeniser::new(nosubstitutiontemplate);
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -581,7 +597,7 @@ mod test {
         );
 
         let mut file = Tokeniser::new(template);
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -589,7 +605,7 @@ mod test {
                 String::from("head")
             ))
         );
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -597,7 +613,7 @@ mod test {
                 String::from("ident")
             ))
         );
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -605,7 +621,7 @@ mod test {
                 String::from("middle")
             ))
         );
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -613,7 +629,7 @@ mod test {
                 String::from("ident")
             ))
         );
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -627,7 +643,7 @@ mod test {
     fn keywords_tokens() {
         for test in KEYWORDS_MAP {
             let mut file = Tokeniser::new(test.0);
-            assert_eq!(
+            assert_token(
                 file.next(TokeniserMode::Div),
                 Some(Token::new(SourceLoc::default(), TokenKind::Keyword(test.1)))
             );
@@ -700,7 +716,7 @@ mod test {
         ];
         let mut file = Tokeniser::new(js);
         for test in punctuation {
-            assert_eq!(
+            assert_token(
                 file.next(TokeniserMode::Div),
                 Some(Token::new(
                     SourceLoc::default(),
@@ -714,7 +730,7 @@ mod test {
     fn regex() {
         let js = "/ab+c/g";
         let mut file = Tokeniser::new(js);
-        assert_eq!(
+        assert_token(
             file.next(TokeniserMode::Regex),
             Some(Token::new_string(
                 SourceLoc::default(),
@@ -722,5 +738,19 @@ mod test {
                 "/ab+c/g".into()
             ))
         );
+    }
+
+    // Assert that two tokens are equal without caring about location
+    fn assert_token(a: Option<Token>, b: Option<Token>) {
+        if let Some(tok) = a {
+            if let Some(tok2) = b {
+                assert_eq!(tok.data, tok2.data);
+                assert_eq!(tok.kind, tok2.kind);
+            } else {
+                panic!("Tokens not equal");
+            }
+        } else {
+            panic!("Tokens not equal");
+        }
     }
 }

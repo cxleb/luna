@@ -158,7 +158,8 @@ impl<'a> Parser<'a> {
         } else if self.test(TokenKind::Keyword(Keywords::For)) {
             todo!()
         } else if self.test(TokenKind::Keyword(Keywords::While)) {
-            todo!()
+            let while_ = self.parse_while()?;
+            return Ok(Stmt::While(while_));
         } else if self.test(TokenKind::Punctuation(Punctuation::LeftBrace)) {
             let block = self.parse_block_statement()?;
             return Ok(Stmt::Block(block));
@@ -415,7 +416,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> ParserResult<Expr> {
-        self.parse_bin_expr(0)
+        let old_tokeniser_mode = self.mode;
+        self.mode = TokeniserMode::Div;
+        let expr = self.parse_bin_expr(0)?;
+        self.mode = old_tokeniser_mode;
+        Ok(expr)
     }
 
     /////////////////////////////

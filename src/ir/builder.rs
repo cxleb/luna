@@ -172,12 +172,24 @@ impl FuncBuilder {
         self.append_inst(super::Inst::LoadConstBool(b));
     }
 
+    pub fn truncate(&mut self) {
+        self.append_inst(super::Inst::Truncate);
+    }
+
+    pub fn promote(&mut self) {
+        self.append_inst(super::Inst::Promote);
+    }
+
     pub fn load(&mut self, v: VariableRef) {
         self.append_inst(super::Inst::Load(v));
     }
 
     pub fn store(&mut self, v: VariableRef) {
         self.append_inst(super::Inst::Store(v));
+    }
+
+    pub fn tee(&mut self, v: VariableRef) {
+        self.append_inst(super::Inst::Tee(v));
     }
 
     pub fn nop(&mut self) {
