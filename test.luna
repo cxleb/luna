@@ -1,11 +1,5 @@
 func main() {
-    let a = 3.0;
-    let b = 10.0;
-    let c = a + b;
-    if a == b {
-        b = 11.0;
-    }
-    print_number(a);
-    print_number(b);
-    print_number(c);
+    println("Will this be before?");
+    print("Hello, World!");
+    println("I assume this still works?");
 }

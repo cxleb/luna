@@ -4,6 +4,7 @@ pub mod builder;
 
 type BlockRef = usize;
 type VariableRef = usize;
+type StringRef = usize;
 
 #[derive(Debug, Clone)]
 pub enum Inst {
@@ -33,6 +34,7 @@ pub enum Inst {
     LoadConstInt(i64),
     LoadConstNumber(f64),
     LoadConstBool(bool),
+    LoadConstString(StringRef),
     Truncate, // Convert number to integer
     Promote,   // Convert integer to number
     Load(VariableRef),
@@ -78,4 +80,30 @@ pub struct Function {
 #[derive(Debug, Clone)]
 pub struct Module {
     pub funcs: Vec<Function>,
+    pub string_map: StringMap
+}
+
+#[derive(Debug, Clone)]
+pub struct StringMap {
+    map: Vec<String>
+}
+
+impl StringMap {
+    pub fn new() -> Self {
+        StringMap {
+            map: Vec::new()
+        }
+    }
+
+    pub fn intern(&mut self, s: &str) -> StringRef {
+        if let Some((i, _)) = self.map.iter().enumerate().find(|(_, v)| *v == s) {
+            return i;
+        }
+        self.map.push(s.to_string());
+        self.map.len() - 1
+    }
+
+    pub fn get(&self, index: StringRef) -> &str {
+        self.map.get(index).map(|s| s.as_str()).unwrap()
+    }
 }

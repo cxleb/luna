@@ -30,9 +30,12 @@ impl Builtins {
 }
 
 // Default built-in functions like print, input, etc.
+pub fn builtin_print(value: *const u8) {
+    print!("{}", crate::runtime::string::convert_from_internal_string(value));
+}
 
-pub fn builtin_print(value: i64) {
-    println!("{}", value);
+pub fn builtin_println(value: *const u8) {
+    println!("{}", crate::runtime::string::convert_from_internal_string(value));
 }
 
 pub fn builtin_assert(cond: i8) {
@@ -44,7 +47,8 @@ pub fn builtin_assert(cond: i8) {
 
 pub fn default_builtins() -> Builtins {
     let mut builtins = Builtins::new();
-    builtins.push_function("print", vec![types::integer()], None, builtin_print);
+    builtins.push_function("print", vec![types::string()], None, builtin_print);
+    builtins.push_function("println", vec![types::string()], None, builtin_println);
     builtins.push_function("assert", vec![types::bool()], None, builtin_assert); 
     builtins
 }

@@ -1,13 +1,14 @@
 use crate::compiler::ast;
 use crate::ir::builder::FuncBuilder;
-use crate::ir::{self};
+use crate::ir::{self, StringMap};
 use crate::types;
 
-struct FuncGen {
+struct FuncGen<'a> {
     bld: FuncBuilder,
+    str_map: &'a mut StringMap,
 }
 
-impl FuncGen {
+impl<'a> FuncGen<'a> {
     fn binary_expr(&mut self, e: &ast::Expr, b: &Box<ast::BinaryExpr>) {
         match e.typ.as_ref() {
             crate::types::Type::Number => {
@@ -108,8 +109,9 @@ impl FuncGen {
         self.bld.load_const_bool(b.value);
     }
 
-    fn string_literal(&mut self, _s: &Box<ast::StringLiteral>) {
-        todo!()
+    fn string_literal(&mut self, s: &Box<ast::StringLiteral>) {
+        let s = self.str_map.intern(&s.value);
+        self.bld.load_const_string(s);
     }
 
     fn identifier(&mut self, i: &Box<ast::Identifier>) {
@@ -293,7 +295,7 @@ impl FuncGen {
         }
     }
 
-    fn generate(func: &Box<ast::Func>) -> Self {
+    fn generate(func: &Box<ast::Func>, str_map: &'a mut StringMap) -> Self {
         let mut signature = ir::Signature {
             ret_types: Vec::new(),
             parameters: func.signature.params.iter().map(|p| p.type_annotation.clone()).collect()
@@ -302,6 +304,7 @@ impl FuncGen {
             signature.ret_types.push(ret_type.clone());
         }
         let mut s = Self {
+            str_map,
             bld: FuncBuilder::new(func.signature.id.clone(), signature),
         };
         s.bld.push_scope();
@@ -321,15 +324,15 @@ impl FuncGen {
     }
 }
 
-pub fn gen_function(func: &Box<ast::Func>) -> Box<ir::Function> {
-    FuncGen::generate(func).finish()
+pub fn gen_function(func: &Box<ast::Func>, str_map: &mut StringMap) -> Box<ir::Function> {
+    FuncGen::generate(func, str_map).finish()
 }
 
 pub fn gen_module(module: Box<ast::Module>) -> Box<ir::Module> {
-    let mut ir_module = ir::Module { funcs: vec![] };
+    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![] };
 
     for func in module.functions.iter() {
-        let ir_func = gen_function(&func);
+        let ir_func = gen_function(&func, &mut ir_module.string_map);
         ir_module.funcs.push(*ir_func);
     }
 

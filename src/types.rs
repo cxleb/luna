@@ -55,3 +55,7 @@ pub fn number() -> Box<Type> {
 pub fn bool() -> Box<Type> {
     Box::new(Type::Bool)
 }
+
+pub fn string() -> Box<Type> {
+    Box::new(Type::String)
+}

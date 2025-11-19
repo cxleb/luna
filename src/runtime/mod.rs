@@ -7,6 +7,7 @@ use crate::{builtins::Builtins, ir::Signature, runtime::translate::TranslateSign
 
 mod translate;
 mod gc;
+pub mod string;
 
 pub struct CompiledFunc {
     id: FuncId,
@@ -84,7 +85,7 @@ impl JitContext {
             });
         }
         let translated = module.funcs.iter().map(|func| {
-            translate::translate_function(self, &func, &mut context, &signatures);
+            translate::translate_function(self, &func, &mut context, &signatures, &module.string_map);
             let id = self.module.declare_function(&func.id, cranelift_module::Linkage::Local, &context.func.signature).unwrap();
             self.module.define_function(id, &mut context).unwrap();
             self.module.clear_context(&mut context);

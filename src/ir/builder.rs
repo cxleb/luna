@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ir::{Block, BlockRef, Signature, VariableRef};
+use crate::ir::{Block, BlockRef, Signature, StringRef, VariableRef};
 use crate::types::Type;
 
 pub struct FuncBuilder {
@@ -170,6 +170,10 @@ impl FuncBuilder {
 
     pub fn load_const_bool(&mut self, b: bool) {
         self.append_inst(super::Inst::LoadConstBool(b));
+    }
+
+    pub fn load_const_string(&mut self, s: StringRef) {
+        self.append_inst(super::Inst::LoadConstString(s));
     }
 
     pub fn truncate(&mut self) {
