@@ -1,5 +1,7 @@
 func main() {
-    println("Will this be before?");
-    print("Hello, World!");
-    println("I assume this still works?");
+    let a = ["Hello, World", "This is a string", "Another one"];
+    a[1] = "This is not a string";
+    println(a[0]);
+    println(a[1]);
+    println(a[2]);
 }

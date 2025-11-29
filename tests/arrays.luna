@@ -1,17 +1,17 @@
 func main() {
     // arrays
-    let a: []int = [];
+    let a: []int = [0, 1, 2, 3];
     a[0] = 0;
     a[1] = 10;
     a[2] = 20;
-    a[30] = 30;
+    a[3] = 30;
     assert(a[0] == 0);
     assert(a[1] == 10);
     assert(a[2] == 20);
-    assert(a[30] == 30);
+    assert(a[3] == 30);
 
     // assignments with arrays
-    let g: []int = [];
+    let g: []int = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     g[10] = 10;
     let h = g[10];
     assert(g[10] == 10);

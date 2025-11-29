@@ -72,8 +72,8 @@ impl FuncBuilder {
         self.func.blocks[self.current_block].ins.push(inst);
     }
 
-    pub fn dup(&mut self) {
-        self.append_inst(super::Inst::Dup);
+    pub fn dup(&mut self, i: usize) {
+        self.append_inst(super::Inst::Dup(i));
     }
 
     pub fn add_int(&mut self) {
@@ -218,6 +218,18 @@ impl FuncBuilder {
 
     pub fn indirect_call(&mut self) {
         self.append_inst(super::Inst::IndirectCall);
+    }
+
+    pub fn new_array(&mut self, size: usize) {
+        self.append_inst(super::Inst::NewArray(size));
+    }
+
+    pub fn load_array(&mut self, typ: Box<Type>) {
+        self.append_inst(super::Inst::LoadArray(typ));
+    }
+
+    pub fn store_array(&mut self, typ: Box<Type>) {
+        self.append_inst(super::Inst::StoreArray(typ));
     }
 
     pub fn finish(self) -> Box<super::Function> {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{ir::{self, StringMap}, runtime::string};
-use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, Signature, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
+use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, MemFlags, Signature, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use cranelift_module::{DataDescription, Linkage, Module};
 
@@ -11,8 +11,10 @@ pub(crate) struct TranslateSignature {
 }
 
 fn translate_signature(ctx: &super::JitContext, signature: &crate::ir::Signature, call_conv: CallConv) -> Signature {
+    let mut params: Vec<AbiParam> = signature.parameters.iter().map(|a| AbiParam::new(ctx.translate_type(a))).collect();
+    params.insert(0, AbiParam::new(ctx.context_type()));
     Signature { 
-        params: signature.parameters.iter().map(|a| AbiParam::new(ctx.translate_type(a))).collect(), 
+        params, 
         returns: signature.ret_types.iter().map(|a| AbiParam::new(ctx.translate_type(a))).collect(), 
         call_conv
     }
@@ -45,18 +47,44 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
     
     builder.switch_to_block(blocks[0]); 
     for i in 0..func.signature.parameters.len() {
-        builder.def_var(variables[i], builder.block_params(blocks[0])[i]);
+        builder.def_var(variables[i], builder.block_params(blocks[0])[1+i]);
     }
 
+    let runtime_ctx = builder.block_params(blocks[0])[0];
     let mut stack = Vec::new();
+
+    let mut translate_call = |
+        ctx: &mut super::JitContext,
+        builder: &mut cranelift_frontend::FunctionBuilder, 
+        stack: &mut Vec<cranelift_codegen::ir::Value>, 
+        id: &str| {
+        let sig = signatures.iter().find(|s| s.id == *id).unwrap();
+        if !declared_signatures.contains_key(id) {
+            let signature = translate_signature(ctx, &sig.signature, call_conv);
+            let func_id = ctx.module.declare_function(&sig.id, Linkage::Import, &signature).expect("Failed to declare function");
+            let func_ref = ctx.module.declare_func_in_func(func_id, builder.func);
+            declared_signatures.insert(id.to_string(), func_ref);
+        }
+
+        let mut args = stack.iter().rev().take(sig.signature.parameters.len()).cloned().collect::<Vec<_>>();
+        args.reverse();
+        stack.truncate(stack.len() - args.len());
+        args.insert(0, runtime_ctx);
+
+        let call = builder.ins().call(declared_signatures[id], &args);
+        for r in builder.inst_results(call) {
+            stack.push(*r);
+        }
+    };
+
     for (i, block) in func.blocks.iter().enumerate() {
         builder.switch_to_block(blocks[i]);
         
         for inst in block.ins.iter() {
             match inst {
                 ir::Inst::Nop => {}
-                ir::Inst::Dup => {
-                    let val = *stack.last().unwrap();
+                ir::Inst::Dup(i) => {
+                    let val = *stack.iter().rev().nth(*i).unwrap();
                     stack.push(val);
                 }
                 ir::Inst::AddInt => {
@@ -236,22 +264,32 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     builder.ins().return_(&ret_vals);
                 }
                 ir::Inst::Call(id) => {
-                    let sig = signatures.iter().find(|s| s.id == *id).unwrap();
-                    if !declared_signatures.contains_key(id) {
-                        let signature = translate_signature(ctx, &sig.signature, call_conv);
-                        let func_id = ctx.module.declare_function(&sig.id, Linkage::Import, &signature).expect("Failed to declare function");
-                        let func_ref = ctx.module.declare_func_in_func(func_id, builder.func);
-                        declared_signatures.insert(id.clone(), func_ref);
-                    }
-
-                    let args = stack.iter().rev().take(sig.signature.parameters.len()).cloned().collect::<Vec<_>>();
-                    stack.truncate(stack.len() - args.len());
-                    let call = builder.ins().call(declared_signatures[id], &args);
-                    for r in builder.inst_results(call) {
-                        stack.push(*r);
-                    }
+                    translate_call(ctx, &mut builder, &mut stack, &id);
                 }
-                ir::Inst::IndirectCall => todo!()
+                ir::Inst::IndirectCall => todo!(),
+                ir::Inst::NewArray(size) => {
+                    let val = builder.ins().iconst(I64, *size as i64);
+                    stack.push(val);
+                    translate_call(ctx, &mut builder, &mut stack, "__create_array");
+                }
+                ir::Inst::LoadArray(typ) => {
+                    let array = stack.pop().unwrap();
+                    let index = stack.pop().unwrap();
+                    let offset = builder.ins().imul_imm(index, 8);
+                    let pointer = builder.ins().iadd(array, offset);
+                    let value = builder.ins().load(ctx.translate_type(&typ), MemFlags::new(), pointer, 0);
+                    stack.push(value);
+                    //translate_call(ctx, &mut builder, &mut stack, "dummy_load_array");
+                }
+                ir::Inst::StoreArray(_) => {
+                    //translate_call(ctx, &mut builder, &mut stack, "dummy_store_array");
+                    let array = stack.pop().unwrap();
+                    let index = stack.pop().unwrap();
+                    let value = stack.pop().unwrap();
+                    let offset = builder.ins().imul_imm(index, 8);
+                    let pointer = builder.ins().iadd(array, offset);
+                    builder.ins().store(MemFlags::new().with_aligned(), value, pointer, 0);
+                }
             }
         }
     }
@@ -259,6 +297,7 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
     builder.seal_all_blocks();
     builder.finalize();
 
+    //println!("{}", func.id);
     //println!("{}", translated.display());
     let res = verify_function(&translated, ctx.isa());
     if let Err(errors) = res {

@@ -10,6 +10,10 @@ func add(a: int, b: int): int {
     return a + b;
 }
 
+func sub(a: int, b: int): int {
+    return a - b;
+}
+
 func fibonacci(n: int): int {
     if n <= 1 {
         return n;
@@ -23,6 +27,6 @@ func main() {
     assert(returns10() == 10);
     assert(maths());
     assert(add(10, 10) == 20);
+    assert(sub(10, 5) == 5);
     assert(fibonacci(10) == 55);
-
 }

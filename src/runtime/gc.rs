@@ -1,40 +1,21 @@
-use std::sync::{Mutex, MutexGuard};
+use libc::malloc;
 
-static GC: Mutex<GarbageCollector> = Mutex::new(GarbageCollector::new());
-
-trait Glob<'a> {
-    fn access(&'a self) -> MutexGuard<'a, GarbageCollector>;
-} 
-
-impl<'a> Glob<'a> for Mutex<GarbageCollector> {
-    fn access(&'a self) -> MutexGuard<'a, GarbageCollector> {
-        self.lock().unwrap()
-    }
-}
-
-struct GarbageCollector {
+pub struct GarbageCollector {
 
 }
 
 impl GarbageCollector {
-    const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
 
         }
     }
-}
 
-fn gc_init() {
-    
-}
+    pub fn collect(&mut self) {
+    }
 
-fn gc_deinit() {
-}
-
-fn gc_collect() {
-    //let gc =GC.access();
-}
-
-fn gc_alloc() {
-
+    pub fn create_array(&mut self, size: usize) -> *const u64 {
+        // Placeholder implementation
+        unsafe { malloc(8 * size) as *const u64 }
+    }
 }

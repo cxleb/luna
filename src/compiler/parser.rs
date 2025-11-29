@@ -27,6 +27,7 @@ type ParserResult<X> = Result<X, ParserError>;
 pub struct Parser<'a> {
     tokeniser: Tokeniser<'a>,
     mode: TokeniserMode,
+    nest_level: i32,
 }
 
 impl<'a> Parser<'a> {
@@ -34,6 +35,7 @@ impl<'a> Parser<'a> {
         Self {
             tokeniser: Tokeniser::new(contents),
             mode: TokeniserMode::Regex,
+            nest_level: 0,
         }
     }
 
@@ -103,10 +105,45 @@ impl<'a> Parser<'a> {
                     let func = self.parse_function()?;
                     module.functions.push(func);
                 }
+                TokenKind::Keyword(Keywords::Struct) => {
+                    let struct_ = self.parse_struct()?;
+                    module.structs.push(struct_);
+                }
                 _ => return self.error(ParserErrorReason::ExpectedTopLevelDefinition),
             }
         }
         Ok(module)
+    }
+
+    pub fn parse_struct(&mut self) -> ParserResult<Box<Struct>> {
+        let loc = self.source_loc();
+        self.expect(TokenKind::Keyword(Keywords::Struct))?;
+        let id = self.expect(TokenKind::Identifier)?;
+        let mut struct_ = Box::new(Struct{
+            loc,
+            id: id.get_string(),
+            fields: Vec::new(),
+        });
+        self.expect(TokenKind::Punctuation(Punctuation::LeftBrace))?;
+        while !self.test(TokenKind::Punctuation(Punctuation::RightBrace)) {
+            let loc = self.source_loc();
+            let field_id_token = self.expect(TokenKind::Identifier)?;
+            let field_id = field_id_token.get_string(); 
+            self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
+            let field_type = self.parse_type()?;
+            struct_.fields.push(StructField {
+                loc,
+                id: field_id,
+                type_annotation: field_type,
+            });
+            if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                self.expect(TokenKind::Punctuation(Punctuation::Comma))?;
+            } else {
+                break;
+            }
+        }
+        self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
+        Ok(struct_)
     }
 
     pub fn parse_function(&mut self) -> ParserResult<Box<Func>> {
@@ -174,7 +211,10 @@ impl<'a> Parser<'a> {
     fn parse_if(&mut self) -> ParserResult<Box<IfStmt>> {
         let loc = self.source_loc();
         self.expect(TokenKind::Keyword(Keywords::If))?;
+        let old_nest_level = self.nest_level;
+        self.nest_level = -1;
         let test = self.parse_expression()?;
+        self.nest_level = old_nest_level;
         let consequent = self.parse_statement()?;
         let alternate = if self.test(TokenKind::Keyword(Keywords::Else)) {
             self.expect(TokenKind::Keyword(Keywords::Else))?;
@@ -193,7 +233,10 @@ impl<'a> Parser<'a> {
     fn parse_while(&mut self) -> ParserResult<Box<WhileStmt>> {
         let loc = self.source_loc();
         self.expect(TokenKind::Keyword(Keywords::While))?;
+        let old_nest_level = self.nest_level;
+        self.nest_level = -1;
         let condition = self.parse_expression()?;
+        self.nest_level = old_nest_level;
         let consequent = self.parse_statement()?;
         Ok(Box::new(WhileStmt {
             loc,
@@ -323,7 +366,7 @@ impl<'a> Parser<'a> {
                 self.next()?;
                 let index = self.parse_expression()?;
                 expr = self.expr(
-                    ExprKind::Lookup(Box::new(Lookup { value: expr, index })),
+                    ExprKind::Subscript(Box::new(Subscript { value: expr, index })),
                     loc,
                 );
                 self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;
@@ -337,7 +380,20 @@ impl<'a> Parser<'a> {
                     })),
                     loc,
                 );
-            } else if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
+            } 
+            else if self.test(TokenKind::Punctuation(Punctuation::Dot)) {
+                self.next()?;
+                let id_token = self.expect(TokenKind::Identifier)?;
+                let id = id_token.get_string();
+                expr = self.expr(
+                    ExprKind::Selector(Box::new(Selector {
+                        value: expr,
+                        selector: Identifier { id },
+                    })),
+                    loc,
+                );
+            }
+            else if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
                 self.next()?;
                 let mut parameters = Vec::new();
                 while !self.test(TokenKind::Punctuation(Punctuation::RightParenthesis)) {
@@ -365,8 +421,10 @@ impl<'a> Parser<'a> {
     fn parse_primary_expr(&mut self) -> ParserResult<Expr> {
         if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
             self.next()?;
+            self.nest_level += 1;
             let expr = self.parse_expression()?;
             self.expect(TokenKind::Punctuation(Punctuation::RightParenthesis))?;
+            self.nest_level -= 1;
             return Ok(expr);
         } else if self.test(TokenKind::IntegerLiteral) {
             let token = self.next()?;
@@ -395,7 +453,40 @@ impl<'a> Parser<'a> {
         } else if self.test(TokenKind::Identifier) {
             let token = self.next()?;
             let id = token.get_string();
-            return Ok(self.expr(ExprKind::Identifier(Box::new(Identifier { id })), token.loc));
+
+            // test for object literal
+            if self.nest_level >= 0 && self.test(TokenKind::Punctuation(Punctuation::LeftBrace)) {
+                self.next()?;
+                let mut fields = Vec::new();
+                while !self.test(TokenKind::Punctuation(Punctuation::RightBrace)) {
+                    let field_loc = self.source_loc();
+                    let field_id_token = self.expect(TokenKind::Identifier)?;
+                    let field_id = field_id_token.get_string();
+                    self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
+                    let field_value = self.parse_expression()?;
+                    fields.push(ObjectLiteralField {
+
+                        loc: field_loc,
+                        id: field_id,
+                        value: field_value,
+                    });
+                    if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                        self.expect(TokenKind::Punctuation(Punctuation::Comma))?;
+                    } else {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
+                return Ok(self.expr(
+                    ExprKind::ObjectLiteral(Box::new(ObjectLiteral {
+                        id: Some(Identifier { id }),
+                        fields,
+                    })),
+                    token.loc,
+                ));
+            } else {
+                return Ok(self.expr(ExprKind::Identifier(Box::new(Identifier { id })), token.loc));
+            }
         } else if self.test(TokenKind::Keyword(Keywords::True)) {
             let token = self.next()?;
             return Ok(Expr {
@@ -410,7 +501,55 @@ impl<'a> Parser<'a> {
                 loc: token.loc,
                 typ: Box::new(Type::Bool),
             });
-        } else {
+        } else if self.test(TokenKind::Punctuation(Punctuation::LeftBracket)) {
+            let token = self.next()?;
+            let mut literals = Vec::new();
+            while !self.test(TokenKind::Punctuation(Punctuation::RightBracket)) {
+                let literal = self.parse_expression()?;
+                literals.push(literal);
+                if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                    self.expect(TokenKind::Punctuation(Punctuation::Comma))?;
+                } else {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;
+            return Ok(self.expr(
+                ExprKind::ArrayLiteral(Box::new(ArrayLiteral { literals })),
+                token.loc,
+            ));
+        }
+        // else if self.test(TokenKind::Punctuation(Punctuation::LeftBrace)) {
+        //     let token = self.next()?;
+        //     let mut fields = Vec::new();
+        //     while !self.test(TokenKind::Punctuation(Punctuation::RightBrace)) {
+        //         let field_loc = self.source_loc();
+        //         let field_id_token = self.expect(TokenKind::Identifier)?;
+        //         let field_id = field_id_token.get_string();
+        //         self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
+        //         let field_value = self.parse_expression()?;
+        //         fields.push(ObjectLiteralField {
+
+        //             loc: field_loc,
+        //             id: field_id,
+        //             value: field_value,
+        //         });
+        //         if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+        //             self.expect(TokenKind::Punctuation(Punctuation::Comma))?;
+        //         } else {
+        //             break;
+        //         }
+        //     }
+        //     self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
+        //     return Ok(self.expr(
+        //         ExprKind::ObjectLiteral(Box::new(ObjectLiteral {
+        //             id: None,
+        //             fields,
+        //         })),
+        //         token.loc,
+        //     ));
+        // }
+        else {
             return self.error(ParserErrorReason::ExpectedExpression);
         }
     }
@@ -456,10 +595,12 @@ mod tests {
     fn test_parse_module() {
         use crate::compiler::parser::Parser;
 
-        let mut parser = Parser::new("func test() {}");
+        let mut parser = Parser::new("func test() {} struct MyStruct {}");
         let module = parser.parse_module().unwrap();
         assert_eq!(module.functions.len(), 1);
         assert_eq!(module.functions[0].signature.id, "test");
+        assert_eq!(module.structs.len(), 1);
+        assert_eq!(module.structs[0].id, "MyStruct");
     }
 
     #[test]
@@ -474,6 +615,20 @@ mod tests {
         assert_eq!(*func.signature.params[0].type_annotation, crate::types::Type::String);
         assert_eq!(func.signature.params[1].id, "param2");
         assert_eq!(*func.signature.params[1].type_annotation, crate::types::Type::Integer);
+    }
+
+    #[test]
+    fn test_parse_struct() {
+        use crate::compiler::parser::Parser;
+
+        let mut parser = Parser::new("struct MyStruct { field1: string, field2: int }");
+        let struct_ = parser.parse_struct().unwrap();
+        assert_eq!(struct_.id, "MyStruct");
+        assert_eq!(struct_.fields.len(), 2);
+        assert_eq!(struct_.fields[0].id, "field1");
+        assert_eq!(*struct_.fields[0].type_annotation, crate::types::Type::String);
+        assert_eq!(struct_.fields[1].id, "field2");
+        assert_eq!(*struct_.fields[1].type_annotation, crate::types::Type::Integer);
     }
 
     #[test]

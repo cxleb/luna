@@ -62,9 +62,15 @@ pub struct Identifier {
 }
 
 #[derive(Debug, Clone)]
-pub struct Lookup {
+pub struct Subscript {
     pub value: Expr,
     pub index: Expr,
+}
+
+#[derive(Debug, Clone)]
+pub struct Selector {
+    pub value: Expr,
+    pub selector: Identifier,
 }
 
 #[derive(Debug, Clone)]
@@ -73,8 +79,16 @@ pub struct ArrayLiteral {
 }
 
 #[derive(Debug, Clone)]
+pub struct ObjectLiteralField {
+    pub loc: SourceLoc,
+    pub id: String,
+    pub value: Expr,
+}
+
+#[derive(Debug, Clone)]
 pub struct ObjectLiteral {
-    // ?!?
+    pub id: Option<Identifier>,
+    pub fields: Vec<ObjectLiteralField>,
 }
 
 #[derive(Debug, Clone)]
@@ -88,7 +102,8 @@ pub enum ExprKind {
     StringLiteral(Box<StringLiteral>),
     Boolean(Box<Bool>),
     Identifier(Box<Identifier>),
-    Lookup(Box<Lookup>),
+    Subscript(Box<Subscript>),
+    Selector(Box<Selector>),
     ArrayLiteral(Box<ArrayLiteral>),
     ObjectLiteral(Box<ObjectLiteral>),
 }
@@ -182,6 +197,21 @@ pub struct Func {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct StructField {
+    pub loc: SourceLoc,
+    pub id: String,
+    pub type_annotation: Box<Type>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Struct {
+    pub loc: SourceLoc,
+    pub id: String,
+    pub fields: Vec<StructField>,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Module {
     pub functions: Vec<Box<Func>>,
+    pub structs: Vec<Box<Struct>>,
 }

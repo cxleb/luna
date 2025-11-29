@@ -122,12 +122,24 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn lookup(&mut self, _l: &Box<ast::Lookup>) {
-        todo!()
+    fn subscript(&mut self, e: &ast::Expr, l: &Box<ast::Subscript>) {
+        self.expr(&l.index);
+        self.expr(&l.value);
+        self.bld.load_array(e.typ.clone());
+    }
+    
+    fn selector(&mut self, _l: &Box<ast::Selector>) {
+        unimplemented!()
     }
 
-    fn array_literal(&mut self, _a: &Box<ast::ArrayLiteral>) {
-        todo!()
+    fn array_literal(&mut self, a: &Box<ast::ArrayLiteral>) {
+        self.bld.new_array(a.literals.len());
+        for (i, literal) in a.literals.iter().enumerate() {
+            self.expr(literal);
+            self.bld.load_const_int(i as i64);
+            self.bld.dup(2);
+            self.bld.store_array(literal.typ.clone());
+        }
     }
 
     fn object_literal(&mut self, _o: &Box<ast::ObjectLiteral>) {
@@ -145,13 +157,20 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::Boolean(b) => self.boolean(b),
             ast::ExprKind::StringLiteral(s) => self.string_literal(s),
             ast::ExprKind::Identifier(i) => self.identifier(i),
-            ast::ExprKind::Lookup(l) => self.lookup(l),
+            ast::ExprKind::Subscript(l) => self.subscript(e, l),
+            ast::ExprKind::Selector(l) => self.selector(l),
             ast::ExprKind::ArrayLiteral(a) => self.array_literal(a),
             ast::ExprKind::ObjectLiteral(o) => self.object_literal(o),
         }
     }
 
-    fn store_lookup(&mut self, _e: &ast::Expr, _l: &Box<ast::Lookup>) {
+    fn store_subscript(&mut self, e: &ast::Expr, l: &Box<ast::Subscript>) {
+        self.expr(&l.index);
+        self.expr(&l.value);
+        self.bld.store_array(e.typ.clone());
+    }
+
+    fn store_selector(&mut self, _e: &ast::Expr, _l: &Box<ast::Selector>) {
         unimplemented!()
     }
 
@@ -168,7 +187,8 @@ impl<'a> FuncGen<'a> {
     fn store_expr(&mut self, e: &ast::Expr) {
         //println!("here {:?}", e);
         match &e.kind {
-            ast::ExprKind::Lookup(l) => self.store_lookup(e, l),
+            ast::ExprKind::Subscript(l) => self.store_subscript(e, l),
+            ast::ExprKind::Selector(l) => self.store_selector(e, l),
             ast::ExprKind::Identifier(i) => self.store_identifier(e, i),
             //ast::ExprKind::Assign(a) => self.store_assign(e, a),
             //ast::Expr::BinaryExpr(b)

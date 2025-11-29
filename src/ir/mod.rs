@@ -9,7 +9,7 @@ type StringRef = usize;
 #[derive(Debug, Clone)]
 pub enum Inst {
     Nop,
-    Dup, // Duplicates the top of the stack
+    Dup(usize), // Duplicates the top - i of the stack
     AddInt,
     SubInt,
     MulInt,
@@ -48,6 +48,10 @@ pub enum Inst {
     // Pops the necessary arguments off the stack, e.g a(10, 10) will pop 2 
     Call(String),
     IndirectCall, // top of the stack is the function to call.
+
+    NewArray(usize),
+    LoadArray(Box<Type>), // Pops the index and array
+    StoreArray(Box<Type>), // Pops the value, index, and array
 }
 
 #[derive(Debug, Clone)]

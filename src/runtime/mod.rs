@@ -3,7 +3,7 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{FuncId, Module};
 use target_lexicon::triple;
 
-use crate::{builtins::Builtins, ir::Signature, runtime::translate::TranslateSignature};
+use crate::{builtins::Builtins, ir::Signature, runtime::{gc::GarbageCollector, translate::TranslateSignature}};
 
 mod translate;
 mod gc;
@@ -15,11 +15,30 @@ pub struct CompiledFunc {
     code: *const u8,
 }
 
+pub struct RuntimeContext {
+    pub gc: GarbageCollector
+}
+
+impl RuntimeContext {
+    pub fn new() -> Self {
+        Self {
+            gc: GarbageCollector::new()
+        }
+    }
+}
+
+pub extern "C" fn create_array(ctx: *mut RuntimeContext, size: i64) -> *const u64 {
+    let gc = unsafe { &mut (*ctx).gc };
+    let array = gc.create_array(size as usize);
+    array
+}
+
 pub struct JitContext {
     isa: OwnedTargetIsa,
     module: JITModule,
     builtins: Builtins,
-    compiled_funcs: Vec<CompiledFunc>
+    compiled_funcs: Vec<CompiledFunc>,
+    runtime_ctx: *mut RuntimeContext,
 }
 
 impl JitContext {
@@ -41,11 +60,16 @@ impl JitContext {
             builder.symbol(&func.id, func.implementation);
         }
 
+        builder.symbol("__create_array", create_array as *const u8);
+
+        let runtime_ctx = Box::new(RuntimeContext::new());
+
         Self {
             isa,
             module: JITModule::new(builder),
             compiled_funcs: Vec::new(),
-            builtins
+            builtins,
+            runtime_ctx: Box::into_raw(runtime_ctx),
         }
     }
 
@@ -61,6 +85,10 @@ impl JitContext {
 
             _ => cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple()), // pointer?
         }
+    }
+
+    fn context_type(&self) -> cranelift_codegen::ir::Type {
+        cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple())
     }
 
     pub fn compile_ir_module(&mut self, module: &crate::ir::Module) {
@@ -84,6 +112,15 @@ impl JitContext {
                 }
             });
         }
+
+        signatures.push(TranslateSignature {
+            id: "__create_array".into(),
+            signature: Signature {
+                parameters: vec![crate::types::integer()],
+                ret_types: vec![crate::types::unknown_reference()],
+            }
+        });
+
         let translated = module.funcs.iter().map(|func| {
             translate::translate_function(self, &func, &mut context, &signatures, &module.string_map);
             let id = self.module.declare_function(&func.id, cranelift_module::Linkage::Local, &context.func.signature).unwrap();
