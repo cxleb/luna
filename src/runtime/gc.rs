@@ -14,8 +14,13 @@ impl GarbageCollector {
     pub fn collect(&mut self) {
     }
 
-    pub fn create_array(&mut self, size: usize) -> *const u64 {
+    pub fn create_array(&mut self, size: usize) -> *const i64 {
         // Placeholder implementation
-        unsafe { malloc(8 * size) as *const u64 }
+        // +8 for the size
+        unsafe { 
+            let ptr = malloc((8 * size) + 8) as *mut i64;
+            *ptr = size as i64;
+            ptr
+        }
     }
 }

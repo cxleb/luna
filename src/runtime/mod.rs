@@ -27,7 +27,11 @@ impl RuntimeContext {
     }
 }
 
-pub extern "C" fn create_array(ctx: *mut RuntimeContext, size: i64) -> *const u64 {
+pub extern "C" fn panic(_: *mut RuntimeContext) {
+    panic!("Temporary Panic Handler!");
+}
+
+pub extern "C" fn create_array(ctx: *mut RuntimeContext, size: i64) -> *const i64 {
     let gc = unsafe { &mut (*ctx).gc };
     let array = gc.create_array(size as usize);
     array
@@ -60,6 +64,7 @@ impl JitContext {
             builder.symbol(&func.id, func.implementation);
         }
 
+        builder.symbol("__panic", panic as *const u8);
         builder.symbol("__create_array", create_array as *const u8);
 
         let runtime_ctx = Box::new(RuntimeContext::new());
@@ -113,6 +118,14 @@ impl JitContext {
             });
         }
 
+
+        signatures.push(TranslateSignature {
+            id: "__panic".into(),
+            signature: Signature {
+                parameters: vec![],
+                ret_types: vec![],
+            }
+        });
         signatures.push(TranslateSignature {
             id: "__create_array".into(),
             signature: Signature {

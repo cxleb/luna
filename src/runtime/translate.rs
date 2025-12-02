@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::HashMap;
 
 use crate::{ir::{self, StringMap}, runtime::string};
@@ -76,6 +77,8 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
             stack.push(*r);
         }
     };
+
+    let panic_block = builder.create_block();
 
     for (i, block) in func.blocks.iter().enumerate() {
         builder.switch_to_block(blocks[i]);
@@ -275,30 +278,63 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                 ir::Inst::LoadArray(typ) => {
                     let array = stack.pop().unwrap();
                     let index = stack.pop().unwrap();
+                    // create a new block that everything after this load goes into
+                    let continue_block = builder.create_block();
+                    // load the array size, which is directly at the array pointer
+                    let array_size = builder.ins().load(I64, MemFlags::new(), array, 0); 
+                    // check the index is allg
+                    let index_ok_zero = builder.ins().icmp_imm(IntCC::SignedGreaterThanOrEqual, array_size, 0);
+                    let index_ok_size = builder.ins().icmp(IntCC::SignedLessThan, index, array_size);
+                    let index_ok = builder.ins().band(index_ok_size, index_ok_zero);
+                    // jump to continue block if we are allg otherwise panic block
+                    builder.ins().brif(index_ok, continue_block, &[], panic_block, &[]);
+
+                    builder.switch_to_block(continue_block);
+                    // load the value now we know the array index is ok
                     let offset = builder.ins().imul_imm(index, 8);
-                    let pointer = builder.ins().iadd(array, offset);
+                    let array_begin = builder.ins().iadd_imm(array, 8);
+                    let pointer = builder.ins().iadd(array_begin, offset);
                     let value = builder.ins().load(ctx.translate_type(&typ), MemFlags::new(), pointer, 0);
                     stack.push(value);
-                    //translate_call(ctx, &mut builder, &mut stack, "dummy_load_array");
                 }
                 ir::Inst::StoreArray(_) => {
-                    //translate_call(ctx, &mut builder, &mut stack, "dummy_store_array");
                     let array = stack.pop().unwrap();
                     let index = stack.pop().unwrap();
                     let value = stack.pop().unwrap();
+                    // create a new block that everything after this load goes into
+                    let continue_block = builder.create_block();
+                    // load the array size, which is directly at the array pointer
+                    let array_size = builder.ins().load(I64, MemFlags::new(), array, 0); 
+                    // check the index is allg
+                    let index_ok_zero = builder.ins().icmp_imm(IntCC::SignedGreaterThanOrEqual, array_size, 0);
+                    let index_ok_size = builder.ins().icmp(IntCC::SignedLessThan, index, array_size);
+                    let index_ok = builder.ins().band(index_ok_size, index_ok_zero);
+                    // jump to continue block if we are allg otherwise panic block
+                    builder.ins().brif(index_ok, continue_block, &[], panic_block, &[]);
+
+                    builder.switch_to_block(continue_block);
+                    // store the value now we know the array index is ok
                     let offset = builder.ins().imul_imm(index, 8);
-                    let pointer = builder.ins().iadd(array, offset);
+                    let array_begin = builder.ins().iadd_imm(array, 8);
+                    let pointer = builder.ins().iadd(array_begin, offset);
                     builder.ins().store(MemFlags::new().with_aligned(), value, pointer, 0);
                 }
             }
         }
     }
 
+    // This is the panic block
+    builder.switch_to_block(panic_block);
+    translate_call(ctx, &mut builder, &mut stack, "__panic"); 
+    // todo(caleb): Find a better instruction to terminate the block
+    builder.ins().jump(panic_block, &[]);
+
+
     builder.seal_all_blocks();
     builder.finalize();
 
-    //println!("{}", func.id);
-    //println!("{}", translated.display());
+    println!("{}", func.id);
+    println!("{}", translated.display());
     let res = verify_function(&translated, ctx.isa());
     if let Err(errors) = res {
         panic!("{}", errors);

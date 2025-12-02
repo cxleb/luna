@@ -1,7 +1,6 @@
 func main() {
-    let a = ["Hello, World", "This is a string", "Another one"];
-    a[1] = "This is not a string";
-    println(a[0]);
-    println(a[1]);
-    println(a[2]);
+    let a = [1, 2, 3];
+    printarray(a);
+    a[0] = 100;
+    printint(a[0]);
 }
