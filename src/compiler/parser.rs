@@ -89,6 +89,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn skip(&mut self) {
+        _ = self.tokeniser.next(self.mode);
+    }
+
     fn source_loc(&self) -> SourceLoc {
         SourceLoc {
             line: self.tokeniser.line_no(),
@@ -211,6 +215,11 @@ impl<'a> Parser<'a> {
     fn parse_if(&mut self) -> ParserResult<Box<IfStmt>> {
         let loc = self.source_loc();
         self.expect(TokenKind::Keyword(Keywords::If))?;
+        let mut not = false;
+        if self.test(TokenKind::Keyword(Keywords::Not)) {
+            self.skip();
+            not = true;
+        }
         let old_nest_level = self.nest_level;
         self.nest_level = -1;
         let test = self.parse_expression()?;
@@ -227,6 +236,7 @@ impl<'a> Parser<'a> {
             test,
             consequent,
             alternate,
+            not
         }))
     }
 
@@ -304,16 +314,18 @@ impl<'a> Parser<'a> {
 
     fn parse_prec(token: Token) -> u8 {
         match token.kind {
+            TokenKind::Punctuation(Punctuation::BarBar)
+            | TokenKind::Punctuation(Punctuation::AndAnd) => 1,
             TokenKind::Punctuation(Punctuation::EqualsEquals)
             | TokenKind::Punctuation(Punctuation::ExclamationEquals)
             | TokenKind::Punctuation(Punctuation::LeftAngle)
             | TokenKind::Punctuation(Punctuation::RightAngle)
             | TokenKind::Punctuation(Punctuation::LeftAngleEquals)
-            | TokenKind::Punctuation(Punctuation::RightAngleEquals) => 1,
+            | TokenKind::Punctuation(Punctuation::RightAngleEquals) => 2,
             TokenKind::Punctuation(Punctuation::Plus)
-            | TokenKind::Punctuation(Punctuation::Minus) => 2,
+            | TokenKind::Punctuation(Punctuation::Minus) => 3,
             TokenKind::Punctuation(Punctuation::Multiply)
-            | TokenKind::Punctuation(Punctuation::ForwardSlash) => 3,
+            | TokenKind::Punctuation(Punctuation::ForwardSlash) => 4,
             _ => 0,
         }
     }
@@ -334,6 +346,8 @@ impl<'a> Parser<'a> {
             TokenKind::Punctuation(Punctuation::RightAngleEquals) => {
                 Ok(BinaryExprKind::GreaterThanEqual)
             }
+            TokenKind::Punctuation(Punctuation::AndAnd) => Ok(BinaryExprKind::LogicalAnd),
+            TokenKind::Punctuation(Punctuation::BarBar) => Ok(BinaryExprKind::LogicalOr),
             _ => self.error(ParserErrorReason::UnknownBinaryOperator),
         }
     }
@@ -639,6 +653,18 @@ mod tests {
         let if_ = parser.parse_if().unwrap();
         //assert_eq!(if_.consequent.stmts.len(), 0);
         assert!(if_.alternate.is_some());
+        assert!(if_.not == false);
+    }
+
+    #[test]
+    fn test_parse_if_not() {
+        use crate::compiler::parser::Parser;
+
+        let mut parser = Parser::new("if not x < 10 {} else {}");
+        let if_ = parser.parse_if().unwrap();
+        //assert_eq!(if_.consequent.stmts.len(), 0);
+        assert!(if_.alternate.is_some());
+        assert!(if_.not == true);
     }
 
     #[test]

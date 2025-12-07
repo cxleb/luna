@@ -2,7 +2,7 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::{ir::{self, StringMap}, runtime::string};
-use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, MemFlags, Signature, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
+use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use cranelift_module::{DataDescription, Linkage, Module};
 
@@ -211,6 +211,18 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let res = builder.ins().fcmp(FloatCC::GreaterThanOrEqual, lhs, rhs);
                     stack.push(res);
                 },
+                ir::Inst::And => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().band(lhs, rhs);
+                    stack.push(res);
+                },
+                ir::Inst::Or => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    let res = builder.ins().bor(lhs, rhs);
+                    stack.push(res);
+                },
                 ir::Inst::LoadConstInt(value) => {
                     let val = builder.ins().iconst(I64, *value);
                     stack.push(val);
@@ -326,15 +338,13 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
     // This is the panic block
     builder.switch_to_block(panic_block);
     translate_call(ctx, &mut builder, &mut stack, "__panic"); 
-    // todo(caleb): Find a better instruction to terminate the block
-    builder.ins().jump(panic_block, &[]);
-
+    builder.ins().trap(TrapCode::user(1).expect("Could not get trap code"));
 
     builder.seal_all_blocks();
     builder.finalize();
 
-    println!("{}", func.id);
-    println!("{}", translated.display());
+    //println!("{}", func.id);
+    //println!("{}", translated.display());
     let res = verify_function(&translated, ctx.isa());
     if let Err(errors) = res {
         panic!("{}", errors);

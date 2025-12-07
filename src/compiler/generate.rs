@@ -68,6 +68,13 @@ impl<'a> FuncGen<'a> {
                             _ => panic!("Invalid binary operation for bool type"),
                         }
                     },
+                    crate::types::Type::Bool => {
+                        match b.kind {
+                            ast::BinaryExprKind::LogicalAnd => self.bld.and(),
+                            ast::BinaryExprKind::LogicalOr => self.bld.or(),
+                            _ => panic!("Invalid binary operation for bool type"),
+                        }
+                    },
                     _ => { panic!("Invalid lhs type for bool binary expr"); }
                 }
                 
@@ -231,7 +238,11 @@ impl<'a> FuncGen<'a> {
             let consequent_block = self.bld.new_block();
             let alternate_block = self.bld.new_block();
             self.expr(&f.test);
-            self.bld.condbr(consequent_block, alternate_block);
+            if f.not {
+                self.bld.condbr(alternate_block, consequent_block);
+            } else {
+                self.bld.condbr(consequent_block, alternate_block);
+            }
             self.bld.switch_to_block(consequent_block);
             let consequent_returned = self.stmt(&f.consequent);
             self.bld.switch_to_block(alternate_block);
@@ -256,7 +267,11 @@ impl<'a> FuncGen<'a> {
             let consequent_block = self.bld.new_block();
             let finish_block = self.bld.new_block();
             self.expr(&f.test);
-            self.bld.condbr(consequent_block, finish_block);
+            if f.not {
+                self.bld.condbr(finish_block, consequent_block);
+            } else {
+                self.bld.condbr(consequent_block, finish_block);
+            }
             self.bld.switch_to_block(consequent_block);
             self.stmt(&f.consequent);
             // In this situation, we always need to branch to finish

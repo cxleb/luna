@@ -23,6 +23,7 @@ pub enum SemaErrorReason {
     ValueIsNotIndexable,
     ValueCannotBeUsedAsIndex,
     AssignmentTypesIncompatible,
+    NonBoolInLogicalExpression
 }
 
 #[derive(Debug)]
@@ -130,6 +131,18 @@ impl<'a> FuncTypeInference<'a> {
 
                 e.typ = types::bool();
             }
+            ast::BinaryExprKind::LogicalAnd |
+            ast::BinaryExprKind::LogicalOr => {
+                if !types::is_bool(&b.lhs.typ) {
+                    return self.error(SemaErrorReason::NonBoolInLogicalExpression);
+                }
+                if !types::is_bool(&b.rhs.typ) {
+                    return self.error(SemaErrorReason::NonBoolInLogicalExpression);
+                }
+
+                e.typ = types::bool();
+            }
+            
         }
         self.ok()
     }

@@ -5,8 +5,8 @@ pub enum Type {
     Integer,
     Number,
     String,
-    Bool, // An internal detail before generics is correctly implemented
-    UnknownReference,
+    Bool, 
+    UnknownReference, // An internal detail before generics is correctly implemented
     Array(Box<Type>),
     Identifier(String), //Function,
                         //Interface,
@@ -43,6 +43,10 @@ pub fn is_integer(ty: &Type) -> bool {
 
 pub fn is_array(ty: &Type) -> bool {
     matches!(ty, Type::Array(_))
+}
+
+pub fn is_bool(ty: &Type) -> bool {
+    matches!(ty, Type::Bool)
 }
 
 pub fn unknown() -> Box<Type> {

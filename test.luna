@@ -1,6 +1,11 @@
 func main() {
-    let a = [1, 2, 3];
-    printarray(a);
-    a[0] = 100;
-    printint(a[0]);
+    //let a = [1, 2, 3];
+    //a[5] = 10;
+    //printarray(a);
+    //a[0] = 100;
+    //printint(a[0]);
+
+    if 10 != 12 && 13 > 10 {
+        println("Does this work?");
+    }
 }

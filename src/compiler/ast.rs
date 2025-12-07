@@ -2,6 +2,8 @@ use crate::{compiler::SourceLoc, types::Type};
 
 #[derive(Debug, Clone)]
 pub enum BinaryExprKind {
+    LogicalAnd,
+    LogicalOr,
     Add,
     Subtract,
     Multiply,
@@ -121,6 +123,7 @@ pub struct IfStmt {
     pub test: Expr,
     pub consequent: Stmt,
     pub alternate: Option<Stmt>,
+    pub not: bool
 }
 
 #[derive(Debug, Clone)]

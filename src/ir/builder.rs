@@ -160,6 +160,14 @@ impl FuncBuilder {
         self.append_inst(super::Inst::GeqNumber);
     }
 
+    pub fn and(&mut self) {
+        self.append_inst(super::Inst::And);
+    }
+
+    pub fn or(&mut self) {
+        self.append_inst(super::Inst::Or);
+    }
+
     pub fn load_const_int(&mut self, i: i64) {
         self.append_inst(super::Inst::LoadConstInt(i));
     }
