@@ -331,6 +331,25 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let pointer = builder.ins().iadd(array_begin, offset);
                     builder.ins().store(MemFlags::new().with_aligned(), value, pointer, 0);
                 }
+                ir::Inst::NewObject(size) => {
+                    let val = builder.ins().iconst(I64, *size as i64);
+                    stack.push(val);
+                    translate_call(ctx, &mut builder, &mut stack, "__create_object");
+                }
+                ir::Inst::GetObject(i, typ) => {
+                    let object = stack.pop().unwrap();
+                    let offset = *i as i64 * 8; 
+                    let pointer = builder.ins().iadd_imm(object, offset);
+                    let value = builder.ins().load(ctx.translate_type(&typ), MemFlags::new(), pointer, 0);
+                    stack.push(value);
+                }
+                ir::Inst::SetObject(i, _) => {
+                    let object = stack.pop().unwrap();
+                    let value = stack.pop().unwrap();
+                    let offset = *i as i64 * 8; 
+                    let pointer = builder.ins().iadd_imm(object, offset);
+                    builder.ins().store(MemFlags::new().with_aligned(), value, pointer, 0);
+                }
             }
         }
     }

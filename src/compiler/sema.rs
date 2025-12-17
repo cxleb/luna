@@ -23,7 +23,11 @@ pub enum SemaErrorReason {
     ValueIsNotIndexable,
     ValueCannotBeUsedAsIndex,
     AssignmentTypesIncompatible,
-    NonBoolInLogicalExpression
+    NonBoolInLogicalExpression,
+    TypeNotFound,
+    StructFieldNotFound,
+    UsingSelectorOnNonStructType,
+    CannotFindSelectorInStruct,
 }
 
 #[derive(Debug)]
@@ -35,14 +39,16 @@ pub struct SemaError {
 type SemaResult<X> = Result<X, SemaError>;
 
 struct FuncTypeInference<'a> {
+    structs: &'a Vec<Box<ast::Struct>>,
     own_signature:&'a ast::FuncSignature,
     signatures: &'a Vec<ast::FuncSignature>,
     variable_scopes: Vec<HashMap<String, Box<Type>>>,
 }
 
 impl<'a> FuncTypeInference<'a> {
-    fn new(own_signature: &'a ast::FuncSignature, signatures: &'a Vec<ast::FuncSignature>) -> Self {
+    fn new(structs: &'a Vec<Box<ast::Struct>>, own_signature: &'a ast::FuncSignature, signatures: &'a Vec<ast::FuncSignature>) -> Self {
         Self {
+            structs,
             own_signature,
             signatures,
             variable_scopes: Vec::new(),
@@ -268,7 +274,27 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn selector(&mut self, _l: &Box<ast::Selector>, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn selector(&mut self, e: &mut ast::Expr, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+        let s = match &mut e.kind {
+            ast::ExprKind::Selector(s) => s,
+            _ => panic!()
+        };
+
+        self.expr(&mut s.value, None)?;
+
+        if !types::is_struct(&s.value.typ) {
+            return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
+        }
+
+        if let types::Type::Struct(_, f) = s.value.typ.as_ref() {
+            if let Some((i, (_, ty))) = f.iter().enumerate().find(|a| a.1.0 == s.selector.id) {
+                e.typ = ty.clone();
+                s.idx = i;
+            } else {
+                return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc);
+            }
+        }
+
         self.ok()
     }
 
@@ -304,7 +330,41 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn object_literal(&mut self, _o: &Box<ast::ObjectLiteral>, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn object_literal(&mut self, e: &mut ast::Expr, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+        let l = match &mut e.kind {
+            ast::ExprKind::ObjectLiteral(l) => l,
+            _ => panic!()
+        };
+
+        let id = match &l.id {
+            Some(id) => id,
+            None => unimplemented!("Anonymous object literals not supported yet"),
+        };
+
+        // maybe there need to be a module look up mapping to know which structs we want
+        // does the struct exist?
+        let struct_def = match self.structs.iter().find(|s| s.id == id.id) {
+            Some(s) => s,
+            None => return self.error_loc(SemaErrorReason::TypeNotFound, e.loc),
+        };
+        // once we find the struct, we need to check what fields we are setting and if they exist
+        // run the expr sema for the fields
+        // then we need to type check them
+        for field in l.fields.iter_mut() {
+            let struct_field = match struct_def.fields.iter().find(|f| f.id == field.id) {
+                Some(f) => f,
+                None => return self.error_loc(SemaErrorReason::StructFieldNotFound, field.loc),
+            };
+            // run sema on the field value
+            self.expr(&mut field.value, Some(&struct_field.type_annotation))?;
+            // check the type matches
+            if types::compare(&field.value.typ, &struct_field.type_annotation) == types::ComparisonResult::Incompatible {
+                return self.error_loc(SemaErrorReason::AssignmentTypesIncompatible, field.loc);
+            }
+        }
+
+        e.typ = types::struct_type(&id.id, struct_def.fields.iter().map(|f| (f.id.clone(), f.type_annotation.clone())).collect());
+
         self.ok()
     }
 
@@ -320,9 +380,9 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::StringLiteral(s) => self.string_literal(s, type_hint),
             ast::ExprKind::Identifier(_) => self.identifier(e, type_hint),
             ast::ExprKind::Subscript(_) => self.subscript(e, type_hint),
-            ast::ExprKind::Selector(l) => self.selector(l, type_hint),
+            ast::ExprKind::Selector(_) => self.selector(e, type_hint),
             ast::ExprKind::ArrayLiteral(_) => self.array_literal(e, type_hint),
-            ast::ExprKind::ObjectLiteral(o) => self.object_literal(o, type_hint),
+            ast::ExprKind::ObjectLiteral(_) => self.object_literal(e, type_hint),
         }
     }
 
@@ -352,7 +412,27 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn store_selector(&mut self, _e: &ast::Expr, _l: &Box<ast::Selector>) -> SemaResult<()> {
+    fn store_selector(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
+        let s = match &mut e.kind {
+            ast::ExprKind::Selector(s) => s,
+            _ => panic!()
+        };
+
+        self.expr(&mut s.value, None)?;
+
+        if !types::is_struct(&s.value.typ) {
+            return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
+        }
+
+        if let types::Type::Struct(_, f) = s.value.typ.as_ref() {
+            if let Some((i, (_, ty))) = f.iter().enumerate().find(|a| a.1.0 == s.selector.id) {
+                e.typ = ty.clone();
+                s.idx = i;
+            } else {
+                return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc);
+            }
+        }
+
         self.ok()
     }
 
@@ -374,7 +454,7 @@ impl<'a> FuncTypeInference<'a> {
     fn store_expr(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
         match &e.kind {
             ast::ExprKind::Subscript(_) => self.store_subscript(e),
-            ast::ExprKind::Selector(l) => self.store_selector(e, l),
+            ast::ExprKind::Selector(_) => self.store_selector(e),
             ast::ExprKind::Identifier(_) => self.store_identifier(e),
             _ => self.error(SemaErrorReason::CannotUseExpressionInLeftHandExpression)
         }
@@ -473,14 +553,15 @@ impl<'a> FuncTypeInference<'a> {
     }
 }
 
-pub fn sema_function(signatures: &Vec<ast::FuncSignature>, func: & mut ast::Func) -> SemaResult<()> {
+pub fn sema_function(structs: &Vec<Box<ast::Struct>>, signatures: &Vec<ast::FuncSignature>, func: & mut ast::Func) -> SemaResult<()> {
     let own_signature = signatures.iter().find(|s| s.id == func.signature.id).unwrap();
-    FuncTypeInference::new(own_signature, signatures).check(func)?;
+    FuncTypeInference::new(structs, own_signature, signatures).check(func)?;
     Ok(())
 }
 
 pub fn sema_module(module: &mut Box<ast::Module>, builtins: &Builtins) -> SemaResult<()> {
     let mut signatures = module.functions.iter().map(|f| f.signature.clone()).collect::<Vec<_>>();
+    let structs = module.structs.iter().map(|s| s.clone()).collect::<Vec<_>>();
     // add builtin signatures
     for builtin in builtins.functions.iter() {
         let signature = ast::FuncSignature {
@@ -498,7 +579,7 @@ pub fn sema_module(module: &mut Box<ast::Module>, builtins: &Builtins) -> SemaRe
         //}
     }
     for func in module.functions.iter_mut() {
-        sema_function(&signatures, func)?;
+        sema_function(&structs, &signatures, func)?;
     }
 
     Ok(())

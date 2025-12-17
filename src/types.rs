@@ -8,9 +8,11 @@ pub enum Type {
     Bool, 
     UnknownReference, // An internal detail before generics is correctly implemented
     Array(Box<Type>),
-    Identifier(String), //Function,
-                        //Interface,
-                        //Struct,
+    Struct(String, Vec<(String, Box<Type>)>),
+    Identifier(String), 
+    //Function,
+    //Interface,
+    //Struct,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +51,10 @@ pub fn is_bool(ty: &Type) -> bool {
     matches!(ty, Type::Bool)
 }
 
+pub fn is_struct(ty: &Type) -> bool {
+    matches!(ty, Type::Struct(_, _))
+}
+
 pub fn unknown() -> Box<Type> {
     Box::new(Type::Unknown)
 }
@@ -75,4 +81,8 @@ pub fn unknown_reference() -> Box<Type> {
 
 pub fn array(element_type: Box<Type>) -> Box<Type> {
     Box::new(Type::Array(element_type))
+}
+
+pub fn struct_type(id: &str, fields: Vec<(String, Box<Type>)>) -> Box<Type> {
+    Box::new(Type::Struct(id.to_string(), fields))
 }

@@ -37,6 +37,12 @@ pub extern "C" fn create_array(ctx: *mut RuntimeContext, size: i64) -> *const i6
     array
 }
 
+pub extern "C" fn create_object(ctx: *mut RuntimeContext, size: i64) -> *const i64 {
+    let gc = unsafe { &mut (*ctx).gc };
+    let array = gc.create_object(size as usize);
+    array
+}
+
 pub struct JitContext {
     isa: OwnedTargetIsa,
     module: JITModule,
@@ -66,6 +72,7 @@ impl JitContext {
 
         builder.symbol("__panic", panic as *const u8);
         builder.symbol("__create_array", create_array as *const u8);
+        builder.symbol("__create_object", create_object as *const u8);
 
         let runtime_ctx = Box::new(RuntimeContext::new());
 
@@ -128,6 +135,13 @@ impl JitContext {
         });
         signatures.push(TranslateSignature {
             id: "__create_array".into(),
+            signature: Signature {
+                parameters: vec![crate::types::integer()],
+                ret_types: vec![crate::types::unknown_reference()],
+            }
+        });
+        signatures.push(TranslateSignature {
+            id: "__create_object".into(),
             signature: Signature {
                 parameters: vec![crate::types::integer()],
                 ret_types: vec![crate::types::unknown_reference()],

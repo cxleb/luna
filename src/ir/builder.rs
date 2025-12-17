@@ -240,6 +240,18 @@ impl FuncBuilder {
         self.append_inst(super::Inst::StoreArray(typ));
     }
 
+    pub fn new_object(&mut self, size: usize) {
+        self.append_inst(super::Inst::NewObject(size));
+    }
+
+    pub fn set_object(&mut self, size: usize, typ: Box<Type>) {
+        self.append_inst(super::Inst::SetObject(size, typ));
+    }
+
+    pub fn get_object(&mut self, size: usize, typ: Box<Type>) {
+        self.append_inst(super::Inst::GetObject(size, typ));
+    }
+
     pub fn finish(self) -> Box<super::Function> {
         return Box::new(self.func);
     }

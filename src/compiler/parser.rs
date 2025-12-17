@@ -403,6 +403,7 @@ impl<'a> Parser<'a> {
                     ExprKind::Selector(Box::new(Selector {
                         value: expr,
                         selector: Identifier { id },
+                        idx: 0
                     })),
                     loc,
                 );

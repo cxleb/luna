@@ -73,6 +73,8 @@ pub struct Subscript {
 pub struct Selector {
     pub value: Expr,
     pub selector: Identifier,
+    pub idx: usize // the offset of the field within the struct, 
+                 // saves us computing it twice and some complexity
 }
 
 #[derive(Debug, Clone)]

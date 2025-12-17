@@ -54,6 +54,10 @@ pub enum Inst {
     NewArray(usize),
     LoadArray(Box<Type>), // Pops the index and array
     StoreArray(Box<Type>), // Pops the value, index, and array
+
+    NewObject(usize),
+    GetObject(usize, Box<Type>),
+    SetObject(usize, Box<Type>),
 }
 
 #[derive(Debug, Clone)]

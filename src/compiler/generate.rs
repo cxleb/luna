@@ -6,6 +6,7 @@ use crate::types;
 struct FuncGen<'a> {
     bld: FuncBuilder,
     str_map: &'a mut StringMap,
+    structs: &'a Vec<Box<ast::Struct>>, 
 }
 
 impl<'a> FuncGen<'a> {
@@ -135,8 +136,9 @@ impl<'a> FuncGen<'a> {
         self.bld.load_array(e.typ.clone());
     }
     
-    fn selector(&mut self, _l: &Box<ast::Selector>) {
-        unimplemented!()
+    fn selector(&mut self, e: &ast::Expr, s: &ast::Selector) {
+        self.expr(&s.value);
+        self.bld.get_object(s.idx, e.typ.clone());
     }
 
     fn array_literal(&mut self, a: &Box<ast::ArrayLiteral>) {
@@ -149,8 +151,35 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn object_literal(&mut self, _o: &Box<ast::ObjectLiteral>) {
-        todo!()
+    fn object_literal(&mut self, typ: &types::Type, o: &Box<ast::ObjectLiteral>) {
+        self.bld.new_object(o.fields.len());
+        // We need to set all the fields which we got then we need to provide defaults for the rest
+        if let crate::types::Type::Struct(_, struct_fields) = typ {
+            for (i, (field_name, field_type)) in struct_fields.iter().enumerate() {
+                if let Some(value) = o.fields.iter().find(|field| &field.id == field_name) {
+                    self.expr(&value.value);
+                } else { 
+                    // provide default value
+                    match field_type.as_ref() {
+                        crate::types::Type::Integer => self.bld.load_const_int(0),
+                        crate::types::Type::Number => self.bld.load_const_number(0.0),
+                        crate::types::Type::Bool => self.bld.load_const_bool(false),
+                        crate::types::Type::String => {
+                            let s = self.str_map.intern("");
+                            self.bld.load_const_string(s);
+                        },
+                        crate::types::Type::Array(_) => {
+                            self.bld.new_array(0);
+                        },
+                        _ => { panic!("Cannot provide default value for field type {:?}", field_type); }
+                    }
+                }
+                self.bld.dup(1);
+                self.bld.set_object(i, field_type.clone());
+            }
+        } else {
+            panic!("Trying to emit object literal but type was not struct!")
+        }
     }
 
     fn expr(&mut self, e: &ast::Expr) {
@@ -165,9 +194,9 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::StringLiteral(s) => self.string_literal(s),
             ast::ExprKind::Identifier(i) => self.identifier(i),
             ast::ExprKind::Subscript(l) => self.subscript(e, l),
-            ast::ExprKind::Selector(l) => self.selector(l),
+            ast::ExprKind::Selector(l) => self.selector(e, l),
             ast::ExprKind::ArrayLiteral(a) => self.array_literal(a),
-            ast::ExprKind::ObjectLiteral(o) => self.object_literal(o),
+            ast::ExprKind::ObjectLiteral(o) => self.object_literal(&e.typ, o),
         }
     }
 
@@ -177,8 +206,9 @@ impl<'a> FuncGen<'a> {
         self.bld.store_array(e.typ.clone());
     }
 
-    fn store_selector(&mut self, _e: &ast::Expr, _l: &Box<ast::Selector>) {
-        unimplemented!()
+    fn store_selector(&mut self, e: &ast::Expr, s: &ast::Selector) {
+        self.expr(&s.value);
+        self.bld.set_object(s.idx, e.typ.clone());
     }
 
     fn store_identifier(&mut self, _e: &ast::Expr, i: &Box<ast::Identifier>) {
@@ -330,7 +360,7 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn generate(func: &Box<ast::Func>, str_map: &'a mut StringMap) -> Self {
+    fn generate(func: &Box<ast::Func>, structs: &'a Vec<Box<ast::Struct>>, str_map: &'a mut StringMap) -> Self {
         let mut signature = ir::Signature {
             ret_types: Vec::new(),
             parameters: func.signature.params.iter().map(|p| p.type_annotation.clone()).collect()
@@ -340,6 +370,7 @@ impl<'a> FuncGen<'a> {
         }
         let mut s = Self {
             str_map,
+            structs,
             bld: FuncBuilder::new(func.signature.id.clone(), signature),
         };
         s.bld.push_scope();
@@ -359,15 +390,15 @@ impl<'a> FuncGen<'a> {
     }
 }
 
-pub fn gen_function(func: &Box<ast::Func>, str_map: &mut StringMap) -> Box<ir::Function> {
-    FuncGen::generate(func, str_map).finish()
+pub fn gen_function(func: &Box<ast::Func>, structs: &Vec<Box<ast::Struct>>, str_map: &mut StringMap) -> Box<ir::Function> {
+    FuncGen::generate(func, structs, str_map).finish()
 }
 
 pub fn gen_module(module: Box<ast::Module>) -> Box<ir::Module> {
     let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![] };
 
     for func in module.functions.iter() {
-        let ir_func = gen_function(&func, &mut ir_module.string_map);
+        let ir_func = gen_function(&func, &module.structs, &mut ir_module.string_map);
         ir_module.funcs.push(*ir_func);
     }
 

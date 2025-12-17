@@ -23,4 +23,14 @@ impl GarbageCollector {
             ptr
         }
     }
+
+    pub fn create_object(&mut self, size: usize) -> *const i64 {
+        // Placeholder implementation
+        // No need to encode size as it is fixed.
+        unsafe { 
+            let ptr = malloc(8 * size) as *mut i64;
+            ptr
+        }
+    }
+
 }
