@@ -2,8 +2,8 @@ use crate::types;
 
 pub struct BuiltinFunction {
     pub id: String,
-    pub parameters: Vec<Box<types::Type>>,
-    pub returns: Option<Box<types::Type>>,
+    pub parameters: Vec<types::Type>,
+    pub returns: Option<types::Type>,
     pub implementation: *const u8,
 }
 
@@ -18,7 +18,7 @@ impl Builtins {
         }
     }
 
-    pub fn push_function<P, R>(&mut self, id: &str, params: Vec<Box<types::Type>>, ret: Option<Box<types::Type>>, implementation: fn(*mut crate::runtime::RuntimeContext, P) -> R) {
+    pub fn push_function<P, R>(&mut self, id: &str, params: Vec<types::Type>, ret: Option<types::Type>, implementation: fn(*mut crate::runtime::RuntimeContext, P) -> R) {
         let func = BuiltinFunction {
             id: id.into(),
             parameters: params,
@@ -28,7 +28,7 @@ impl Builtins {
         self.functions.push(func);
     }
 
-    pub fn push_function_2<P1, P2, R>(&mut self, id: &str, params: Vec<Box<types::Type>>, ret: Option<Box<types::Type>>, implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2) -> R) {
+    pub fn push_function_2<P1, P2, R>(&mut self, id: &str, params: Vec<types::Type>, ret: Option<types::Type>, implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2) -> R) {
         let func = BuiltinFunction {
             id: id.into(),
             parameters: params,
@@ -38,7 +38,7 @@ impl Builtins {
         self.functions.push(func);
     }
 
-    pub fn push_function_3<P1, P2, P3, R>(&mut self, id: &str, params: Vec<Box<types::Type>>, ret: Option<Box<types::Type>>, implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2, P3) -> R) {
+    pub fn push_function_3<P1, P2, P3, R>(&mut self, id: &str, params: Vec<types::Type>, ret: Option<types::Type>, implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2, P3) -> R) {
         let func = BuiltinFunction {
             id: id.into(),
             parameters: params,

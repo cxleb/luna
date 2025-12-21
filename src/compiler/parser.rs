@@ -1,6 +1,6 @@
 use crate::{
     compiler::{SourceLoc, ast::*, token::*, tokeniser::*},
-    types::Type,
+    types::{self, Type},
 };
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl<'a> Parser<'a> {
         Expr {
             kind,
             loc,
-            typ: Box::new(Type::default()),
+            typ: Type::default(),
         }
     }
 
@@ -447,7 +447,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr {
                 kind: ExprKind::Integer(Box::new(Integer { value })),
                 loc: token.loc,
-                typ: Box::new(Type::Integer),
+                typ: types::integer(),
             });
         } else if self.test(TokenKind::NumberLiteral) {
             let token = self.next()?;
@@ -455,7 +455,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr {
                 kind: ExprKind::Number(Box::new(Number { value })),
                 loc: token.loc,
-                typ: Box::new(Type::Number),
+                typ: types::number(),
             });
         } else if self.test(TokenKind::StringLiteral) {
             let token = self.next()?;
@@ -463,7 +463,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr {
                 kind: ExprKind::StringLiteral(Box::new(StringLiteral { value })),
                 loc: token.loc,
-                typ: Box::new(Type::String),
+                typ: types::string(),
             });
         } else if self.test(TokenKind::Identifier) {
             let token = self.next()?;
@@ -507,14 +507,14 @@ impl<'a> Parser<'a> {
             return Ok(Expr {
                 kind: ExprKind::Boolean(Box::new(Bool { value: true })),
                 loc: token.loc,
-                typ: Box::new(Type::Bool),
+                typ: types::bool(),
             });
         } else if self.test(TokenKind::Keyword(Keywords::False)) {
             let token = self.next()?;
             return Ok(Expr {
                 kind: ExprKind::Boolean(Box::new(Bool { value: false })),
                 loc: token.loc,
-                typ: Box::new(Type::Bool),
+                typ: types::bool(),
             });
         } else if self.test(TokenKind::Punctuation(Punctuation::LeftBracket)) {
             let token = self.next()?;
@@ -581,26 +581,26 @@ impl<'a> Parser<'a> {
     /// TYPES
     /////////////////////////////
 
-    fn parse_type(&mut self) -> ParserResult<Box<Type>> {
+    fn parse_type(&mut self) -> ParserResult<Type> {
         if self.test(TokenKind::Punctuation(Punctuation::LeftBracket)) {
             self.tokeniser.next(self.mode);
             self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;
             let element_type = self.parse_type()?;
-            return Ok(Box::new(Type::Array(element_type)));
+            return Ok(types::array(element_type));
         }
 
         let string = self.expect(TokenKind::Identifier)?.get_string();
 
         if string == "string" {
-            return Ok(Box::new(Type::String));
+            return Ok(types::string());
         } else if string == "bool" {
-            return Ok(Box::new(Type::Bool));
+            return Ok(types::bool());
         } else if string == "int" {
-            return Ok(Box::new(Type::Integer));
+            return Ok(types::integer());
         } else if string == "number" {
-            return Ok(Box::new(Type::Number));
+            return Ok(types::number());
         } else {
-            return Ok(Box::new(Type::Identifier(string)));
+            return Ok(types::identifier(string));
         }
     }
 }
@@ -627,9 +627,9 @@ mod tests {
         assert_eq!(func.signature.id, "test");
         assert_eq!(func.signature.params.len(), 2);
         assert_eq!(func.signature.params[0].id, "param1");
-        assert_eq!(*func.signature.params[0].type_annotation, crate::types::Type::String);
+        assert_eq!(func.signature.params[0].type_annotation, crate::types::string());
         assert_eq!(func.signature.params[1].id, "param2");
-        assert_eq!(*func.signature.params[1].type_annotation, crate::types::Type::Integer);
+        assert_eq!(func.signature.params[1].type_annotation, crate::types::integer());
     }
 
     #[test]
@@ -641,9 +641,9 @@ mod tests {
         assert_eq!(struct_.id, "MyStruct");
         assert_eq!(struct_.fields.len(), 2);
         assert_eq!(struct_.fields[0].id, "field1");
-        assert_eq!(*struct_.fields[0].type_annotation, crate::types::Type::String);
+        assert_eq!(struct_.fields[0].type_annotation, crate::types::string());
         assert_eq!(struct_.fields[1].id, "field2");
-        assert_eq!(*struct_.fields[1].type_annotation, crate::types::Type::Integer);
+        assert_eq!(struct_.fields[1].type_annotation, crate::types::integer());
     }
 
     #[test]
@@ -698,8 +698,8 @@ mod tests {
         let var_decl = parser.parse_var_decl_statement().unwrap();
         assert_eq!(var_decl.id, "x");
         assert_eq!(
-            *var_decl.type_annotation.unwrap(),
-            crate::types::Type::Integer
+            var_decl.type_annotation.unwrap(),
+            crate::types::integer()
         );
         if let crate::compiler::ast::ExprKind::Integer(int) = &var_decl.value.kind {
             assert_eq!(int.value, 10);
@@ -728,19 +728,18 @@ mod tests {
     #[test]
     fn test_parse_type() {
         use crate::compiler::parser::Parser;
-        use crate::types::Type;
         let mut parser = Parser::new("string bool int number []string myStruct");
         let ty = parser.parse_type().unwrap();
-        assert_eq!(*ty, Type::String);
+        assert_eq!(ty, crate::types::string());
         let ty = parser.parse_type().unwrap();
-        assert_eq!(*ty, Type::Bool);
+        assert_eq!(ty, crate::types::bool());
         let ty = parser.parse_type().unwrap();
-        assert_eq!(*ty, Type::Integer);
+        assert_eq!(ty, crate::types::integer());
         let ty = parser.parse_type().unwrap();
-        assert_eq!(*ty, Type::Number);
+        assert_eq!(ty, crate::types::number());
         let ty = parser.parse_type().unwrap();
-        assert_eq!(*ty, Type::Array(Box::new(Type::String)));
+        assert_eq!(ty, crate::types::array(crate::types::string()));
         let ty = parser.parse_type().unwrap();
-        assert_eq!(*ty, Type::Identifier("myStruct".into()));
+        assert_eq!(ty, crate::types::identifier("myStruct".into()));
     }
 }

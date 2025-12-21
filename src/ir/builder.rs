@@ -51,7 +51,7 @@ impl FuncBuilder {
         self.variable_scopes.pop();
     }
 
-    pub fn create_var(&mut self, name: String, typ: Box<Type>) -> VariableRef {
+    pub fn create_var(&mut self, name: String, typ: Type) -> VariableRef {
         let id = self.variables;
         self.variables += 1;
         self.variable_scopes.last_mut().unwrap().insert(name, id);
@@ -232,11 +232,11 @@ impl FuncBuilder {
         self.append_inst(super::Inst::NewArray(size));
     }
 
-    pub fn load_array(&mut self, typ: Box<Type>) {
+    pub fn load_array(&mut self, typ: Type) {
         self.append_inst(super::Inst::LoadArray(typ));
     }
 
-    pub fn store_array(&mut self, typ: Box<Type>) {
+    pub fn store_array(&mut self, typ: Type) {
         self.append_inst(super::Inst::StoreArray(typ));
     }
 
@@ -244,11 +244,11 @@ impl FuncBuilder {
         self.append_inst(super::Inst::NewObject(size));
     }
 
-    pub fn set_object(&mut self, size: usize, typ: Box<Type>) {
+    pub fn set_object(&mut self, size: usize, typ: Type) {
         self.append_inst(super::Inst::SetObject(size, typ));
     }
 
-    pub fn get_object(&mut self, size: usize, typ: Box<Type>) {
+    pub fn get_object(&mut self, size: usize, typ: Type) {
         self.append_inst(super::Inst::GetObject(size, typ));
     }
 

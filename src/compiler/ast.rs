@@ -115,7 +115,7 @@ pub enum ExprKind {
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub loc: SourceLoc,
-    pub typ: Box<Type>,
+    pub typ: Type,
     pub kind: ExprKind,
 }
 
@@ -139,7 +139,7 @@ pub struct VarDeclStmt {
     pub loc: SourceLoc,
     pub is_const: bool,
     pub id: String,
-    pub type_annotation: Option<Box<Type>>,
+    pub type_annotation: Option<Type>,
     pub value: Expr,
 }
 
@@ -184,14 +184,14 @@ pub enum Stmt {
 #[derive(Debug, Default, Clone)]
 pub struct Param {
     pub id: String,
-    pub type_annotation: Box<Type>,
+    pub type_annotation: Type,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct FuncSignature {
     pub id: String,
     pub params: Vec<Param>,
-    pub return_type: Option<Box<Type>>,
+    pub return_type: Option<Type>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -205,7 +205,7 @@ pub struct Func {
 pub struct StructField {
     pub loc: SourceLoc,
     pub id: String,
-    pub type_annotation: Box<Type>,
+    pub type_annotation: Type,
 }
 
 #[derive(Debug, Default, Clone)]

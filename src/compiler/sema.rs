@@ -88,14 +88,14 @@ impl<'a> FuncTypeInference<'a> {
         Err(SemaError { reason, loc })
     }
 
-    fn binary_expr(&mut self, e: &mut ast::Expr, type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn binary_expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
         let b = match &mut e.kind {
             ast::ExprKind::BinaryExpr(b) => b,
             _ => panic!()
         };
         
-        self.expr(&mut b.lhs, type_hint)?;
-        self.expr(&mut b.rhs, type_hint)?;
+        self.expr(&mut b.lhs, type_hint.clone())?;
+        self.expr(&mut b.rhs, type_hint.clone())?;
 
         match b.kind {
             ast::BinaryExprKind::Add |
@@ -153,11 +153,11 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn unary_expr(&mut self, _u: &mut Box<ast::UnaryExpr>, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn unary_expr(&mut self, _u: &mut Box<ast::UnaryExpr>, _type_hint: Option<types::Type>) -> SemaResult<()> {
         self.ok()
     }
 
-    fn assign(&mut self, e: &mut ast::Expr, type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn assign(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
         let a = match &mut e.kind {
             ast::ExprKind::Assign(a) => a,
             _ => panic!()
@@ -173,7 +173,7 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn call(&mut self, e: &mut ast::Expr, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn call(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
         let c = match &mut e.kind {
             ast::ExprKind::Call(c) => c,
             _ => panic!()
@@ -204,7 +204,7 @@ impl<'a> FuncTypeInference<'a> {
 
         // Sema check arguements, then check argument types
         for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
-            self.expr(arg, Some(&param.type_annotation))?;
+            self.expr(arg, Some(param.type_annotation.clone()))?;
             if types::compare(&arg.typ, &param.type_annotation) == types::ComparisonResult::Incompatible {
                 return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
             }
@@ -219,23 +219,23 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn integer(&mut self, _i: &mut Box<ast::Integer>, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn integer(&mut self, _i: &mut Box<ast::Integer>, _type_hint: Option<types::Type>) -> SemaResult<()> {
         self.ok()
     }
 
-    fn number(&mut self, _f: &mut Box<ast::Number>, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn number(&mut self, _f: &mut Box<ast::Number>, _type_hint: Option<types::Type>) -> SemaResult<()> {
         self.ok()
     }
 
-    fn boolean(&mut self, _b: &mut Box<ast::Bool>, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn boolean(&mut self, _b: &mut Box<ast::Bool>, _type_hint: Option<types::Type>) -> SemaResult<()> {
         self.ok()
     }
 
-    fn string_literal(&mut self, _s: &mut Box<ast::StringLiteral>, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn string_literal(&mut self, _s: &mut Box<ast::StringLiteral>, _type_hint: Option<types::Type>) -> SemaResult<()> {
         self.ok()
     }
 
-    fn identifier(&mut self, e: &mut ast::Expr, _type_hint: Option<&types::Type>) -> SemaResult<()> { 
+    fn identifier(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> { 
         let i = match &e.kind {
             ast::ExprKind::Identifier(i) => i,
             _ => panic!()
@@ -248,7 +248,7 @@ impl<'a> FuncTypeInference<'a> {
         }
     }
 
-    fn subscript(&mut self, e: &mut ast::Expr, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn subscript(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
         // check the array is an array, then check the index is an integer
         // then set the type to the array element type
         let s = match &mut e.kind {
@@ -267,14 +267,14 @@ impl<'a> FuncTypeInference<'a> {
             return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, e.loc);
         }
 
-        e.typ = match &*s.value.typ {
-            types::Type::Array(element_type) => element_type.clone(),
+        e.typ = match &s.value.typ.kind() {
+            types::TypeKind::Array(element_type) => element_type.clone(),
             _ => panic!() // already checked above
         };
         self.ok()
     }
 
-    fn selector(&mut self, e: &mut ast::Expr, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn selector(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
         let s = match &mut e.kind {
             ast::ExprKind::Selector(s) => s,
             _ => panic!()
@@ -286,7 +286,7 @@ impl<'a> FuncTypeInference<'a> {
             return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
         }
 
-        if let types::Type::Struct(_, f) = s.value.typ.as_ref() {
+        if let types::TypeKind::Struct(_, f) = s.value.typ.kind() {
             if let Some((i, (_, ty))) = f.iter().enumerate().find(|a| a.1.0 == s.selector.id) {
                 e.typ = ty.clone();
                 s.idx = i;
@@ -298,7 +298,7 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn array_literal(&mut self, e: &mut ast::Expr, type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn array_literal(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
         // get type from first element, check all are the same, then assign type as array of that type
         let l = match &mut e.kind {
             ast::ExprKind::ArrayLiteral(l) => l,
@@ -309,7 +309,7 @@ impl<'a> FuncTypeInference<'a> {
             // empty array literal, assign type as array of unknown
             match type_hint {
                 Some(typ) => {
-                    e.typ = Box::new(typ.clone());
+                    e.typ = typ.clone();
                 }
                 _ => {
                     e.typ = types::array(types::unknown());
@@ -319,7 +319,7 @@ impl<'a> FuncTypeInference<'a> {
             self.expr(&mut l.literals[0], type_hint)?;
             let element_type = l.literals[0].typ.clone();
             for literal in l.literals.iter_mut().skip(1) {
-                self.expr(literal, Some(&element_type))?;
+                self.expr(literal, Some(element_type.clone()))?;
                 if types::compare(&literal.typ, &element_type) == types::ComparisonResult::Incompatible {
                     return self.error_loc(SemaErrorReason::IncompatibleTypesInBinaryExpression, e.loc);
                 }
@@ -330,7 +330,7 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn object_literal(&mut self, e: &mut ast::Expr, _type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn object_literal(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
         let l = match &mut e.kind {
             ast::ExprKind::ObjectLiteral(l) => l,
             _ => panic!()
@@ -356,7 +356,7 @@ impl<'a> FuncTypeInference<'a> {
                 None => return self.error_loc(SemaErrorReason::StructFieldNotFound, field.loc),
             };
             // run sema on the field value
-            self.expr(&mut field.value, Some(&struct_field.type_annotation))?;
+            self.expr(&mut field.value, Some(struct_field.type_annotation.clone()))?;
             // check the type matches
             if types::compare(&field.value.typ, &struct_field.type_annotation) == types::ComparisonResult::Incompatible {
                 return self.error_loc(SemaErrorReason::AssignmentTypesIncompatible, field.loc);
@@ -368,7 +368,7 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
-    fn expr(&mut self, e: &mut ast::Expr, type_hint: Option<&types::Type>) -> SemaResult<()> {
+    fn expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
         match &mut e.kind {
             ast::ExprKind::BinaryExpr(_) => self.binary_expr(e, type_hint),
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u, type_hint),
@@ -405,8 +405,8 @@ impl<'a> FuncTypeInference<'a> {
             return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, e.loc);
         }
 
-        e.typ = match &*s.value.typ {
-            types::Type::Array(element_type) => element_type.clone(),
+        e.typ = match &s.value.typ.kind() {
+            types::TypeKind::Array(element_type) => element_type.clone(),
             _ => panic!() // already checked above
         };
         self.ok()
@@ -424,7 +424,7 @@ impl<'a> FuncTypeInference<'a> {
             return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
         }
 
-        if let types::Type::Struct(_, f) = s.value.typ.as_ref() {
+        if let types::TypeKind::Struct(_, f) = s.value.typ.kind() {
             if let Some((i, (_, ty))) = f.iter().enumerate().find(|a| a.1.0 == s.selector.id) {
                 e.typ = ty.clone();
                 s.idx = i;
@@ -478,8 +478,8 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     fn if_stmt(&mut self, f: &mut Box<ast::IfStmt>) -> SemaResult<()> {
-        self.expr(&mut f.test, Some(&Type::Bool))?;
-        if types::compare(&f.test.typ, &Type::Bool) != types::ComparisonResult::Same {
+        self.expr(&mut f.test, Some(types::bool()))?;
+        if types::compare(&f.test.typ, &types::bool()) != types::ComparisonResult::Same {
             return self.error_loc(SemaErrorReason::ExpectedBooleanInTestCondition, f.test.loc);
         }
         self.stmt(&mut f.consequent)?;
@@ -492,7 +492,7 @@ impl<'a> FuncTypeInference<'a> {
     fn return_stmt(&mut self, r: &mut Box<ast::ReturnStmt>) -> SemaResult<()> {
         if let Some(return_type) = &self.own_signature.return_type {
             if let Some(r) = &mut r.value {
-                self.expr(r, Some(return_type))?;
+                self.expr(r, Some(return_type.clone()))?;
                 if types::compare(&r.typ, return_type) == types::ComparisonResult::Incompatible {
                     return self.error(SemaErrorReason::IncompatibleTypesInReturnValue);
                 }
@@ -509,7 +509,7 @@ impl<'a> FuncTypeInference<'a> {
 
     fn var_decl_stmt(&mut self, v: &mut Box<ast::VarDeclStmt>) -> SemaResult<()> {
         if let Some(annotation) = &v.type_annotation {
-            self.expr(&mut v.value, Some(annotation))?;
+            self.expr(&mut v.value, Some(annotation.clone()))?;
             let ret = &v.value.typ;
             if types::compare(&annotation, ret) == types::ComparisonResult::Incompatible {
                 return self.error(SemaErrorReason::IncompatibleTypesInVariableDefinition);
@@ -525,7 +525,7 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     fn while_stmt(&mut self, w: &mut Box<ast::WhileStmt>) -> SemaResult<()> {
-        self.expr(&mut w.condition, Some(&Type::Bool))?;
+        self.expr(&mut w.condition, Some(types::bool()))?;
         self.stmt(&mut w.consequent)?;
         self.ok()
     }

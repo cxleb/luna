@@ -52,12 +52,12 @@ pub enum Inst {
     IndirectCall, // top of the stack is the function to call.
 
     NewArray(usize),
-    LoadArray(Box<Type>), // Pops the index and array
-    StoreArray(Box<Type>), // Pops the value, index, and array
+    LoadArray(Type), // Pops the index and array
+    StoreArray(Type), // Pops the value, index, and array
 
     NewObject(usize),
-    GetObject(usize, Box<Type>),
-    SetObject(usize, Box<Type>),
+    GetObject(usize, Type),
+    SetObject(usize, Type),
 }
 
 #[derive(Debug, Clone)]
@@ -69,13 +69,13 @@ pub struct Block {
 #[derive(Debug, Clone)]
 pub struct Variable {
     pub id: VariableRef,
-    pub typ: Box<Type>,
+    pub typ: Type,
 }
 
 #[derive(Debug, Clone)]
 pub struct Signature {
-    pub ret_types: Vec<Box<Type>>,
-    pub parameters: Vec<Box<Type>>,
+    pub ret_types: Vec<Type>,
+    pub parameters: Vec<Type>,
 }
 
 // Logically, a function will start at block 0 and execute

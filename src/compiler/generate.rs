@@ -11,8 +11,8 @@ struct FuncGen<'a> {
 
 impl<'a> FuncGen<'a> {
     fn binary_expr(&mut self, e: &ast::Expr, b: &Box<ast::BinaryExpr>) {
-        match e.typ.as_ref() {
-            crate::types::Type::Number => {
+        match e.typ.kind() {
+            crate::types::TypeKind::Number => {
                 self.expr(&b.lhs);
                 // auto cast to number
                 if types::is_integer(&b.lhs.typ) {
@@ -31,7 +31,7 @@ impl<'a> FuncGen<'a> {
                     _ => { panic!("Invalid condition for type"); }
                 }
             },
-            crate::types::Type::Integer => {
+            crate::types::TypeKind::Integer => {
                 // auto cast to integer is not supported
                 self.expr(&b.lhs);
                 self.expr(&b.rhs);
@@ -43,11 +43,11 @@ impl<'a> FuncGen<'a> {
                     _ => { panic!("Invalid condition for type"); }
                 }
             },
-            crate::types::Type::Bool => {
+            crate::types::TypeKind::Bool => {
                 self.expr(&b.lhs);
                 self.expr(&b.rhs);
-                match b.lhs.typ.as_ref() {
-                    crate::types::Type::Integer => {
+                match b.lhs.typ.kind() {
+                    crate::types::TypeKind::Integer => {
                         match b.kind {
                             ast::BinaryExprKind::Equal => self.bld.eq_int(),
                             ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
@@ -58,7 +58,7 @@ impl<'a> FuncGen<'a> {
                             _ => panic!("Invalid binary operation for bool type"),
                         }
                     },
-                    crate::types::Type::Number => {
+                    crate::types::TypeKind::Number => {
                         match b.kind {
                             ast::BinaryExprKind::Equal => self.bld.eq_number(),
                             ast::BinaryExprKind::NotEqual => self.bld.neq_number(),
@@ -69,7 +69,7 @@ impl<'a> FuncGen<'a> {
                             _ => panic!("Invalid binary operation for bool type"),
                         }
                     },
-                    crate::types::Type::Bool => {
+                    crate::types::TypeKind::Bool => {
                         match b.kind {
                             ast::BinaryExprKind::LogicalAnd => self.bld.and(),
                             ast::BinaryExprKind::LogicalOr => self.bld.or(),
@@ -154,21 +154,21 @@ impl<'a> FuncGen<'a> {
     fn object_literal(&mut self, typ: &types::Type, o: &Box<ast::ObjectLiteral>) {
         self.bld.new_object(o.fields.len());
         // We need to set all the fields which we got then we need to provide defaults for the rest
-        if let crate::types::Type::Struct(_, struct_fields) = typ {
+        if let crate::types::TypeKind::Struct(_, struct_fields) = typ.kind() {
             for (i, (field_name, field_type)) in struct_fields.iter().enumerate() {
                 if let Some(value) = o.fields.iter().find(|field| &field.id == field_name) {
                     self.expr(&value.value);
                 } else { 
                     // provide default value
-                    match field_type.as_ref() {
-                        crate::types::Type::Integer => self.bld.load_const_int(0),
-                        crate::types::Type::Number => self.bld.load_const_number(0.0),
-                        crate::types::Type::Bool => self.bld.load_const_bool(false),
-                        crate::types::Type::String => {
+                    match field_type.kind() {
+                        crate::types::TypeKind::Integer => self.bld.load_const_int(0),
+                        crate::types::TypeKind::Number => self.bld.load_const_number(0.0),
+                        crate::types::TypeKind::Bool => self.bld.load_const_bool(false),
+                        crate::types::TypeKind::String => {
                             let s = self.str_map.intern("");
                             self.bld.load_const_string(s);
                         },
-                        crate::types::Type::Array(_) => {
+                        crate::types::TypeKind::Array(_) => {
                             self.bld.new_array(0);
                         },
                         _ => { panic!("Cannot provide default value for field type {:?}", field_type); }
@@ -320,10 +320,10 @@ impl<'a> FuncGen<'a> {
     }
 
     fn var_decl_stmt(&mut self, v: &Box<ast::VarDeclStmt>) -> bool {
+        self.expr(&v.value);
         let id = self
             .bld
-            .create_var(v.id.clone(), v.type_annotation.clone().unwrap());
-        self.expr(&v.value);
+            .create_var(v.id.clone(), v.value.typ.clone());
         self.bld.store(id);
         false
     }
