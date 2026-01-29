@@ -1,0 +1,24 @@
+func main() {
+    let a = 1;
+    let b = 2;
+    assert(a == 1);
+    assert(b == 2);
+    a = 11;
+    b = 12;
+    assert(a == 11);
+    assert(b == 12);
+    a = b = 10;
+    assert(a == 10);
+    assert(b == 10);
+
+    let c = false;
+    let d = true;
+    if c {
+        assert(false);
+    }
+    if c = d {
+        d = false;
+    }
+    assert(c);
+    //assert(!d); // todo(caleb): implement this
+}

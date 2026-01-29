@@ -1,0 +1,63 @@
+// This serves an "eventualluy" compilable goal
+
+// entry point
+func main() {
+    print("Hello, World!");
+
+    // Variables
+    let a = 10;
+    let b: int = 10;
+    // Constants
+    const c = 10;
+    const d: int = 10;
+
+    // Conditional
+    if a == b {
+        print("a == b");
+    }
+
+    while a == b {
+        print("a == b");
+    }
+
+    // Iterators
+    let array: []int = [10, 20, 30, 40];
+    for i in array {
+        print("Hello, {i/10}");
+    }
+
+    // Other types
+    var the_int: int = 10;
+    var the_number: number = 10.0;
+    var the_bool: bool = true;
+    var the_string: string = "The String";
+
+    // function calls
+    other(a, b);
+
+    // Template strings
+    // The normal string also serves as the template String
+    // This is the primary method to format strings.
+    print("a + b = {a + b}");
+    print("a - b = {a - b}");
+    print("a / b = {a / b}");
+    print("a * b = {a * b}");
+}
+
+// parameters/return types
+func other(a: int, b: int): int {
+    return a + b;
+}
+
+// structs
+struct Bingus {
+    a: int,
+    b: number,
+    c: bool,
+    d: string,
+    e: Bongus,
+}
+
+struct Bongus {
+    a: int,
+}

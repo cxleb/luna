@@ -1,0 +1,50 @@
+func main() {
+    // integer math
+    assert(10 + 10 == 20);
+    assert(10 - 10 == 0);
+    assert(10 * 3 == 30);
+    assert(10 / 2 == 5);
+    
+    // float math
+    assert(10.0 + 10.0 == 20.0);
+    assert(10.0 - 10.0 == 0.0);
+    assert(10.0 * 3.0 == 30.0);
+    assert(10.0 / 2.0 == 5.0);
+
+    // integer-float math
+    assert(10 + 10.0 == 20.0);
+    assert(10 - 10.0 == 0.0);
+    assert(10 * 3.0 == 30.0);
+    assert(10 / 2.0 == 5.0);
+
+    // float-integer math
+    assert(10.0 + 10 == 20.0);
+    assert(10.0 - 10 == 0.0);
+    assert(10.0 * 3 == 30.0);
+    assert(10.0 / 2 == 5.0);
+
+    // integer comparisons
+    assert(0 == 0);
+    assert(1 > 0);
+    assert(0 < 1);
+    assert(1 >= 0);
+    assert(1 >= 1);
+    assert(0 <= 1);
+    assert(1 <= 1);
+
+    // float comparisons
+    assert(10.0 == 10.0);
+    assert(11.0 > 10.0);
+    assert(10.0 < 11.0);
+    assert(11.0 >= 10.0);
+    assert(11.0 >= 11.0);
+    assert(10.0 <= 11.0);
+    assert(11.0 <= 11.0);
+
+    // logical operators
+    assert(true && true);
+    
+    assert(true || false);
+    assert(false || true);
+    assert(true || true);
+}

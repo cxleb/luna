@@ -1,0 +1,32 @@
+func returns10(): int {
+    return 10;
+}
+
+func maths(): bool {
+    return 10.0 / 3.333 > 2.5;
+}
+
+func add(a: int, b: int): int {
+    return a + b;
+}
+
+func sub(a: int, b: int): int {
+    return a - b;
+}
+
+func fibonacci(n: int): int {
+    if n <= 1 {
+        return n;
+    } else {
+        return fibonacci(n - 1) + fibonacci(n - 2);
+    }
+}
+
+func main() {
+    // function calls
+    assert(returns10() == 10);
+    assert(maths());
+    assert(add(10, 10) == 20);
+    assert(sub(10, 5) == 5);
+    assert(fibonacci(10) == 55);
+}

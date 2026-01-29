@@ -1,0 +1,42 @@
+func main() {
+    if true {
+        assert(true);
+    } else {
+        assert(false);
+    }
+
+    if false {
+        assert(false);
+    } else {
+        assert(true);
+    }
+
+    if not true {
+        assert(false);
+    } else {
+        assert(true);
+    }
+
+    if not false {
+        assert(true);
+    } else {
+        assert(false);
+    }
+
+    let a = 0;
+    if a == 0 {
+        a = 10;
+    } else {
+        a = 11;
+    }
+    assert(a == 10);
+
+    let b = 0;
+    if b != 0 {
+        b = 10;
+    } else {
+        b = 11;
+    }
+    assert(b == 11);
+    
+}

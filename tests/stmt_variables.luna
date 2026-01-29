@@ -1,0 +1,8 @@
+func main() {
+    // variables
+    let a = 10;
+    let b = a;
+    b = a = 11;
+    assert(a == 11);
+    assert(b == 11);
+}
