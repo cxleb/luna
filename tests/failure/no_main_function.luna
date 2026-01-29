@@ -1,0 +1,5 @@
+// This should fail - no main function defined
+
+func helper(): int {
+    return 10;
+}

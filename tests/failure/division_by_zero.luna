@@ -1,0 +1,4 @@
+func main() {
+    // This should fail - division by zero
+    let a = 10 / 0;
+}

@@ -1,0 +1,8 @@
+func main() {
+    // This should fail - missing return statement for function with return type
+    let a = no_return();
+}
+
+func no_return(): int {
+    // Missing return statement
+}

@@ -1,0 +1,5 @@
+func main() {
+    // This should fail - syntax error with missing semicolon
+    let a = 10
+    let b = 20;
+}

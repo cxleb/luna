@@ -1,0 +1,9 @@
+func main() {
+    // This should fail - accessing undefined struct field
+    let test = TestStruct { a: 10 };
+    let b = test.undefined_field;
+}
+
+struct TestStruct {
+    a: int,
+}

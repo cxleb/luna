@@ -1,0 +1,4 @@
+func main() {
+    // This should fail - undefined variable
+    let a = undefined_var;
+}

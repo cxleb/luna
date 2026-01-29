@@ -1,0 +1,8 @@
+func main() {
+    // This should fail - calling function with wrong number of arguments
+    let a = add(10);
+}
+
+func add(a: int, b: int): int {
+    return a + b;
+}

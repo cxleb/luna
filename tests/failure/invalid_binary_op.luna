@@ -1,0 +1,4 @@
+func main() {
+    // This should fail - invalid binary operation between incompatible types
+    let a = 10 + "hello";
+}

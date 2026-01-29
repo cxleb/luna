@@ -1,0 +1,4 @@
+func main() {
+    // This should fail - type mismatch in assignment
+    let a: int = "hello";
+}
