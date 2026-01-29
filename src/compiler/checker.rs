@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::builtins::Builtins;
 use crate::compiler::{SourceLoc, ast};
-use crate::types::{self, Type};
+use crate::types::{self, Type, clone_struct_fields};
 
 #[derive(Debug)]
 pub enum SemaErrorReason {
@@ -38,19 +38,213 @@ pub struct SemaError {
 
 type SemaResult<X> = Result<X, SemaError>;
 
+pub fn error<T>(reason: SemaErrorReason) -> SemaResult<T> {
+    Err(SemaError { reason, loc: SourceLoc::default() })
+}
+
+pub fn error_loc<T>(reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
+    Err(SemaError { reason, loc })
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+struct NameSpecification {
+    pub package: String,
+    pub name: String,
+}
+
+struct TypeCollection {
+    types: HashMap<NameSpecification, Type>,
+}
+
+impl TypeCollection {
+    // Find a type in the collection
+    pub fn get(&self, imports: &Vec<String>, package_id: &str, name: &String) -> Option<&Type> {
+        if let Some(typ) = self.get_exact(package_id, name) {
+            return Some(typ);
+        } 
+
+        for import in imports {
+            let name_spec = NameSpecification {
+                package: import.clone(),
+                name: name.clone(),
+            };
+            if let Some(typ) = self.types.get(&name_spec) {
+                return Some(typ);
+            }
+        }
+        None
+    }
+
+    pub fn get_exact(&self, package: &str, name: &str) -> Option<&Type> {
+        let name_spec = NameSpecification {
+            package: package.into(),
+            name: name.into(),
+        };
+        self.types.get(&name_spec)
+    }
+}
+
+fn collect_types(program: &ast::Program) -> TypeCollection {
+    let mut collection = TypeCollection {
+        types: HashMap::new(),
+    };
+
+    for package in program.packages.iter() {
+        for file in package.files.iter() {
+            for struct_ in file.structs.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: struct_.id.clone(),
+                };
+                let typ = types::struct_type(&struct_.id, Vec::new());
+                collection.types.insert(name_spec, typ);
+            }
+        }
+    }
+
+    collection
+}
+
+fn check_types(program: &ast::Program, collection: &TypeCollection) -> SemaResult<()> {
+    for package in program.packages.iter() {
+        for file in package.files.iter() {
+            for struct_ in file.structs.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: struct_.id.clone(),
+                };
+                let typ = collection.types.get(&name_spec).unwrap().clone();
+                for field in struct_.fields.iter() {
+                    let field_type = type_lookup(&field.type_annotation, &collection, &package.id, &file.imports)?;
+                    // resolve field types
+                    if let types::TypeKind::Struct(struct_type) = &typ.inner.kind {
+                        struct_type.fields.write().unwrap().push((field.id.clone(), field_type));
+                    } else {
+                        unreachable!();
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn type_lookup(ast_type: &ast::Type, collection: &TypeCollection, package_id: &str, imports: &Vec<String>) -> SemaResult<Type> {
+    match ast_type {
+        ast::Type::Integer => Ok(types::integer()),
+        ast::Type::Number => Ok(types::number()),
+        ast::Type::String => Ok(types::string()),
+        ast::Type::Bool => Ok(types::bool()),
+        ast::Type::Identifier(id) => collection.get(imports, package_id, id).cloned().ok_or(SemaError { reason: SemaErrorReason::TypeNotFound, loc: SourceLoc::default() }),
+        ast::Type::Array(element_type) => Ok(types::array(type_lookup(element_type, collection, package_id, imports)?)),
+        _ => Err(SemaError { reason: SemaErrorReason::TypeNotFound, loc: SourceLoc::default() }),
+    }
+}
+
+struct FunctionCollection {
+    functions: HashMap<NameSpecification, types::FunctionType>,
+}
+
+impl FunctionCollection {
+    // Find a function in the collection
+    pub fn get(&self, imports: &Vec<String>, package: &str, name: &String) -> Option<&types::FunctionType> {
+        if let Some(typ) = self.get_exact(package, name) {
+            return Some(typ);
+        }
+        for import in imports {
+            let name_spec = NameSpecification {
+                package: import.clone(),
+                name: name.clone(),
+            };
+            if let Some(typ) = self.functions.get(&name_spec) {
+                return Some(typ);
+            }
+        }
+        None
+    }
+
+    pub fn get_exact(&self, package: &str, name: &str) -> Option<&types::FunctionType> {
+        let name_spec = NameSpecification {
+            package: package.into(),
+            name: name.into(),
+        };
+        self.functions.get(&name_spec)
+    }
+}
+
+fn collect_functions(program: &ast::Program, builtins: &Builtins, collection: &TypeCollection) -> SemaResult<FunctionCollection> {
+    let mut function_collection = FunctionCollection {
+        functions: HashMap::new(),
+    };
+
+    // collect the builtin functions into the builtin package(which is implicitly imported)
+    for builtin in builtins.functions.iter() {
+        let name_spec = NameSpecification {
+            package: "builtins".into(),
+            name: builtin.id.clone(),
+        };
+        let mut params = Vec::new();
+        for param in builtin.parameters.iter() {
+            params.push(param.clone());
+        }
+        let mut returns = Vec::new();
+        for return_type in builtin.returns.iter() {
+            returns.push(return_type.clone());
+        }
+        let function_type = types::FunctionType {
+            params,
+            returns,
+        };
+        function_collection.functions.insert(name_spec, function_type);
+    }
+     
+    for package in program.packages.iter() {
+        for file in package.files.iter() {
+            for func in file.functions.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: func.signature.id.clone(),
+                };
+                let mut params = Vec::new();
+                for param in func.signature.params.iter() {
+                    params.push(type_lookup(&param.type_annotation, &collection, &package.id, &file.imports)?);
+                }
+                let mut returns = Vec::new();
+                for return_type in func.signature.return_type.iter() {
+                    returns.push(type_lookup(&return_type, &collection, &package.id, &file.imports)?);
+                }
+                let function_type = types::FunctionType {
+                    params,
+                    returns,
+                };
+                function_collection.functions.insert(name_spec, function_type);
+            }
+        }
+    }
+
+    Ok(function_collection)
+}
+
 struct FuncTypeInference<'a> {
-    structs: &'a Vec<Box<ast::Struct>>,
-    own_signature:&'a ast::FuncSignature,
-    signatures: &'a Vec<ast::FuncSignature>,
+    ///structs: &'a Vec<Box<ast::Struct>>,
+    imports: &'a Vec<String>,
+    types: &'a TypeCollection,
+    //own_signature:&'a ast::FuncSignature,
+    //signatures: &'a Vec<ast::FuncSignature>,
+    functions: &'a FunctionCollection,
+    own_signature: &'a types::FunctionType,
+    package_id: &'a str,
     variable_scopes: Vec<HashMap<String, Box<Type>>>,
 }
 
 impl<'a> FuncTypeInference<'a> {
-    fn new(structs: &'a Vec<Box<ast::Struct>>, own_signature: &'a ast::FuncSignature, signatures: &'a Vec<ast::FuncSignature>) -> Self {
+    fn new(imports: &'a Vec<String>, types: &'a TypeCollection, own_signature: &'a types::FunctionType, functions: &'a FunctionCollection, package_id: &'a str) -> Self {
         Self {
-            structs,
+            imports,
+            types,
             own_signature,
-            signatures,
+            functions,
+            package_id,
             variable_scopes: Vec::new(),
         }
     }
@@ -189,7 +383,7 @@ impl<'a> FuncTypeInference<'a> {
         // find the called function
         //println!("Looking for function: {}", name);
         //println!("Available functions: {}", self.signatures.iter().map(|s| s.id.clone()).collect::<Vec<_>>().join(", "));
-        let func_signature = match self.signatures.iter().find(|s| s.id == *name) {
+        let func_signature = match self.functions.get(self.imports, self.package_id, name) {
             Some(s) => s,
             None => return self.error_loc(SemaErrorReason::FunctionNotFound, e.loc),
         };
@@ -204,17 +398,17 @@ impl<'a> FuncTypeInference<'a> {
 
         // Sema check arguements, then check argument types
         for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
-            self.expr(arg, Some(param.type_annotation.clone()))?;
-            if types::compare(&arg.typ, &param.type_annotation) == types::ComparisonResult::Incompatible {
+            self.expr(arg, Some(param.clone()))?;
+            if types::compare(&arg.typ, &param) == types::ComparisonResult::Incompatible {
                 return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
             }
         }
 
         // Assign this expr the return type of the function
-        if let Some(typ) = &func_signature.return_type {
+        if let Some(typ) = func_signature.returns.first() {
             e.typ = typ.clone();
         } else {
-            e.typ = types::unknown();
+            e.typ = types::bad();
         }
         self.ok()
     }
@@ -286,8 +480,8 @@ impl<'a> FuncTypeInference<'a> {
             return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
         }
 
-        if let types::TypeKind::Struct(_, f) = s.value.typ.kind() {
-            if let Some((i, (_, ty))) = f.iter().enumerate().find(|a| a.1.0 == s.selector.id) {
+        if let types::TypeKind::Struct(struct_type) = s.value.typ.kind() {
+            if let Some((i, (_, ty))) = struct_type.fields.read().unwrap().iter().enumerate().find(|a| a.1.0 == s.selector.id) {
                 e.typ = ty.clone();
                 s.idx = i;
             } else {
@@ -312,7 +506,7 @@ impl<'a> FuncTypeInference<'a> {
                     e.typ = typ.clone();
                 }
                 _ => {
-                    e.typ = types::array(types::unknown());
+                    e.typ = types::array(types::bad());
                 }
             }
         } else {
@@ -343,27 +537,35 @@ impl<'a> FuncTypeInference<'a> {
 
         // maybe there need to be a module look up mapping to know which structs we want
         // does the struct exist?
-        let struct_def = match self.structs.iter().find(|s| s.id == id.id) {
-            Some(s) => s,
+        let struct_def = match self.types.get(self.imports, self.package_id, &id.id) {
+            Some(s) => s.clone(),
             None => return self.error_loc(SemaErrorReason::TypeNotFound, e.loc),
         };
+
+        // check the type is actually a struct
+        if !types::is_struct(&struct_def) {
+            return self.error_loc(SemaErrorReason::TypeNotFound, e.loc);
+        }
+
+        let struct_fields = clone_struct_fields(&struct_def);
+
         // once we find the struct, we need to check what fields we are setting and if they exist
         // run the expr sema for the fields
         // then we need to type check them
         for field in l.fields.iter_mut() {
-            let struct_field = match struct_def.fields.iter().find(|f| f.id == field.id) {
+            let struct_field = match struct_fields.iter().find(|f| f.0 == field.id) {
                 Some(f) => f,
                 None => return self.error_loc(SemaErrorReason::StructFieldNotFound, field.loc),
             };
             // run sema on the field value
-            self.expr(&mut field.value, Some(struct_field.type_annotation.clone()))?;
+            self.expr(&mut field.value, Some(struct_field.1.clone()))?;
             // check the type matches
-            if types::compare(&field.value.typ, &struct_field.type_annotation) == types::ComparisonResult::Incompatible {
+            if types::compare(&field.value.typ, &struct_field.1) == types::ComparisonResult::Incompatible {
                 return self.error_loc(SemaErrorReason::AssignmentTypesIncompatible, field.loc);
             }
         }
 
-        e.typ = types::struct_type(&id.id, struct_def.fields.iter().map(|f| (f.id.clone(), f.type_annotation.clone())).collect());
+        e.typ = struct_def;
 
         self.ok()
     }
@@ -424,8 +626,8 @@ impl<'a> FuncTypeInference<'a> {
             return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
         }
 
-        if let types::TypeKind::Struct(_, f) = s.value.typ.kind() {
-            if let Some((i, (_, ty))) = f.iter().enumerate().find(|a| a.1.0 == s.selector.id) {
+        if let types::TypeKind::Struct(struct_type) = s.value.typ.kind() {
+            if let Some((i, (_, ty))) = struct_type.fields.read().unwrap().iter().enumerate().find(|a| a.1.0 == s.selector.id) {
                 e.typ = ty.clone();
                 s.idx = i;
             } else {
@@ -490,10 +692,10 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     fn return_stmt(&mut self, r: &mut Box<ast::ReturnStmt>) -> SemaResult<()> {
-        if let Some(return_type) = &self.own_signature.return_type {
+        if let Some(return_type) = self.own_signature.returns.first().cloned() {
             if let Some(r) = &mut r.value {
                 self.expr(r, Some(return_type.clone()))?;
-                if types::compare(&r.typ, return_type) == types::ComparisonResult::Incompatible {
+                if types::compare(&r.typ, &return_type) == types::ComparisonResult::Incompatible {
                     return self.error(SemaErrorReason::IncompatibleTypesInReturnValue);
                 }
             } else {
@@ -509,6 +711,7 @@ impl<'a> FuncTypeInference<'a> {
 
     fn var_decl_stmt(&mut self, v: &mut Box<ast::VarDeclStmt>) -> SemaResult<()> {
         if let Some(annotation) = &v.type_annotation {
+            let annotation = type_lookup(&annotation, self.types, self.package_id, self.imports)?;
             self.expr(&mut v.value, Some(annotation.clone()))?;
             let ret = &v.value.typ;
             if types::compare(&annotation, ret) == types::ComparisonResult::Incompatible {
@@ -518,7 +721,7 @@ impl<'a> FuncTypeInference<'a> {
         } else {
             self.expr(&mut v.value, None)?;
             let ret = &v.value.typ;
-            v.type_annotation = Some(ret.clone());
+            //v.type_annotation = Some(ret.clone());
             self.create_var(v.id.clone(), ret);
         }
         self.ok()
@@ -545,7 +748,8 @@ impl<'a> FuncTypeInference<'a> {
     fn check(&mut self, func: & mut ast::Func) -> SemaResult<()> {
         self.push_scope();
         for p in func.signature.params.iter() {
-            self.create_var(p.id.clone(), &p.type_annotation);
+            let annotation = type_lookup(&p.type_annotation, self.types, self.package_id, self.imports)?;
+            self.create_var(p.id.clone(), &annotation);
         }
         self.block_stmt(&mut func.body)?;
         self.pop_scope();
@@ -553,34 +757,33 @@ impl<'a> FuncTypeInference<'a> {
     }
 }
 
-pub fn sema_function(structs: &Vec<Box<ast::Struct>>, signatures: &Vec<ast::FuncSignature>, func: & mut ast::Func) -> SemaResult<()> {
-    let own_signature = signatures.iter().find(|s| s.id == func.signature.id).unwrap();
-    FuncTypeInference::new(structs, own_signature, signatures).check(func)?;
-    Ok(())
-}
-
-pub fn sema_module(module: &mut Box<ast::Module>, builtins: &Builtins) -> SemaResult<()> {
-    let mut signatures = module.functions.iter().map(|f| f.signature.clone()).collect::<Vec<_>>();
-    let structs = module.structs.iter().map(|s| s.clone()).collect::<Vec<_>>();
-    // add builtin signatures
-    for builtin in builtins.functions.iter() {
-        let signature = ast::FuncSignature {
-            id: builtin.id.clone(),
-            params: builtin.parameters.iter().enumerate().map(|(i, p)| ast::Param {
-                id: format!("arg{}", i),
-                type_annotation: p.clone(),
-            }).collect(),
-            return_type: builtin.returns.clone(),
-        };
-        signatures.push(signature);
-        //// avoid duplicates
-        //if !signatures.iter().any(|s| s.id == signature.id) {
-        //    // println!("Adding builtin function signature: {:?}", signature);
-        //}
-    }
-    for func in module.functions.iter_mut() {
-        sema_function(&structs, &signatures, func)?;
+fn check_file(file: &mut Box<ast::File>, package_id: &str, collection: &TypeCollection, functions: &FunctionCollection) -> SemaResult<()> {
+    file.imports.push("builtins".into());
+    for func in file.functions.iter_mut() {
+        let own_signature = functions.get_exact(package_id, &func.signature.id).unwrap();
+        func.typ_ = own_signature.clone();
+        FuncTypeInference::new(&file.imports, collection, own_signature, functions, package_id).check(func)?;
     }
 
     Ok(())
 }
+
+fn check_package(package: &mut ast::Package, collection: &TypeCollection, functions: &FunctionCollection) -> SemaResult<()> {
+    for file in package.files.iter_mut() {
+        check_file(file, &package.id, collection, functions)?;
+    }
+    Ok(())
+}
+
+pub fn check_program(program: &mut ast::Program, builtins: &Builtins) -> SemaResult<()> {
+    let collection = collect_types(program);
+    check_types(program, &collection)?;
+
+    let function_collection = collect_functions(program, builtins, &collection)?;
+
+    for file in program.packages.iter_mut() {
+        check_package(file, &collection, &function_collection)?;
+    }
+    Ok(())
+}
+

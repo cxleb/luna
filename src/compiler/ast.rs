@@ -1,4 +1,19 @@
-use crate::{compiler::SourceLoc, types::Type};
+use crate::{compiler::SourceLoc, types};
+
+// This is used in the AST to store a reference to a type.
+// This will be used with the file's lookup rules to resolve to a type
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum Type {
+    #[default]
+    Unknown,
+    Integer,
+    Number,
+    String,
+    Bool, 
+    Identifier(String),
+    Array(Box<Type>),
+    //UnknownReference, // An internal detail before generics is correctly implemented
+}
 
 #[derive(Debug, Clone)]
 pub enum BinaryExprKind {
@@ -115,7 +130,7 @@ pub enum ExprKind {
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub loc: SourceLoc,
-    pub typ: Type,
+    pub typ: types::Type,
     pub kind: ExprKind,
 }
 
@@ -139,7 +154,7 @@ pub struct VarDeclStmt {
     pub loc: SourceLoc,
     pub is_const: bool,
     pub id: String,
-    pub type_annotation: Option<Type>,
+    pub type_annotation: Option<Box<Type>>,
     pub value: Expr,
 }
 
@@ -184,20 +199,21 @@ pub enum Stmt {
 #[derive(Debug, Default, Clone)]
 pub struct Param {
     pub id: String,
-    pub type_annotation: Type,
+    pub type_annotation: Box<Type>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct FuncSignature {
     pub id: String,
     pub params: Vec<Param>,
-    pub return_type: Option<Type>,
+    pub return_type: Option<Box<Type>>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Func {
     pub loc: SourceLoc,
     pub signature: FuncSignature,
+    pub typ_: types::FunctionType,
     pub body: Box<BlockStmt>,
 }
 
@@ -205,7 +221,7 @@ pub struct Func {
 pub struct StructField {
     pub loc: SourceLoc,
     pub id: String,
-    pub type_annotation: Type,
+    pub type_annotation: Box<Type>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -216,7 +232,20 @@ pub struct Struct {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct Module {
+pub struct File {
+    pub id: String,
     pub functions: Vec<Box<Func>>,
     pub structs: Vec<Box<Struct>>,
+    pub imports: Vec<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Package {
+    pub id: String,
+    pub files: Vec<Box<File>>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Program {
+    pub packages: Vec<Box<Package>>,
 }

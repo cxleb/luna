@@ -154,8 +154,8 @@ impl<'a> FuncGen<'a> {
     fn object_literal(&mut self, typ: &types::Type, o: &Box<ast::ObjectLiteral>) {
         self.bld.new_object(o.fields.len());
         // We need to set all the fields which we got then we need to provide defaults for the rest
-        if let crate::types::TypeKind::Struct(_, struct_fields) = typ.kind() {
-            for (i, (field_name, field_type)) in struct_fields.iter().enumerate() {
+        if let crate::types::TypeKind::Struct(struct_fields) = typ.kind() {
+            for (i, (field_name, field_type)) in struct_fields.fields.read().unwrap().iter().enumerate() {
                 if let Some(value) = o.fields.iter().find(|field| &field.id == field_name) {
                     self.expr(&value.value);
                 } else { 
@@ -361,13 +361,10 @@ impl<'a> FuncGen<'a> {
     }
 
     fn generate(func: &Box<ast::Func>, structs: &'a Vec<Box<ast::Struct>>, str_map: &'a mut StringMap) -> Self {
-        let mut signature = ir::Signature {
-            ret_types: Vec::new(),
-            parameters: func.signature.params.iter().map(|p| p.type_annotation.clone()).collect()
+        let signature = ir::Signature {
+            ret_types: func.typ_.returns.iter().cloned().collect(),
+            parameters: func.typ_.params.iter().cloned().collect()
         };
-        if let Some(ret_type) = &func.signature.return_type {
-            signature.ret_types.push(ret_type.clone());
-        }
         let mut s = Self {
             str_map,
             structs,
@@ -375,8 +372,8 @@ impl<'a> FuncGen<'a> {
         };
         s.bld.push_scope();
         // add params as variables for scope purposes
-        for p in func.signature.params.iter() {
-            s.bld.create_var(p.id.clone(), p.type_annotation.clone());
+        for (p, sig_p) in func.signature.params.iter().zip(func.typ_.params.iter()) {
+            s.bld.create_var(p.id.clone(), sig_p.clone());
         }
         if !s.block_stmt(&func.body) {
             s.bld.ret();
@@ -394,12 +391,26 @@ pub fn gen_function(func: &Box<ast::Func>, structs: &Vec<Box<ast::Struct>>, str_
     FuncGen::generate(func, structs, str_map).finish()
 }
 
-pub fn gen_module(module: Box<ast::Module>) -> Box<ir::Module> {
-    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![] };
+// pub fn gen_module(module: Box<ast::File>) -> Box<ir::Module> {
 
-    for func in module.functions.iter() {
-        let ir_func = gen_function(&func, &module.structs, &mut ir_module.string_map);
-        ir_module.funcs.push(*ir_func);
+//     for func in module.functions.iter() {
+//         let ir_func = gen_function(&func, &module.structs, &mut ir_module.string_map);
+//         ir_module.funcs.push(*ir_func);
+//     }
+
+//     Box::new(ir_module)
+// }
+
+pub fn emit_program(program: &ast::Program) -> Box<ir::Module> {
+    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![] };
+    
+    for package in program.packages.iter() {
+        for file in package.files.iter() {
+            for func in file.functions.iter() {
+                let ir_func = gen_function(&func, &file.structs, &mut ir_module.string_map);
+                ir_module.funcs.push(*ir_func);
+            }
+        }
     }
 
     Box::new(ir_module)

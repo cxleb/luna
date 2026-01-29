@@ -11,5 +11,8 @@ func main() {
         c: "This is a string"
     };
 
-    print(a.c);
+    assert(a.a == 10);
+    assert(a.b > 10.0);
+    assert(a.b < 11.0);
+    //assert(a.c == "This is a string");
 }

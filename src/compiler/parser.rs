@@ -1,6 +1,6 @@
 use crate::{
     compiler::{SourceLoc, ast::*, token::*, tokeniser::*},
-    types::{self, Type},
+    types::{self},
 };
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl<'a> Parser<'a> {
         Expr {
             kind,
             loc,
-            typ: Type::default(),
+            typ: types::Type::default(),
         }
     }
 
@@ -101,22 +101,22 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_module(&mut self) -> ParserResult<Box<Module>> {
-        let mut module = Box::new(Module::default());
+    pub fn parse_file(&mut self) -> ParserResult<Box<File>> {
+        let mut file = Box::new(File::default());
         while let Some(next) = self.tokeniser.peek(TokeniserMode::Regex) {
             match next.kind {
                 TokenKind::Keyword(Keywords::Func) => {
                     let func = self.parse_function()?;
-                    module.functions.push(func);
+                    file.functions.push(func);
                 }
                 TokenKind::Keyword(Keywords::Struct) => {
                     let struct_ = self.parse_struct()?;
-                    module.structs.push(struct_);
+                    file.structs.push(struct_);
                 }
                 _ => return self.error(ParserErrorReason::ExpectedTopLevelDefinition),
             }
         }
-        Ok(module)
+        Ok(file)
     }
 
     pub fn parse_struct(&mut self) -> ParserResult<Box<Struct>> {
@@ -581,26 +581,26 @@ impl<'a> Parser<'a> {
     /// TYPES
     /////////////////////////////
 
-    fn parse_type(&mut self) -> ParserResult<Type> {
+    fn parse_type(&mut self) -> ParserResult<Box<Type>> {
         if self.test(TokenKind::Punctuation(Punctuation::LeftBracket)) {
             self.tokeniser.next(self.mode);
             self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;
             let element_type = self.parse_type()?;
-            return Ok(types::array(element_type));
+            return Ok(Box::new(Type::Array(element_type)));
         }
 
         let string = self.expect(TokenKind::Identifier)?.get_string();
 
         if string == "string" {
-            return Ok(types::string());
+            return Ok(Box::new(Type::String));
         } else if string == "bool" {
-            return Ok(types::bool());
+            return Ok(Box::new(Type::Bool));
         } else if string == "int" {
-            return Ok(types::integer());
+            return Ok(Box::new(Type::Integer));
         } else if string == "number" {
-            return Ok(types::number());
+            return Ok(Box::new(Type::Number));
         } else {
-            return Ok(types::identifier(string));
+            return Ok(Box::new(Type::Identifier(string)));
         }
     }
 }
@@ -611,39 +611,42 @@ mod tests {
         use crate::compiler::parser::Parser;
 
         let mut parser = Parser::new("func test() {} struct MyStruct {}");
-        let module = parser.parse_module().unwrap();
-        assert_eq!(module.functions.len(), 1);
-        assert_eq!(module.functions[0].signature.id, "test");
-        assert_eq!(module.structs.len(), 1);
-        assert_eq!(module.structs[0].id, "MyStruct");
+        let file = parser.parse_file().unwrap();
+        assert_eq!(file.functions.len(), 1);
+        assert_eq!(file.functions[0].signature.id, "test");
+        assert_eq!(file.structs.len(), 1);
+        assert_eq!(file.structs[0].id, "MyStruct");
     }
 
     #[test]
     fn test_parse_function() {
         use crate::compiler::parser::Parser;
+        use crate::compiler::ast;
+
 
         let mut parser = Parser::new("func test(param1: string, param2: int) {}");
         let func = parser.parse_function().unwrap();
         assert_eq!(func.signature.id, "test");
         assert_eq!(func.signature.params.len(), 2);
         assert_eq!(func.signature.params[0].id, "param1");
-        assert_eq!(func.signature.params[0].type_annotation, crate::types::string());
+        assert_eq!(func.signature.params[0].type_annotation, Box::new(ast::Type::String));
         assert_eq!(func.signature.params[1].id, "param2");
-        assert_eq!(func.signature.params[1].type_annotation, crate::types::integer());
+        assert_eq!(func.signature.params[1].type_annotation, Box::new(ast::Type::Integer));
     }
 
     #[test]
     fn test_parse_struct() {
         use crate::compiler::parser::Parser;
+        use crate::compiler::ast;
 
         let mut parser = Parser::new("struct MyStruct { field1: string, field2: int }");
         let struct_ = parser.parse_struct().unwrap();
         assert_eq!(struct_.id, "MyStruct");
         assert_eq!(struct_.fields.len(), 2);
         assert_eq!(struct_.fields[0].id, "field1");
-        assert_eq!(struct_.fields[0].type_annotation, crate::types::string());
+        assert_eq!(struct_.fields[0].type_annotation, Box::new(ast::Type::String));
         assert_eq!(struct_.fields[1].id, "field2");
-        assert_eq!(struct_.fields[1].type_annotation, crate::types::integer());
+        assert_eq!(struct_.fields[1].type_annotation, Box::new(ast::Type::Integer));
     }
 
     #[test]
@@ -693,13 +696,14 @@ mod tests {
     #[test]
     fn test_parse_var_decl() {
         use crate::compiler::parser::Parser;
+        use crate::compiler::ast;
 
         let mut parser = Parser::new("let x: int = 10;");
         let var_decl = parser.parse_var_decl_statement().unwrap();
         assert_eq!(var_decl.id, "x");
         assert_eq!(
             var_decl.type_annotation.unwrap(),
-            crate::types::integer()
+            Box::new(ast::Type::Integer)
         );
         if let crate::compiler::ast::ExprKind::Integer(int) = &var_decl.value.kind {
             assert_eq!(int.value, 10);
@@ -728,18 +732,20 @@ mod tests {
     #[test]
     fn test_parse_type() {
         use crate::compiler::parser::Parser;
+        use crate::compiler::ast;
+        
         let mut parser = Parser::new("string bool int number []string myStruct");
         let ty = parser.parse_type().unwrap();
-        assert_eq!(ty, crate::types::string());
+        assert_eq!(ty, Box::new(ast::Type::String));
         let ty = parser.parse_type().unwrap();
-        assert_eq!(ty, crate::types::bool());
+        assert_eq!(ty, Box::new(ast::Type::Bool));
         let ty = parser.parse_type().unwrap();
-        assert_eq!(ty, crate::types::integer());
+        assert_eq!(ty, Box::new(ast::Type::Integer));
         let ty = parser.parse_type().unwrap();
-        assert_eq!(ty, crate::types::number());
+        assert_eq!(ty, Box::new(ast::Type::Number));
         let ty = parser.parse_type().unwrap();
-        assert_eq!(ty, crate::types::array(crate::types::string()));
+        assert_eq!(ty, Box::new(ast::Type::Array(Box::new(ast::Type::String))));
         let ty = parser.parse_type().unwrap();
-        assert_eq!(ty, crate::types::identifier("myStruct".into()));
+        assert_eq!(ty, Box::new(ast::Type::Identifier("myStruct".into())));
     }
 }

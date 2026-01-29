@@ -1,29 +1,48 @@
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FunctionType {
+    pub params: Vec<Type>,
+    pub returns: Vec<Type>,
+}
+
+#[derive(Debug)]
+pub struct StructType {
+    pub id: String,
+    pub fields: RwLock<Vec<(String, Type)>>,
+}
+
+impl PartialEq for StructType {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum TypeKind {
-    Unknown,
+    Bad,
     Integer,
     Number,
     String,
     Bool, 
     UnknownReference, // An internal detail before generics is correctly implemented
     Array(Type),
-    Struct(String, Vec<(String, Type)>),
+    Struct(StructType),
     Identifier(String), 
+    Function(FunctionType),
     //Function,
     //Interface,
     //Struct,
 }
 
 #[derive(Debug, PartialEq)]
-struct Inner {
-    kind: TypeKind,
+pub struct Inner {
+    pub kind: TypeKind,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Type {
-    inner: Arc<Inner>,
+    pub inner: Arc<Inner>,
 }
 
 impl Type {
@@ -42,7 +61,7 @@ impl Clone for Type {
 
 impl Default for Type {
     fn default() -> Self {
-        unknown()
+        bad()
     }
 }
 
@@ -87,7 +106,19 @@ pub fn is_string(ty: &Type) -> bool {
 }
 
 pub fn is_struct(ty: &Type) -> bool {
-    matches!(ty.inner.kind, TypeKind::Struct(_, _))
+    matches!(ty.inner.kind, TypeKind::Struct(_))
+}
+
+pub fn is_function(ty: &Type) -> bool {
+    matches!(ty.inner.kind, TypeKind::Function(_))
+}
+
+pub fn clone_struct_fields(ty: &Type) -> Vec<(String, Type)> {
+    if let TypeKind::Struct(struct_type) = &ty.inner.kind {
+        struct_type.fields.read().unwrap().clone()
+    } else {
+        panic!("Type is not a struct");
+    }
 }
 
 pub fn create_type(kind: TypeKind) -> Type {
@@ -96,9 +127,9 @@ pub fn create_type(kind: TypeKind) -> Type {
     }
 }
 
-pub fn unknown() -> Type {
+pub fn bad() -> Type {
     static UNKNOWN_TYPE: OnceLock<Type> = OnceLock::new();
-    UNKNOWN_TYPE.get_or_init(|| create_type(TypeKind::Unknown)).clone()
+    UNKNOWN_TYPE.get_or_init(|| create_type(TypeKind::Bad)).clone()
 }
 
 pub fn integer() -> Type {
@@ -135,5 +166,12 @@ pub fn identifier(id: String) -> Type {
 }
 
 pub fn struct_type(id: &str, fields: Vec<(String, Type)>) -> Type {
-    create_type(TypeKind::Struct(id.to_string(), fields))
+    create_type(TypeKind::Struct(StructType {
+        id: id.to_string(),
+        fields: RwLock::new(fields),
+    }))
+}
+
+pub fn function_type(params: Vec<Type>, returns: Vec<Type>) -> Type {
+    create_type(TypeKind::Function(FunctionType { params, returns }))
 }
