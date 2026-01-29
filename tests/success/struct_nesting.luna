@@ -1,0 +1,48 @@
+// Nested struct declarations at top level
+struct Address {
+    zip: int,
+}
+
+struct Person {
+    age: int,
+    address: Address,
+}
+
+struct Company {
+    id: int,
+    ceo: Person,
+}
+
+func main() {
+    // Creating nested structs
+    let addr = Address {
+        zip: 12345
+    };
+    
+    let person = Person {
+        age: 30,
+        address: addr
+    };
+    
+    // Accessing nested fields
+    assert(person.age == 30);
+    assert(person.address.zip == 12345);
+    
+    // Modifying nested fields
+    person.address.zip = 54321;
+    assert(person.address.zip == 54321);
+    
+    // Deeply nested structs
+    let company = Company {
+        id: 1001,
+        ceo: person
+    };
+    
+    assert(company.id == 1001);
+    assert(company.ceo.age == 30);
+    assert(company.ceo.address.zip == 54321);
+    
+    // Modifying deeply nested fields
+    company.ceo.age = 35;
+    assert(company.ceo.age == 35);
+}

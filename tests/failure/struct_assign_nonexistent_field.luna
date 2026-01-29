@@ -1,0 +1,10 @@
+struct Point {
+    x: int,
+    y: int,
+}
+
+func main() {
+    // This should fail - trying to assign to non-existent field
+    let p = Point { x: 10, y: 20 };
+    p.z = 30;  // z field doesn't exist
+}

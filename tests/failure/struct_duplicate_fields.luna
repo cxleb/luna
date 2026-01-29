@@ -1,0 +1,9 @@
+// This should fail - duplicate field names in struct
+struct BadStruct {
+    field: int,
+    field: string,
+}
+
+func main() {
+    let test = BadStruct { field: 10, field: "hello" };
+}

@@ -1,0 +1,41 @@
+struct Point {
+    x: int,
+    y: int,
+}
+
+// Function that takes a struct as parameter
+func getx(pt: Point): int {
+    return pt.x;
+}
+
+func sety(pt: Point, newy: int): Point {
+    pt.y = newy;
+    return pt;
+}
+
+func createpoint(x: int, y: int): Point {
+    return Point { x: x, y: y };
+}
+
+func main() {
+    // Basic struct parameter passing
+    let p1 = Point { x: 10, y: 20 };
+    
+    // Test basic function call
+    let result = getx(p1);
+    assert(result == 10);
+    
+    // Test direct field access
+    assert(p1.x == 10);
+    assert(p1.y == 20);
+    
+    // Test struct modification and return
+    let p2 = sety(p1, 30);
+    assert(p2.x == 10);
+    assert(p2.y == 30);
+    
+    // Test struct creation in function
+    let p3 = createpoint(50, 25);
+    assert(p3.x == 50);
+    assert(p3.y == 25);
+}

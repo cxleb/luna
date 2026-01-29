@@ -1,0 +1,41 @@
+// Basic struct declarations at top level
+struct Point {
+    x: int,
+    y: int,
+}
+
+struct Mixed {
+    count: int,
+    value: number,
+    score: number,
+}
+
+func main() {
+    // Basic struct instantiation
+    let p1 = Point { x: 10, y: 20 };
+    assert(p1.x == 10);
+    assert(p1.y == 20);
+    
+    // Struct with different types
+    let m = Mixed { 
+        count: 42, 
+        value: 3.14,
+        score: 99.5
+    };
+    assert(m.count == 42);
+    assert(m.value > 3.0);
+    assert(m.value < 4.0);
+    assert(m.score == 99.5);
+    
+    // Mutating struct fields
+    p1.x = 30;
+    p1.y = 40;
+    assert(p1.x == 30);
+    assert(p1.y == 40);
+    
+    m.count = 100;
+    m.value = 2.71;
+    assert(m.count == 100);
+    assert(m.value > 2.5);
+    assert(m.value < 3.0);
+}

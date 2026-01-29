@@ -1,0 +1,9 @@
+// This should fail - invalid field type in struct initialization
+struct Point {
+    x: int,
+    y: int,
+}
+
+func main() {
+    let p = Point { x: 10, y: "twenty" };  // y should be int
+}

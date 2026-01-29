@@ -1,0 +1,8 @@
+// This should fail - struct field type doesn't exist
+struct BadStruct {
+    field: NonExistentType,
+}
+
+func main() {
+    let test = BadStruct { field: something };
+}

@@ -1,0 +1,9 @@
+// This should fail - extra field in struct initialization
+struct Point {
+    x: int,
+    y: int,
+}
+
+func main() {
+    let p = Point { x: 10, y: 20, z: 30 };  // Extra z field
+}

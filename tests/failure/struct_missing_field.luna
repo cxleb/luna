@@ -1,0 +1,9 @@
+// This should fail - missing field in struct initialization
+struct Point {
+    x: int,
+    y: int,
+}
+
+func main() {
+    let p = Point { x: 10 };  // Missing y field
+}

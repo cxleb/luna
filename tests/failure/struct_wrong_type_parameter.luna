@@ -1,0 +1,19 @@
+struct Point {
+    x: int,
+    y: int,
+}
+
+struct OtherPoint {
+    a: int,
+    b: int,
+}
+
+func process_point(p: Point): int {
+    return p.x;
+}
+
+func main() {
+    // This should fail - passing wrong struct type to function
+    let op = OtherPoint { a: 10, b: 20 };
+    let result = process_point(op);  // Wrong struct type
+}
