@@ -5,7 +5,6 @@ use crate::ir;
 
 use crate::builtins::Builtins;
 
-mod taskgraph;
 pub mod ast;
 pub mod emit;
 pub mod parser;
