@@ -156,6 +156,7 @@ pub enum Punctuation {
     RightParenthesis,                     // )
     SemiColon,                            // ;
     Tilde,                                // ~
+    Underscore,                           // _
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -171,6 +172,7 @@ pub enum TokenKind {
     TemplateMiddle,
     TemplateTail,
     Regex,
+    Underscore,
 }
 
 #[derive(Debug, Clone, PartialEq)]

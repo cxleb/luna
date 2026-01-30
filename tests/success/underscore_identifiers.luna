@@ -1,0 +1,44 @@
+// Test underscore identifiers in various contexts
+struct TestStruct {
+    field_one: int,
+    field_two: int,
+    another_field: number,
+}
+
+func my_function_name(param_one: int, param_two: int): int {
+    let local_var_one = param_one + 5;
+    let local_var_two = param_two * 2;
+    return local_var_one + local_var_two;
+}
+
+func create_struct(x: int, y: int): TestStruct {
+    return TestStruct { 
+        field_one: x, 
+        field_two: y, 
+        another_field: 3.14 
+    };
+}
+
+func main() {
+    // Test struct with underscore field names
+    let test_struct = create_struct(10, 20);
+    assert(test_struct.field_one == 10);
+    assert(test_struct.field_two == 20);
+    assert(test_struct.another_field > 3.0);
+    
+    // Test function with underscore names
+    let result = my_function_name(5, 7);
+    assert(result == 24);  // (5 + 5) + (7 * 2) = 10 + 14 = 24
+    
+    // Test variables with underscores
+    let underscore_var = 42;
+    let another_underscore_var = 100;
+    assert(underscore_var == 42);
+    assert(another_underscore_var == 100);
+    
+    // Test struct field access with underscores
+    test_struct.field_one = underscore_var;
+    test_struct.field_two = another_underscore_var;
+    assert(test_struct.field_one == 42);
+    assert(test_struct.field_two == 100);
+}

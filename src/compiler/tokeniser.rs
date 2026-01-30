@@ -100,9 +100,11 @@ impl<'a> Tokeniser<'a> {
         };
         let c = self.source.peek_char()?;
 
-        if c.is_alphabetic() {
-            let str = self.source.accum(|c, _| c.is_alphanumeric());
-            if let Some(token) = keyword(str) {
+        if c.is_alphabetic() || c == '_' {
+            let str = self.source.accum(|c, _| c.is_alphanumeric() || c == '_');
+            if str == "_" {
+                Some(Token::new(loc, TokenKind::Underscore))
+            } else if let Some(token) = keyword(str) {
                 Some(Token::new(loc, TokenKind::Keyword(token)))
             } else {
                 Some(Token::new_string(
@@ -464,6 +466,10 @@ impl<'a> Tokeniser<'a> {
                     self.source.next();
                     Punctuation::Tilde
                 }
+                '_' => {
+                    self.source.next();
+                    Punctuation::Underscore
+                }
                 _ => panic!(
                     "Unexpected Token \"{}\" at {}:{}",
                     c,
@@ -500,16 +506,16 @@ mod test {
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::Identifier,
-                String::from("ident")
-            ))
+                String::from("ident"),
+            )),
         );
         assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::Identifier,
-                String::from("ident")
-            ))
+                String::from("ident"),
+            )),
         );
     }
 
@@ -522,16 +528,16 @@ mod test {
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::Identifier,
-                String::from("ident")
-            ))
+                String::from("ident"),
+            )),
         );
         assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::Identifier,
-                String::from("ident")
-            ))
+                String::from("ident"),
+            )),
         );
     }
 
@@ -592,8 +598,8 @@ mod test {
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::NoSubstitutionTemplate,
-                String::from("template")
-            ))
+                String::from("template"),
+            )),
         );
 
         let mut file = Tokeniser::new(template);
@@ -602,40 +608,40 @@ mod test {
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::TemplateHead,
-                String::from("head")
-            ))
+                String::from("head"),
+            )),
         );
         assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::Identifier,
-                String::from("ident")
-            ))
+                String::from("ident"),
+            )),
         );
         assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::TemplateMiddle,
-                String::from("middle")
-            ))
+                String::from("middle"),
+            )),
         );
         assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::Identifier,
-                String::from("ident")
-            ))
+                String::from("ident"),
+            )),
         );
         assert_token(
             file.next(TokeniserMode::TemplateTail),
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::TemplateTail,
-                String::from("tail")
-            ))
+                String::from("tail"),
+            )),
         );
     }
 
@@ -645,7 +651,7 @@ mod test {
             let mut file = Tokeniser::new(test.0);
             assert_token(
                 file.next(TokeniserMode::Div),
-                Some(Token::new(SourceLoc::default(), TokenKind::Keyword(test.1)))
+                Some(Token::new(SourceLoc::default(), TokenKind::Keyword(test.1))),
             );
             assert_eq!(file.next(TokeniserMode::Div), None);
         }
@@ -720,8 +726,8 @@ mod test {
                 file.next(TokeniserMode::Div),
                 Some(Token::new(
                     SourceLoc::default(),
-                    TokenKind::Punctuation(*test)
-                ))
+                    TokenKind::Punctuation(*test),
+                )),
             );
         }
     }
@@ -735,9 +741,32 @@ mod test {
             Some(Token::new_string(
                 SourceLoc::default(),
                 TokenKind::Regex,
-                "/ab+c/g".into()
-            ))
+                "/ab+c/g".into(),
+            )),
         );
+    }
+
+    #[test]
+    fn test_single_underscore_token() {
+        let mut file = Tokeniser::new("_");
+        let token = file.next(TokeniserMode::Div).unwrap();
+        assert_eq!(token.kind, TokenKind::Underscore);
+    }
+
+    #[test]
+    fn test_underscore_in_identifier() {
+        let mut file = Tokeniser::new("test_var");
+        let token = file.next(TokeniserMode::Div).unwrap();
+        assert_eq!(token.kind, TokenKind::Identifier);
+        assert_eq!(token.get_string(), "test_var");
+    }
+
+    #[test]
+    fn test_multiple_underscores_in_identifier() {
+        let mut file = Tokeniser::new("test_var_name");
+        let token = file.next(TokeniserMode::Div).unwrap();
+        assert_eq!(token.kind, TokenKind::Identifier);
+        assert_eq!(token.get_string(), "test_var_name");
     }
 
     // Assert that two tokens are equal without caring about location
