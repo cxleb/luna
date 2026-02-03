@@ -1,6 +1,6 @@
 use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}};
-use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::{FuncId, Module};
+//use cranelift_jit::{JITBuilder, JITModule};
+//use cranelift_module::{FuncId, Module};
 use target_lexicon::triple;
 
 use crate::{builtins::Builtins, ir::Signature, runtime::{gc::GarbageCollector, translate::TranslateSignature}};
@@ -8,6 +8,10 @@ use crate::{builtins::Builtins, ir::Signature, runtime::{gc::GarbageCollector, t
 mod translate;
 mod gc;
 pub mod string;
+mod cranelift;
+
+use cranelift::backend::{JITBuilder, JITModule};
+use cranelift::module::{FuncId, Module};
 
 pub struct CompiledFunc {
     id: FuncId,
@@ -62,7 +66,7 @@ impl JitContext {
             .unwrap();
 
         let mut builder = 
-            JITBuilder::new(cranelift_module::default_libcall_names())
+            JITBuilder::new(cranelift::default_libcall_names())
             .unwrap();
 
         // add the builtins as look up symbols
@@ -150,7 +154,7 @@ impl JitContext {
 
         let translated = module.funcs.iter().map(|func| {
             translate::translate_function(self, &func, &mut context, &signatures, &module.string_map);
-            let id = self.module.declare_function(&func.id, cranelift_module::Linkage::Local, &context.func.signature).unwrap();
+            let id = self.module.declare_function(&func.id, cranelift::module::Linkage::Local, &context.func.signature).unwrap();
             self.module.define_function(id, &mut context).unwrap();
             self.module.clear_context(&mut context);
             (id, func.id.clone())

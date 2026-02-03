@@ -4,7 +4,8 @@ use std::collections::HashMap;
 use crate::{ir::{self, StringMap}, runtime::string};
 use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
-use cranelift_module::{DataDescription, Linkage, Module};
+use super::cranelift::data_context::{DataDescription};
+use super::cranelift::module::{Linkage, Module};
 
 pub(crate) struct TranslateSignature {
     pub id: String,
