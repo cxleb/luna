@@ -4,7 +4,6 @@ use std::io;
 mod arena;
 mod system;
 
-pub use arena::ArenaMemoryProvider;
 pub use system::SystemMemoryProvider;
 
 /// Type of branch protection to apply to executable memory.

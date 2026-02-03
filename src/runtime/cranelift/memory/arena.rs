@@ -234,7 +234,9 @@ impl JITMemoryProvider for ArenaMemoryProvider {
     }
 
     unsafe fn free_memory(&mut self) {
-        self.free_memory();
+        unsafe {
+            self.free_memory();
+        }
     }
 
     fn finalize(&mut self, branch_protection: BranchProtection) -> ModuleResult<()> {

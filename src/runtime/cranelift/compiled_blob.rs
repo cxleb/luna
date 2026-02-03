@@ -5,18 +5,17 @@ use super::module::ModuleRelocTarget;
 /// Reads a 32bit instruction at `iptr`, and writes it again after
 /// being altered by `modifier`
 unsafe fn modify_inst32(iptr: *mut u32, modifier: impl FnOnce(u32) -> u32) {
-    let inst = iptr.read_unaligned();
-    let new_inst = modifier(inst);
-    iptr.write_unaligned(new_inst);
+    unsafe {
+        let inst = iptr.read_unaligned();
+        let new_inst = modifier(inst);
+        iptr.write_unaligned(new_inst);
+    }
 }
-
 #[derive(Clone)]
 pub(crate) struct CompiledBlob {
     pub(crate) ptr: *mut u8,
     pub(crate) size: usize,
     pub(crate) relocs: Vec<ModuleReloc>,
-    #[cfg(feature = "wasmtime-unwinder")]
-    pub(crate) exception_data: Option<Vec<u8>>,
 }
 
 unsafe impl Send for CompiledBlob {}
