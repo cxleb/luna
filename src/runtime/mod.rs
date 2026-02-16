@@ -1,3 +1,5 @@
+use std::{arch::asm, collections::HashMap};
+
 use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}};
 //use cranelift_jit::{JITBuilder, JITModule};
 //use cranelift_module::{FuncId, Module};
@@ -9,6 +11,7 @@ mod translate;
 mod gc;
 pub mod string;
 mod cranelift;
+mod stack_roots;
 
 use cranelift::backend::{JITBuilder, JITModule};
 use cranelift::module::{FuncId, Module};
@@ -19,16 +22,36 @@ pub struct CompiledFunc {
     code: *const u8,
 }
 
+#[derive(Debug, Clone)]
+pub struct StackMap {
+    pub map: Vec<u32>,
+    pub frame_to_fp_offset: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct StackMaps {
+    pub lr_map: HashMap<usize, StackMap>
+}
+
 pub struct RuntimeContext {
-    pub gc: GarbageCollector
+    pub gc: GarbageCollector,
+    pub stack_maps: StackMaps,
 }
 
 impl RuntimeContext {
     pub fn new() -> Self {
         Self {
-            gc: GarbageCollector::new()
+            gc: GarbageCollector::new(),
+            stack_maps: StackMaps {
+                lr_map: HashMap::new(),
+            },
         }
     }
+}
+
+struct Fiber {
+    ctx: *mut RuntimeContext,
+    entry_point: *const u8,
 }
 
 pub extern "C" fn panic(_: *mut RuntimeContext) {
@@ -45,6 +68,41 @@ pub extern "C" fn create_object(ctx: *mut RuntimeContext, size: i64) -> *const i
     let gc = unsafe { &mut (*ctx).gc };
     let array = gc.create_object(size as usize);
     array
+}
+
+pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
+    let mut fp: usize;
+    unsafe {
+        asm!("mov {}, fp", out(reg) fp);
+    }
+
+    let gc = unsafe { &mut (*ctx).gc };
+    
+    if gc.should_collect() {
+        let stack_maps = unsafe { &mut (*ctx).stack_maps };
+        let roots = stack_roots::collect_roots(stack_maps, fp);
+        gc.collect(&roots);
+    }
+
+    // perform fiber switch if we need ?
+}
+ 
+// Entry point into a task.
+pub extern "C" fn fiber_entry(t: context::Transfer) -> ! {    
+    let fiber = unsafe { &mut *(t.data as *mut Fiber) };
+
+    unsafe {
+        let code_fn = core::mem::transmute::<_, fn(*mut RuntimeContext)>(fiber.entry_point);
+        code_fn(fiber.ctx);
+    }
+
+    unsafe {
+        t.context.resume(0);
+    }
+
+    loop {
+        check_yield(fiber.ctx);
+    }
 }
 
 pub struct JitContext {
@@ -77,15 +135,17 @@ impl JitContext {
         builder.symbol("__panic", panic as *const u8);
         builder.symbol("__create_array", create_array as *const u8);
         builder.symbol("__create_object", create_object as *const u8);
+        builder.symbol("__check_yield", check_yield as *const u8);
 
         let runtime_ctx = Box::new(RuntimeContext::new());
-
+        let runtime_ctx = Box::into_raw(runtime_ctx);
+        
         Self {
             isa,
             module: JITModule::new(builder),
             compiled_funcs: Vec::new(),
             builtins,
-            runtime_ctx: Box::into_raw(runtime_ctx),
+            runtime_ctx,
         }
     }
 
@@ -109,6 +169,7 @@ impl JitContext {
 
     pub fn compile_ir_module(&mut self, module: &crate::ir::Module) {
         let mut context = self.module.make_context();
+        //context.set_disasm(true);
         let mut signatures = Vec::new();
         for func in module.funcs.iter() {
             signatures.push(TranslateSignature {
@@ -151,6 +212,13 @@ impl JitContext {
                 ret_types: vec![crate::types::unknown_reference()],
             }
         });
+        signatures.push(TranslateSignature {
+            id: "__check_yield".into(),
+            signature: Signature {
+                parameters: vec![],
+                ret_types: vec![],
+            }
+        });
 
         let translated = module.funcs.iter().map(|func| {
             translate::translate_function(self, &func, &mut context, &signatures, &module.string_map);
@@ -163,27 +231,53 @@ impl JitContext {
         self.module.finalize_definitions().unwrap();
 
         for (id, name) in translated {
+            let blob = self.module.get_finalized_function(id);
             self.compiled_funcs.push(CompiledFunc { 
                 id, 
                 name, 
-                code: self.module.get_finalized_function(id)
+                code: blob.ptr
             });
+
+            for stack_map in blob.stack_maps.iter() {
+                unsafe { 
+                    (*self.runtime_ctx) 
+                        .stack_maps
+                        .lr_map
+                        .insert(
+                            blob.ptr as usize + stack_map.offset as usize, 
+                            StackMap { map: stack_map.map.clone(), frame_to_fp_offset: blob.frame_to_fp_offset as usize }
+                        ); 
+                }
+            }
+
         }
     }
 
     pub fn call_function_no_params_no_return(&self, name: &str) {
         let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name).unwrap();
+        let fiber = Box::new(Fiber {
+            ctx: self.runtime_ctx,
+            entry_point: compiled_func.code,
+        });
+        let fiber = Box::into_raw(fiber);
+
         unsafe {
-            let code_fn = core::mem::transmute::<_, fn()>(compiled_func.code);
-            code_fn();
-        }    
+            let s = context::stack::ProtectedFixedSizeStack::new(1024 * 1024).unwrap();
+            let t = context::Transfer::new(context::Context::new(&s, fiber_entry), 0);
+            t.context.resume(fiber as usize);
+        }
+
+        //unsafe {
+        //    let code_fn = core::mem::transmute::<_, fn(*mut RuntimeContext)>(compiled_func.code);
+        //    code_fn(self.runtime_ctx);
+        //}    
     }
 
     pub fn call_function_no_params<Returns>(&self, name: &str) -> Returns {
         let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name).unwrap();
         unsafe {
-            let code_fn = core::mem::transmute::<_, fn() -> Returns>(compiled_func.code);
-            code_fn()
+            let code_fn = core::mem::transmute::<_, fn(*mut RuntimeContext) -> Returns>(compiled_func.code);
+            code_fn(self.runtime_ctx)
         }    
     }
 }

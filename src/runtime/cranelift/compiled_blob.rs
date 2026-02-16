@@ -11,11 +11,20 @@ unsafe fn modify_inst32(iptr: *mut u32, modifier: impl FnOnce(u32) -> u32) {
         iptr.write_unaligned(new_inst);
     }
 }
+
 #[derive(Clone)]
-pub(crate) struct CompiledBlob {
-    pub(crate) ptr: *mut u8,
-    pub(crate) size: usize,
-    pub(crate) relocs: Vec<ModuleReloc>,
+pub struct StackMap {
+    pub offset: u32,
+    pub map: Vec<u32>,
+}
+
+#[derive(Clone)]
+pub struct CompiledBlob {
+    pub ptr: *mut u8,
+    pub size: usize,
+    pub relocs: Vec<ModuleReloc>,
+    pub frame_to_fp_offset: u32,
+    pub stack_maps: Vec<StackMap>,
 }
 
 unsafe impl Send for CompiledBlob {}

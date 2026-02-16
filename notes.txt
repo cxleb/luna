@@ -1,9 +1,7 @@
 - Debug information is generated alongside bytecode
 - Make functions a const value
-- Builtin functions have function signatures
 - The compiler takes the "Global Defines" as a parameter for compiling the module
 - Fix interface so it can either be a cli thing or embedded.
-- Implement structs
 - Implement interfaces
 - Implement error handling
 - Implement garbage collector
@@ -12,6 +10,8 @@
 - Casting types
 
 done:
+- Implement structs
+- Builtin functions have function signatures
 - Bug in AST source location
 - Fix array types
 - Adding source locations to AST

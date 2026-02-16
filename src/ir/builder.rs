@@ -252,6 +252,10 @@ impl FuncBuilder {
         self.append_inst(super::Inst::GetObject(size, typ));
     }
 
+    pub fn check_yield(&mut self) {
+        self.append_inst(super::Inst::CheckYield);
+    }
+
     pub fn finish(self) -> Box<super::Function> {
         return Box::new(self.func);
     }

@@ -1,7 +1,7 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::{ir::{self, StringMap}, runtime::string};
+use crate::{ir::{self, StringMap}, runtime::string, types};
 use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use super::cranelift::data_context::{DataDescription};
@@ -50,6 +50,12 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
     builder.switch_to_block(blocks[0]); 
     for i in 0..func.signature.parameters.len() {
         builder.def_var(variables[i], builder.block_params(blocks[0])[1+i]);
+    }
+
+    for (var, func_var) in variables.iter().zip(func.variables.iter()) {
+        if types::is_reference(&func_var.typ) {
+            builder.declare_var_needs_stack_map(*var);
+        }
     }
 
     let runtime_ctx = builder.block_params(blocks[0])[0];
@@ -350,6 +356,9 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let offset = *i as i64 * 8; 
                     let pointer = builder.ins().iadd_imm(object, offset);
                     builder.ins().store(MemFlags::new().with_aligned(), value, pointer, 0);
+                }
+                ir::Inst::CheckYield => {
+                    translate_call(ctx, &mut builder, &mut stack, "__check_yield");
                 }
             }
         }

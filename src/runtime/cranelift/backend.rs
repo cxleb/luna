@@ -1,5 +1,7 @@
 //! Defines `JITModule`.
 
+use crate::runtime::cranelift::compiled_blob::StackMap;
+
 use super::{
     compiled_blob::CompiledBlob,
     memory::{BranchProtection, JITMemoryProvider, SystemMemoryProvider},
@@ -266,15 +268,14 @@ impl JITModule {
     ///
     /// The pointer remains valid until either [`JITModule::free_memory`] is called or in the future
     /// some way of deallocating this individual function is used.
-    pub fn get_finalized_function(&self, func_id: FuncId) -> *const u8 {
+    pub fn get_finalized_function(&self, func_id: FuncId) -> &CompiledBlob {
         let info = &self.compiled_functions[func_id];
         assert!(
             !self.functions_to_finalize.iter().any(|x| *x == func_id),
             "function not yet finalized"
         );
-        info.as_ref()
-            .expect("function must be compiled before it can be finalized")
-            .ptr
+        let info = info.as_ref().expect("function must be compiled before it can be finalized");
+        info
     }
 
     /// Returns the address and size of a finalized data object.
@@ -466,6 +467,19 @@ impl Module for JITModule {
             mem.copy_from_slice(compiled_code.code_buffer());
         }
 
+        let stack_maps = compiled_code
+            .buffer
+            .user_stack_maps()
+            .iter()
+            .map(|(off, _, stack_map)| {
+                StackMap {
+                    offset: *off,
+                    map: stack_map.entries().map(|(_, o)| o).collect(),
+                }
+            })
+            .collect();
+        let frame_to_fp_offset = compiled_code.buffer.frame_layout().unwrap().frame_to_fp_offset;
+
         let relocs = compiled_code
             .buffer
             .relocs()
@@ -478,6 +492,8 @@ impl Module for JITModule {
             ptr,
             size,
             relocs,
+            stack_maps,
+            frame_to_fp_offset,
         });
 
         let range_start = ptr as usize;
@@ -531,6 +547,8 @@ impl Module for JITModule {
         self.compiled_functions[id] = Some(CompiledBlob {
             ptr,
             size,
+            stack_maps: Vec::new(),
+            frame_to_fp_offset: 0,
             relocs: relocs.to_owned(),
         });
 
@@ -622,6 +640,8 @@ impl Module for JITModule {
         self.compiled_data_objects[id] = Some(CompiledBlob {
             ptr,
             size: init.size(),
+            stack_maps: Vec::new(),
+            frame_to_fp_offset: 0,
             relocs,
         });
         self.data_objects_to_finalize.push(id);

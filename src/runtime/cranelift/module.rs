@@ -666,6 +666,7 @@ pub trait Module {
             name: ir::ExternalName::user(user_name_ref),
             signature,
             colocated,
+            patchable: false,
         })
     }
 

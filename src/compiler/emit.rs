@@ -94,6 +94,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn call(&mut self, c: &Box<ast::Call>) {
+        self.bld.check_yield();
         for arg in c.parameters.iter() {
             self.expr(arg);
         }
@@ -342,6 +343,7 @@ impl<'a> FuncGen<'a> {
         if did_return {
             true
         } else {
+            self.bld.check_yield();
             self.bld.br(condition_block);
             self.bld.switch_to_block(finish_block);
             false

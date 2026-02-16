@@ -113,6 +113,10 @@ pub fn is_function(ty: &Type) -> bool {
     matches!(ty.inner.kind, TypeKind::Function(_))
 }
 
+pub fn is_reference(ty: &Type) -> bool {
+    matches!(ty.inner.kind, TypeKind::UnknownReference | TypeKind::Struct(_) | TypeKind::Array(_))
+}
+
 pub fn clone_struct_fields(ty: &Type) -> Vec<(String, Type)> {
     if let TypeKind::Struct(struct_type) = &ty.inner.kind {
         struct_type.fields.read().unwrap().clone()

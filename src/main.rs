@@ -1,12 +1,7 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
-
-mod compiler;
-mod ir;
-mod runtime;
-mod types;
-mod builtins;
+use luna_rs::{builtins, compiler, runtime};
 
 fn main() {
 
@@ -25,6 +20,6 @@ fn main() {
     jit.compile_ir_module(&module);
     //println!("done.");
     //println!("running...\n");
-    _ = jit.call_function_no_params::<i64>("main");
+    jit.call_function_no_params_no_return("main");
     //println!("Returned {}", returned);
 }

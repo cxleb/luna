@@ -58,6 +58,10 @@ pub enum Inst {
     NewObject(usize),
     GetObject(usize, Type),
     SetObject(usize, Type),
+
+    /// Check if this task should yield control (inserted at loop backedges and function prologue)
+    /// This is a no-op if no yield is needed, or calls __yield() if the scheduler has marked this task
+    CheckYield,
 }
 
 #[derive(Debug, Clone)]
