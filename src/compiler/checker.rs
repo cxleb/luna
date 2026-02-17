@@ -38,10 +38,6 @@ pub struct SemaError {
 
 type SemaResult<X> = Result<X, SemaError>;
 
-pub fn error<T>(reason: SemaErrorReason) -> SemaResult<T> {
-    Err(SemaError { reason, loc: SourceLoc::default() })
-}
-
 pub fn error_loc<T>(reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
     Err(SemaError { reason, loc })
 }
@@ -274,10 +270,6 @@ impl<'a> FuncTypeInference<'a> {
         Ok(())
     }
 
-    pub fn error<T>(&self, reason: SemaErrorReason) -> SemaResult<T> {
-        Err(SemaError { reason, loc: SourceLoc::default() })
-    }
-
     pub fn error_loc<T>(&self, reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
         Err(SemaError { reason, loc })
     }
@@ -307,7 +299,7 @@ impl<'a> FuncTypeInference<'a> {
                             typ = types::integer();
                         }
                     } else {
-                        return self.error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
+                        return self.error_loc(SemaErrorReason::IncompatibleTypesInBinaryExpression, e.loc);
                     }
                 }
 
@@ -326,7 +318,7 @@ impl<'a> FuncTypeInference<'a> {
             ast::BinaryExprKind::LessThanEqual |
             ast::BinaryExprKind::GreaterThanEqual => {
                 if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
-                    return self.error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
+                    return self.error_loc(SemaErrorReason::IncompatibleTypesInBinaryExpression, e.loc);
                 }
 
                 e.typ = types::bool();
@@ -334,10 +326,10 @@ impl<'a> FuncTypeInference<'a> {
             ast::BinaryExprKind::LogicalAnd |
             ast::BinaryExprKind::LogicalOr => {
                 if !types::is_bool(&b.lhs.typ) {
-                    return self.error(SemaErrorReason::NonBoolInLogicalExpression);
+                    return self.error_loc(SemaErrorReason::NonBoolInLogicalExpression, b.lhs.loc);
                 }
                 if !types::is_bool(&b.rhs.typ) {
-                    return self.error(SemaErrorReason::NonBoolInLogicalExpression);
+                    return self.error_loc(SemaErrorReason::NonBoolInLogicalExpression, b.rhs.loc);
                 }
 
                 e.typ = types::bool();
@@ -438,7 +430,7 @@ impl<'a> FuncTypeInference<'a> {
             e.typ = typ.clone().into();
             self.ok()
         } else {
-            self.error(SemaErrorReason::VariableNotFound)
+            self.error_loc(SemaErrorReason::VariableNotFound, e.loc)
         }
     }
 
@@ -647,7 +639,7 @@ impl<'a> FuncTypeInference<'a> {
             e.typ = typ.clone().into();
             self.ok()
         } else {
-            self.error(SemaErrorReason::VariableNotFound)
+            self.error_loc(SemaErrorReason::VariableNotFound, e.loc)
         }
     }
 
@@ -658,7 +650,7 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Subscript(_) => self.store_subscript(e),
             ast::ExprKind::Selector(_) => self.store_selector(e),
             ast::ExprKind::Identifier(_) => self.store_identifier(e),
-            _ => self.error(SemaErrorReason::CannotUseExpressionInLeftHandExpression)
+            _ => self.error_loc(SemaErrorReason::CannotUseExpressionInLeftHandExpression, e.loc)
         }
     }
 
@@ -696,14 +688,14 @@ impl<'a> FuncTypeInference<'a> {
             if let Some(r) = &mut r.value {
                 self.expr(r, Some(return_type.clone()))?;
                 if types::compare(&r.typ, &return_type) == types::ComparisonResult::Incompatible {
-                    return self.error(SemaErrorReason::IncompatibleTypesInReturnValue);
+                    return self.error_loc(SemaErrorReason::IncompatibleTypesInReturnValue, r.loc);
                 }
             } else {
-                return self.error(SemaErrorReason::MissingReturnValue);
+                return self.error_loc(SemaErrorReason::MissingReturnValue, r.loc);
             }
         } else {
             if r.value.is_some() {
-                return self.error(SemaErrorReason::UnexpectedReturnValue);
+                return self.error_loc(SemaErrorReason::UnexpectedReturnValue, r.loc);
             }
         }
         self.ok()
@@ -715,7 +707,7 @@ impl<'a> FuncTypeInference<'a> {
             self.expr(&mut v.value, Some(annotation.clone()))?;
             let ret = &v.value.typ;
             if types::compare(&annotation, ret) == types::ComparisonResult::Incompatible {
-                return self.error(SemaErrorReason::IncompatibleTypesInVariableDefinition);
+                return self.error_loc(SemaErrorReason::IncompatibleTypesInVariableDefinition, v.loc);
             }
             self.create_var(v.id.clone(), ret);
         } else {
