@@ -1,0 +1,19 @@
+import "std:http"
+
+struct HttpServer {
+    a: int,
+
+    func accept(c: http.Context) {
+        if c.path == "/hello" {
+            c.ok("<p>Hello! {a}</p>");
+            a += 1;
+        }
+    }
+}
+
+func main() {
+    let server = HttpServer{
+        a: 0
+    };
+    http.serve("127.0.0.1:80", server);
+}
