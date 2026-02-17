@@ -5,7 +5,7 @@ struct HttpServer {
 
     func accept(c: http.Context) {
         if c.path == "/hello" {
-            c.ok("<p>Hello! {a}</p>");
+            c.ok("<p>Hello! ${a}</p>");
             a += 1;
         }
     }
