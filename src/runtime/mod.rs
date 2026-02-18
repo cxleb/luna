@@ -70,9 +70,31 @@ pub extern "C" fn create_object(ctx: *mut RuntimeContext, size: i64) -> *const i
     array
 }
 
+#[cfg(target_arch = "aarch64")]
 pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
-    let fp = current_frame_pointer();
+    let mut fp: usize;
+    unsafe {
+        core::arch::asm!("mov {}, fp", out(reg) fp);
+    }
 
+    check_yield_common(ctx, fp);
+}
+
+#[cfg(target_arch = "x86_64")]
+pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
+    let mut fp: usize;
+    unsafe {
+        core::arch::asm!("mov {}, rbp", out(reg) fp);
+    }
+    
+    check_yield_common(ctx, fp);
+}
+
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
+}
+
+fn check_yield_common(ctx: *mut RuntimeContext, fp: usize) {
     let gc = unsafe { &mut (*ctx).gc };
     
     if gc.should_collect() {
@@ -82,29 +104,6 @@ pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
     }
 
     // perform fiber switch if we need ?
-}
-
-#[cfg(target_arch = "aarch64")]
-fn current_frame_pointer() -> usize {
-    let fp: usize;
-    unsafe {
-        core::arch::asm!("mov {fp}, x29", fp = out(reg) fp);
-    }
-    fp
-}
-
-#[cfg(target_arch = "x86_64")]
-fn current_frame_pointer() -> usize {
-    let fp: usize;
-    unsafe {
-        core::arch::asm!("mov {fp}, rbp", fp = out(reg) fp);
-    }
-    fp
-}
-
-#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
-fn current_frame_pointer() -> usize {
-    0
 }
  
 // Entry point into a task.

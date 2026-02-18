@@ -9,11 +9,10 @@ fn read_word(addr: usize) -> Option<usize> {
 }
 
 pub fn collect_roots(stack_maps: &StackMaps, fp: usize) -> Vec<usize> {
-    let Some(mut fp) = read_word(fp) else {
+    let Some(mut lr) = read_word(fp + 8) else {
         return Vec::new();
     };
-
-    let Some(mut lr) = read_word(fp + 8) else {
+    let Some(mut fp) = read_word(fp) else {
         return Vec::new();
     };
 
