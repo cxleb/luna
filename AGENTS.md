@@ -10,7 +10,7 @@ This file contains guidelines and commands for agentic coding agents working on 
 
 ### Testing
 - `cargo test` - Run Rust unit tests
-- `./run_tests.sh` - Run the complete test suite including Luna language tests
+- `./scripts/run_tests.sh` - Run the complete test suite including Luna language tests
 - `./target/debug/luna-rs <filename.luna>` - Run a single Luna test file
 
 ### Single Test Execution
