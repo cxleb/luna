@@ -1,9 +1,9 @@
-use std::{arch::asm, collections::HashMap};
+use std::collections::HashMap;
 
 use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}};
 //use cranelift_jit::{JITBuilder, JITModule};
 //use cranelift_module::{FuncId, Module};
-use target_lexicon::triple;
+use target_lexicon::Triple;
 
 use crate::{builtins::Builtins, ir::Signature, runtime::{gc::GarbageCollector, translate::TranslateSignature}};
 
@@ -70,12 +70,31 @@ pub extern "C" fn create_object(ctx: *mut RuntimeContext, size: i64) -> *const i
     array
 }
 
+#[cfg(target_arch = "aarch64")]
 pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
     let mut fp: usize;
     unsafe {
-        asm!("mov {}, fp", out(reg) fp);
+        core::arch::asm!("mov {}, fp", out(reg) fp);
     }
 
+    check_yield_common(ctx, fp);
+}
+
+#[cfg(target_arch = "x86_64")]
+pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
+    let mut fp: usize;
+    unsafe {
+        core::arch::asm!("mov {}, rbp", out(reg) fp);
+    }
+    
+    check_yield_common(ctx, fp);
+}
+
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
+}
+
+fn check_yield_common(ctx: *mut RuntimeContext, fp: usize) {
     let gc = unsafe { &mut (*ctx).gc };
     
     if gc.should_collect() {
@@ -117,7 +136,7 @@ impl JitContext {
     pub fn new(builtins: Builtins) -> Self {
         let shared_builder = cranelift_codegen::settings::builder();
         let shared_flags = cranelift_codegen::settings::Flags::new(shared_builder);
-        let triple = triple!("arm64-apple-macosx");
+        let triple = Triple::host();
         let isa = cranelift_codegen::isa::lookup(triple)
             .unwrap()
             .finish(shared_flags)
