@@ -162,30 +162,16 @@ impl<'a> Tokeniser<'a> {
                 ))
             }
         }
-        //else if c == '\'' {
-        //    self.source.next();
-        //    let literal = self.source.accum_string(|c, _| c == '\'');
-        //    self.source.next();
-        //
-        //    Some(Token::StringLiteral(literal))
-        //}
         else if c == '\"' {
             self.source.next();
-            let literal = self.source.accum_string(|c, _| c == '\"');
-            self.source.next();
-            Some(Token::new_string(loc, TokenKind::StringLiteral, literal))
-        } else if c == '`' {
-            self.source.next();
-            // once we matched we either need to eat all valid template
-            // characters
             let literal = self
                 .source
-                .accum_string(|c, chars| c == '`' || (c == '$' && chars.next() == Some('{')));
-            let end = self.source.next().expect("Unfinished template sequence");
-            if end == '`' {
+                .accum_string(|c, chars| c == '"' || (c == '$' && chars.next() == Some('{')));
+            let end = self.source.next().expect("Unfinished string or template sequence");
+            if end == '"' {
                 Some(Token::new_string(
                     loc,
-                    TokenKind::NoSubstitutionTemplate,
+                    TokenKind::StringLiteral,
                     literal,
                 ))
             } else if end == '$' {
@@ -207,9 +193,9 @@ impl<'a> Tokeniser<'a> {
             // characters
             let literal = self
                 .source
-                .accum_string(|c, chars| c == '`' || (c == '$' && chars.next() == Some('{')));
+                .accum_string(|c, chars| c == '"' || (c == '$' && chars.next() == Some('{')));
             let end = self.source.next().expect("Unfinished template sequence");
-            if end == '`' {
+            if end == '"' {
                 Some(Token::new_string(loc, TokenKind::TemplateTail, literal))
             } else if end == '$' {
                 // consume '{' which should already checked
@@ -590,14 +576,14 @@ mod test {
 
     #[test]
     fn templates() {
-        let nosubstitutiontemplate = "`template`";
-        let template = "`head${ident}middle${ident}tail`";
+        let nosubstitutiontemplate = "\"template\"";
+        let template = "\"head${ident}middle${ident}tail\"";
         let mut file = Tokeniser::new(nosubstitutiontemplate);
         assert_token(
             file.next(TokeniserMode::Div),
             Some(Token::new_string(
                 SourceLoc::default(),
-                TokenKind::NoSubstitutionTemplate,
+                TokenKind::StringLiteral,
                 String::from("template"),
             )),
         );

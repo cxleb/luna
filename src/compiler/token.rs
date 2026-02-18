@@ -167,7 +167,6 @@ pub enum TokenKind {
     StringLiteral,
     NumberLiteral,
     IntegerLiteral,
-    NoSubstitutionTemplate,
     TemplateHead,
     TemplateMiddle,
     TemplateTail,
