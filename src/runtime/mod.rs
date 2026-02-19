@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}};
+use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}, settings::Configurable};
 //use cranelift_jit::{JITBuilder, JITModule};
 //use cranelift_module::{FuncId, Module};
 use target_lexicon::Triple;
@@ -134,7 +134,10 @@ pub struct JitContext {
 
 impl JitContext {
     pub fn new(builtins: Builtins) -> Self {
-        let shared_builder = cranelift_codegen::settings::builder();
+        let mut shared_builder = cranelift_codegen::settings::builder();
+        shared_builder
+            .set("preserve_frame_pointers", "true")
+            .expect("failed to enable frame pointers for stack-root walking");
         let shared_flags = cranelift_codegen::settings::Flags::new(shared_builder);
         let triple = Triple::host();
         let isa = cranelift_codegen::isa::lookup(triple)
