@@ -1,5 +1,12 @@
 use std::sync::{Arc, OnceLock, RwLock};
 
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub struct NameSpecification {
+    pub package: String,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FunctionType {
     pub params: Vec<Type>,
@@ -8,13 +15,14 @@ pub struct FunctionType {
 
 #[derive(Debug)]
 pub struct StructType {
-    pub id: String,
+    pub spec: NameSpecification,
     pub fields: RwLock<Vec<(String, Type)>>,
+    pub functions: RwLock<Vec<(String, FunctionType)>>,
 }
 
 impl PartialEq for StructType {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.spec == other.spec
     }
 }
 
@@ -169,10 +177,11 @@ pub fn identifier(id: String) -> Type {
     create_type(TypeKind::Identifier(id))
 }
 
-pub fn struct_type(id: &str, fields: Vec<(String, Type)>) -> Type {
+pub fn struct_type(spec: NameSpecification, fields: Vec<(String, Type)>, functions: Vec<(String, FunctionType)>) -> Type {
     create_type(TypeKind::Struct(StructType {
-        id: id.to_string(),
+        spec,
         fields: RwLock::new(fields),
+        functions: RwLock::new(functions),
     }))
 }
 

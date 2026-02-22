@@ -2,9 +2,9 @@ use crate::types::Type;
 
 pub mod builder;
 
-type BlockRef = usize;
-type VariableRef = usize;
-type StringRef = usize;
+pub type BlockRef = usize;
+pub type VariableRef = usize;
+pub type StringRef = usize;
 
 #[derive(Debug, Clone)]
 pub enum Inst {

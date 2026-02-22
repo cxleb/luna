@@ -1,7 +1,13 @@
 struct Test {
     a: int,
     b: number,
-    c: string
+    c: string,
+
+    func print() {
+        println("Printing from test");
+        printint(self.a);
+        println(self.c);
+    }
 }
 
 func do_something() {
@@ -11,14 +17,16 @@ func do_something() {
         c: "This is a string"
     };
 
-    //let b = 0;
-    //while b < 10 {
-    //    a.a = a.a + 1;
-    //    b = b + 1;
-    //}
+    let b = 0;
+    while b < 10 {
+        a.a = a.a + 1;
+        b = b + 1;
+    }
 
     println(a.c);
     //printint(a.a);
+
+    a.print();
 }
 
 func intermediate() {
@@ -36,4 +44,6 @@ func main() {
 
     println(a.c);
     println("Hello, World!");
+
+    a.print();
 }

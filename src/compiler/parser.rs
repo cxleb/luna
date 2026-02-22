@@ -127,23 +127,30 @@ impl<'a> Parser<'a> {
             loc,
             id: id.get_string(),
             fields: Vec::new(),
+            functions: Vec::new(),
+            typ: types::Type::default(),
         });
         self.expect(TokenKind::Punctuation(Punctuation::LeftBrace))?;
         while !self.test(TokenKind::Punctuation(Punctuation::RightBrace)) {
             let loc = self.source_loc();
-            let field_id_token = self.expect(TokenKind::Identifier)?;
-            let field_id = field_id_token.get_string(); 
-            self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
-            let field_type = self.parse_type()?;
-            struct_.fields.push(StructField {
-                loc,
-                id: field_id,
-                type_annotation: field_type,
-            });
-            if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
-                self.expect(TokenKind::Punctuation(Punctuation::Comma))?;
+            if self.test(TokenKind::Keyword(Keywords::Func)) {
+                let func = self.parse_function()?;
+                struct_.functions.push(func);
             } else {
-                break;
+                let field_id_token = self.expect(TokenKind::Identifier)?;
+                let field_id = field_id_token.get_string(); 
+                self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
+                let field_type = self.parse_type()?;
+                struct_.fields.push(StructField {
+                    loc,
+                    id: field_id,
+                    type_annotation: field_type,
+                });
+                if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                    self.expect(TokenKind::Punctuation(Punctuation::Comma))?;
+                } else {
+                    break;
+                }
             }
         }
         self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
@@ -423,7 +430,8 @@ impl<'a> Parser<'a> {
                 expr = self.expr(
                     ExprKind::Call(Box::new(Call { 
                         function: expr, 
-                        parameters
+                        parameters,
+                        symbol_name: None
                     })),
                     loc,
                 );
@@ -513,6 +521,13 @@ impl<'a> Parser<'a> {
             let token = self.next()?;
             return Ok(Expr {
                 kind: ExprKind::Boolean(Box::new(Bool { value: false })),
+                loc: token.loc,
+                typ: types::bool(),
+            });
+        } else if self.test(TokenKind::Keyword(Keywords::_Self)) {
+            let token = self.next()?;
+            return Ok(Expr {
+                kind: ExprKind::_Self,
                 loc: token.loc,
                 typ: types::bool(),
             });
@@ -647,6 +662,23 @@ mod tests {
         assert_eq!(struct_.fields[0].type_annotation, Box::new(ast::Type::String));
         assert_eq!(struct_.fields[1].id, "field2");
         assert_eq!(struct_.fields[1].type_annotation, Box::new(ast::Type::Integer));
+    }
+
+    #[test]
+    fn test_parse_struct_with_function() {
+        use crate::compiler::parser::Parser;
+        use crate::compiler::ast;
+
+        let mut parser = Parser::new("struct MyStruct { field1: string, field2: int, func method() {} }");
+        let struct_ = parser.parse_struct().unwrap();
+        assert_eq!(struct_.id, "MyStruct");
+        assert_eq!(struct_.fields.len(), 2);
+        assert_eq!(struct_.fields[0].id, "field1");
+        assert_eq!(struct_.fields[0].type_annotation, Box::new(ast::Type::String));
+        assert_eq!(struct_.fields[1].id, "field2");
+        assert_eq!(struct_.fields[1].type_annotation, Box::new(ast::Type::Integer));
+        assert_eq!(struct_.functions.len(), 1);
+        assert_eq!(struct_.functions[0].signature.id, "method");
     }
 
     #[test]

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::builtins::Builtins;
 use crate::compiler::{SourceLoc, ast};
-use crate::types::{self, Type, clone_struct_fields};
+use crate::types::{self, Type, clone_struct_fields, NameSpecification};
 
 #[derive(Debug)]
 pub enum SemaErrorReason {
@@ -28,6 +28,7 @@ pub enum SemaErrorReason {
     StructFieldNotFound,
     UsingSelectorOnNonStructType,
     CannotFindSelectorInStruct,
+    CannotUseSelfOutsideOfMethod,
 }
 
 #[derive(Debug)]
@@ -40,12 +41,6 @@ type SemaResult<X> = Result<X, SemaError>;
 
 pub fn error_loc<T>(reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
     Err(SemaError { reason, loc })
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-struct NameSpecification {
-    pub package: String,
-    pub name: String,
 }
 
 struct TypeCollection {
@@ -92,7 +87,7 @@ fn collect_types(program: &ast::Program) -> TypeCollection {
                     package: package.id.clone(),
                     name: struct_.id.clone(),
                 };
-                let typ = types::struct_type(&struct_.id, Vec::new());
+                let typ = types::struct_type(name_spec.clone(), Vec::new(), Vec::new());
                 collection.types.insert(name_spec, typ);
             }
         }
@@ -115,6 +110,25 @@ fn check_types(program: &ast::Program, collection: &TypeCollection) -> SemaResul
                     // resolve field types
                     if let types::TypeKind::Struct(struct_type) = &typ.inner.kind {
                         struct_type.fields.write().unwrap().push((field.id.clone(), field_type));
+                    } else {
+                        unreachable!();
+                    }
+                }
+                for func in struct_.functions.iter() {
+                    let mut params = Vec::new();
+                    for param in func.signature.params.iter() {
+                        params.push(type_lookup(&param.type_annotation, &collection, &package.id, &file.imports)?);
+                    }
+                    let mut returns = Vec::new();
+                    for return_type in func.signature.return_type.iter() {
+                        returns.push(type_lookup(&return_type, &collection, &package.id, &file.imports)?);
+                    }
+                    let function_type = types::FunctionType {
+                        params,
+                        returns,
+                    };
+                    if let types::TypeKind::Struct(struct_type) = &typ.inner.kind {
+                        struct_type.functions.write().unwrap().push((func.signature.id.clone(), function_type));
                     } else {
                         unreachable!();
                     }
@@ -143,9 +157,12 @@ struct FunctionCollection {
 
 impl FunctionCollection {
     // Find a function in the collection
-    pub fn get(&self, imports: &Vec<String>, package: &str, name: &String) -> Option<&types::FunctionType> {
+    pub fn get(&self, imports: &Vec<String>, package: &str, name: &String) -> Option<(&types::FunctionType, NameSpecification)> {
         if let Some(typ) = self.get_exact(package, name) {
-            return Some(typ);
+            return Some((typ, NameSpecification {
+                package: package.into(),
+                name: name.clone(),
+            }));
         }
         for import in imports {
             let name_spec = NameSpecification {
@@ -153,7 +170,7 @@ impl FunctionCollection {
                 name: name.clone(),
             };
             if let Some(typ) = self.functions.get(&name_spec) {
-                return Some(typ);
+                return Some((typ, name_spec));
             }
         }
         None
@@ -221,12 +238,23 @@ fn collect_functions(program: &ast::Program, builtins: &Builtins, collection: &T
     Ok(function_collection)
 }
 
+fn mangle_name(name_spec: &NameSpecification) -> String {
+    // For now, we will just mangle by prefixing with the package name, but in the future we will need to mangle generics and stuff too
+    format!("_L{}_{}", name_spec.package, name_spec.name)
+}
+
+fn mangle_name_struct(name_spec: &NameSpecification, name: &str) -> String {
+    // For now, we will just mangle by prefixing with the package name, but in the future we will need to mangle generics and stuff too
+    format!("_L{}_{}_{}", name_spec.package, name_spec.name, name)
+}
+
 struct FuncTypeInference<'a> {
     ///structs: &'a Vec<Box<ast::Struct>>,
     imports: &'a Vec<String>,
     types: &'a TypeCollection,
     //own_signature:&'a ast::FuncSignature,
     //signatures: &'a Vec<ast::FuncSignature>,
+    self_type: Option<Type>,
     functions: &'a FunctionCollection,
     own_signature: &'a types::FunctionType,
     package_id: &'a str,
@@ -242,6 +270,19 @@ impl<'a> FuncTypeInference<'a> {
             functions,
             package_id,
             variable_scopes: Vec::new(),
+            self_type: None,
+        }
+    }
+
+    fn new_for_method(imports: &'a Vec<String>, types: &'a TypeCollection, own_signature: &'a types::FunctionType, functions: &'a FunctionCollection, package_id: &'a str, self_type: Type) -> Self {
+        Self {
+            imports,
+            types,
+            own_signature,
+            functions,
+            package_id,
+            variable_scopes: Vec::new(),
+            self_type: Some(self_type),
         }
     }
 
@@ -365,44 +406,86 @@ impl<'a> FuncTypeInference<'a> {
             _ => panic!()
         };
 
-        // load the function call name if its an identifier
-        // (for now, we only support direct calls)
-        let name = match &c.function.kind {
-            ast::ExprKind::Identifier(i) => &i.id,
-            _ => unimplemented!("Function calls must be direct(by name) for now"),
-        };
+        match &mut c.function.kind {
+            ast::ExprKind::Identifier(i) => {
+                let (func_signature, name_spec) = match self.functions.get(self.imports, self.package_id, &i.id) {
+                    Some(s) => s,
+                    None => return self.error_loc(SemaErrorReason::FunctionNotFound, e.loc),
+                };
 
-        // find the called function
-        //println!("Looking for function: {}", name);
-        //println!("Available functions: {}", self.signatures.iter().map(|s| s.id.clone()).collect::<Vec<_>>().join(", "));
-        let func_signature = match self.functions.get(self.imports, self.package_id, name) {
-            Some(s) => s,
-            None => return self.error_loc(SemaErrorReason::FunctionNotFound, e.loc),
-        };
+                // Do some basic argument count checking
+                if func_signature.params.len() < c.parameters.len() {
+                    return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
+                }
+                if func_signature.params.len() > c.parameters.len() {
+                    return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
+                }
 
-        // Do some basic argument count checking
-        if func_signature.params.len() < c.parameters.len() {
-            return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
-        }
-        if func_signature.params.len() > c.parameters.len() {
-            return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
-        }
+                // Sema check arguements, then check argument types
+                for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
+                    self.expr(arg, Some(param.clone()))?;
+                    if types::compare(&arg.typ, &param) == types::ComparisonResult::Incompatible {
+                        return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
+                    }
+                }
 
-        // Sema check arguements, then check argument types
-        for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
-            self.expr(arg, Some(param.clone()))?;
-            if types::compare(&arg.typ, &param) == types::ComparisonResult::Incompatible {
-                return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
+                c.symbol_name = Some(mangle_name(&name_spec));
+
+                // Assign this expr the return type of the function
+                if let Some(typ) = func_signature.returns.first() {
+                    e.typ = typ.clone();
+                } else {
+                    e.typ = types::bad();
+                }
+
+                self.ok()
             }
-        }
+            ast::ExprKind::Selector(s) => {
+                self.expr(&mut s.value, None)?;
 
-        // Assign this expr the return type of the function
-        if let Some(typ) = func_signature.returns.first() {
-            e.typ = typ.clone();
-        } else {
-            e.typ = types::bad();
+                if !types::is_struct(&s.value.typ) {
+                    return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, s.value.loc);
+                }
+                if let types::TypeKind::Struct(struct_type) = s.value.typ.kind() {
+                    match struct_type.functions.read().unwrap().iter().find(|f| f.0 == s.selector.id) {
+                        Some(f) => {
+                            let func_signature = &f.1;
+
+                            // Do some basic argument count checking
+                            if func_signature.params.len() < c.parameters.len() {
+                                return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
+                            }
+                            if func_signature.params.len() > c.parameters.len() {
+                                return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
+                            }
+
+                            // Sema check arguements, then check argument types
+                            for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
+                                self.expr(arg, Some(param.clone()))?;
+                                if types::compare(&arg.typ, &param) == types::ComparisonResult::Incompatible {
+                                    return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
+                                }
+                            }
+
+                            // Assign this expr the return type of the function
+                            if let Some(typ) = func_signature.returns.first() {
+                                e.typ = typ.clone();
+                            } else {
+                                e.typ = types::bad();
+                            }
+
+                            c.symbol_name = Some(mangle_name_struct(&struct_type.spec, &s.selector.id));
+
+                            self.ok()
+                        },
+                        None => return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc),
+                    }
+                } else {
+                    unreachable!();
+                }
+            },
+            _ => unimplemented!("Function calls must be direct(by name) for now"),
         }
-        self.ok()
     }
 
     fn integer(&mut self, _i: &mut Box<ast::Integer>, _type_hint: Option<types::Type>) -> SemaResult<()> {
@@ -562,6 +645,15 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
+    fn _self(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
+        let self_type = match &self.self_type {
+            Some(t) => t.clone(),
+            None => return self.error_loc(SemaErrorReason::CannotUseSelfOutsideOfMethod, e.loc),
+        };
+        e.typ = self_type;
+        self.ok()
+    } 
+
     fn expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
         match &mut e.kind {
             ast::ExprKind::BinaryExpr(_) => self.binary_expr(e, type_hint),
@@ -577,6 +669,7 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Selector(_) => self.selector(e, type_hint),
             ast::ExprKind::ArrayLiteral(_) => self.array_literal(e, type_hint),
             ast::ExprKind::ObjectLiteral(_) => self.object_literal(e, type_hint),
+            ast::ExprKind::_Self => self._self(e),
         }
     }
 
@@ -755,6 +848,28 @@ fn check_file(file: &mut Box<ast::File>, package_id: &str, collection: &TypeColl
         let own_signature = functions.get_exact(package_id, &func.signature.id).unwrap();
         func.typ_ = own_signature.clone();
         FuncTypeInference::new(&file.imports, collection, own_signature, functions, package_id).check(func)?;
+
+        func.signature.symbol_name = mangle_name(&NameSpecification {
+            package: package_id.into(),
+            name: func.signature.id.clone(),
+        });
+    }
+
+    for _struct in file.structs.iter_mut() {
+        let typ = collection.get_exact(package_id, &_struct.id).unwrap().clone();
+        _struct.typ = typ.clone();
+        for func in _struct.functions.iter_mut() {
+            let own_signature = match typ.kind() {
+                types::TypeKind::Struct(struct_type) => struct_type.functions.read().unwrap().iter().find(|f| f.0 == func.signature.id).unwrap().1.clone(),
+                _ => panic!()
+            };
+            func.typ_ = own_signature.clone();
+            func.signature.symbol_name = mangle_name_struct(&NameSpecification {
+                package: package_id.into(),
+                name: _struct.id.clone(),
+            }, &func.signature.id);
+            FuncTypeInference::new_for_method(&file.imports, collection, &own_signature, functions, package_id, typ.clone()).check(func)?;
+        }
     }
 
     Ok(())

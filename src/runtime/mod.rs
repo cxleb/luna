@@ -151,7 +151,7 @@ impl JitContext {
 
         // add the builtins as look up symbols
         for func in &builtins.functions {
-            builder.symbol(&func.id, func.implementation);
+            builder.symbol(format!("_Lbuiltins_{}", func.id), func.implementation);
         }
 
         builder.symbol("__panic", panic as *const u8);
@@ -201,7 +201,7 @@ impl JitContext {
         }
         for func in self.builtins.functions.iter() {
             signatures.push(TranslateSignature {
-                id: func.id.clone(),
+                id: format!("_Lbuiltins_{}", func.id),
                 signature: Signature {
                     parameters: func.parameters.clone(),
                     ret_types: match &func.returns {

@@ -1,18 +1,21 @@
 - Add source length to AST
 - Debug information is generated alongside bytecode
 - Fix tokeniser(stop copying strings)
-- String templates
+- refactor IR to remove need on type system
+- Implement interfaces (use structual typing like go) (blocker: ir refactor, struct methods)
+- String templates (blocker: interface)
 - Make functions a const value
+- captures functions(closures?)
 - Implement a concept of "api" so we can have std library
 - Fix interface so it can either be a cli thing or embedded.
-- Implement interfaces (use structual typing like go)
 - Implement discriminated enums 
-- Implement error handling(pre req is discriminated enums)
+- Implement error handling(blocker: discriminated enums)
 - Implement multiple modules (import and export syntax?)
 - Templates
 - Casting types
 
 done:
+- struct methods
 - Implement garbage collector
 - Implement structs
 - Builtin functions have function signatures

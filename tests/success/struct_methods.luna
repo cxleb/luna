@@ -1,0 +1,18 @@
+struct Func {
+    a: int,
+
+    func a(i: int) {
+        assert(self.a == i);
+    }
+}
+
+func main() {
+    let f = Func { a: 1 };
+    let g = Func { a: 2 };
+    let h = Func { a: 3 };
+    let i = Func { a: 4 };
+    g.a(2);
+    h.a(3);
+    f.a(1);
+    i.a(4);
+}

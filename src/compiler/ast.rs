@@ -51,6 +51,8 @@ pub struct Assign {
 pub struct Call {
     pub function: Expr,
     pub parameters: Vec<Expr>,
+    // filled in by the checker for direct calls, used for codegen
+    pub symbol_name: Option<String>, 
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +127,7 @@ pub enum ExprKind {
     Selector(Box<Selector>),
     ArrayLiteral(Box<ArrayLiteral>),
     ObjectLiteral(Box<ObjectLiteral>),
+    _Self,
 }
 
 #[derive(Debug, Clone)]
@@ -205,6 +208,7 @@ pub struct Param {
 #[derive(Debug, Default, Clone)]
 pub struct FuncSignature {
     pub id: String,
+    pub symbol_name: String,
     pub params: Vec<Param>,
     pub return_type: Option<Box<Type>>,
 }
@@ -229,6 +233,8 @@ pub struct Struct {
     pub loc: SourceLoc,
     pub id: String,
     pub fields: Vec<StructField>,
+    pub functions: Vec<Box<Func>>,
+    pub typ: types::Type,
 }
 
 #[derive(Debug, Default, Clone)]

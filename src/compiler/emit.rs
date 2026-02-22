@@ -6,7 +6,7 @@ use crate::types;
 struct FuncGen<'a> {
     bld: FuncBuilder,
     str_map: &'a mut StringMap,
-    structs: &'a Vec<Box<ast::Struct>>, 
+    self_var: Option<ir::VariableRef>,
 }
 
 impl<'a> FuncGen<'a> {
@@ -95,11 +95,15 @@ impl<'a> FuncGen<'a> {
 
     fn call(&mut self, c: &Box<ast::Call>) {
         self.bld.check_yield();
+        // when it is a struct/interface function call, we need to load self first
+        if let ast::ExprKind::Selector(s) = &c.function.kind {
+            self.expr(&s.value);
+        }
         for arg in c.parameters.iter() {
             self.expr(arg);
         }
-        if let ast::ExprKind::Identifier(name) = &c.function.kind {
-            self.bld.call(name.id.clone());
+        if let Some(name) = &c.symbol_name {
+            self.bld.call(name.clone());
         } else {
             self.expr(&c.function);
             self.bld.indirect_call();
@@ -183,6 +187,14 @@ impl<'a> FuncGen<'a> {
         }
     }
 
+    fn _self(&mut self) {
+        if let Some(self_var) = self.self_var {
+            self.bld.load(self_var);
+        } else {
+            panic!("Trying to use self in a non struct function");
+        }
+    }
+
     fn expr(&mut self, e: &ast::Expr) {
         match &e.kind {
             ast::ExprKind::BinaryExpr(b) => self.binary_expr(e, b),
@@ -198,6 +210,7 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::Selector(l) => self.selector(e, l),
             ast::ExprKind::ArrayLiteral(a) => self.array_literal(a),
             ast::ExprKind::ObjectLiteral(o) => self.object_literal(&e.typ, o),
+            ast::ExprKind::_Self => self._self(),
         }
     }
 
@@ -362,18 +375,42 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn generate(func: &Box<ast::Func>, structs: &'a Vec<Box<ast::Struct>>, str_map: &'a mut StringMap) -> Self {
+    fn generate(func: &Box<ast::Func>, str_map: &'a mut StringMap) -> Self {
         let signature = ir::Signature {
             ret_types: func.typ_.returns.iter().cloned().collect(),
             parameters: func.typ_.params.iter().cloned().collect()
         };
         let mut s = Self {
             str_map,
-            structs,
-            bld: FuncBuilder::new(func.signature.id.clone(), signature),
+            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature),
+            self_var: None,
         };
         s.bld.push_scope();
         // add params as variables for scope purposes
+        for (p, sig_p) in func.signature.params.iter().zip(func.typ_.params.iter()) {
+            s.bld.create_var(p.id.clone(), sig_p.clone());
+        }
+        if !s.block_stmt(&func.body) {
+            s.bld.ret();
+        }
+        s.bld.pop_scope();
+        s
+    }
+
+    fn generate_struct_func(func: &Box<ast::Func>, str_map: &'a mut StringMap, struct_type: types::Type) -> Self {
+        let mut signature = ir::Signature {
+            ret_types: func.typ_.returns.iter().cloned().collect(),
+            parameters: func.typ_.params.iter().cloned().collect()
+        };
+        signature.parameters.insert(0, struct_type.clone());
+        let mut s = Self {
+            str_map,
+            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature),
+            self_var: None,
+        };
+        s.bld.push_scope();
+        // add params as variables for scope purposes
+        s.self_var = Some(s.bld.create_var("".into(), struct_type.clone()));
         for (p, sig_p) in func.signature.params.iter().zip(func.typ_.params.iter()) {
             s.bld.create_var(p.id.clone(), sig_p.clone());
         }
@@ -389,28 +426,20 @@ impl<'a> FuncGen<'a> {
     }
 }
 
-pub fn gen_function(func: &Box<ast::Func>, structs: &Vec<Box<ast::Struct>>, str_map: &mut StringMap) -> Box<ir::Function> {
-    FuncGen::generate(func, structs, str_map).finish()
-}
-
-// pub fn gen_module(module: Box<ast::File>) -> Box<ir::Module> {
-
-//     for func in module.functions.iter() {
-//         let ir_func = gen_function(&func, &module.structs, &mut ir_module.string_map);
-//         ir_module.funcs.push(*ir_func);
-//     }
-
-//     Box::new(ir_module)
-// }
-
 pub fn emit_program(program: &ast::Program) -> Box<ir::Module> {
     let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![] };
     
     for package in program.packages.iter() {
         for file in package.files.iter() {
             for func in file.functions.iter() {
-                let ir_func = gen_function(&func, &file.structs, &mut ir_module.string_map);
+                let ir_func = FuncGen::generate(func, &mut ir_module.string_map).finish();
                 ir_module.funcs.push(*ir_func);
+            }
+            for _struct in file.structs.iter() {
+                for func in _struct.functions.iter() {
+                    let ir_func = FuncGen::generate_struct_func(func, &mut ir_module.string_map, _struct.typ.clone()).finish();
+                    ir_module.funcs.push(*ir_func);
+                }
             }
         }
     }

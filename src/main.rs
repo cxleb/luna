@@ -20,6 +20,6 @@ fn main() {
     jit.compile_ir_module(&module);
     //println!("done.");
     //println!("running...\n");
-    jit.call_function_no_params_no_return("main");
+    jit.call_function_no_params_no_return("_Lmain_main");
     //println!("Returned {}", returned);
 }
