@@ -1,0 +1,11 @@
+struct Counter {
+    value: int,
+
+    func increment() {
+        self.value = self.value + 1;
+    }
+}
+
+func main() {
+    Counter.increment();
+}

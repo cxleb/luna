@@ -1,0 +1,11 @@
+struct Item {
+    value: int,
+}
+
+func invalid_use_of_self() {
+    let v = self.value;
+}
+
+func main() {
+    invalid_use_of_self();
+}

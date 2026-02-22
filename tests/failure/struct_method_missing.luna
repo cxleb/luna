@@ -1,0 +1,8 @@
+struct User {
+    id: int,
+}
+
+func main() {
+    let user = User { id: 42 };
+    user.deactivate();
+}
