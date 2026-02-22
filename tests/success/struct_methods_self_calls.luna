@@ -1,0 +1,26 @@
+struct Accumulator {
+    total: int,
+
+    func add(value: int) {
+        self.total = self.total + value;
+    }
+
+    func add_twice(value: int) {
+        self.add(value);
+        self.add(value);
+    }
+
+    func assert_total(expected: int) {
+        assert(self.total == expected);
+    }
+}
+
+func main() {
+    let acc = Accumulator { total: 0 };
+
+    acc.add(3);
+    acc.assert_total(3);
+
+    acc.add_twice(4);
+    acc.assert_total(11);
+}

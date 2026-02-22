@@ -1,0 +1,33 @@
+struct Engine {
+    rpm: int,
+
+    func rev(amount: int) {
+        self.rpm = self.rpm + amount;
+    }
+
+    func assert_rpm(expected: int) {
+        assert(self.rpm == expected);
+    }
+}
+
+struct Car {
+    engine: Engine,
+
+    func warm_up() {
+        self.engine.rev(300);
+        self.engine.rev(500);
+    }
+
+    func assert_ready() {
+        self.engine.assert_rpm(800);
+    }
+}
+
+func main() {
+    let car = Car {
+        engine: Engine { rpm: 0 }
+    };
+
+    car.warm_up();
+    car.assert_ready();
+}
