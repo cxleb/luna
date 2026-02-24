@@ -20,7 +20,20 @@ pub struct StructType {
     pub functions: RwLock<Vec<(String, FunctionType)>>,
 }
 
+
 impl PartialEq for StructType {
+    fn eq(&self, other: &Self) -> bool {
+        self.spec == other.spec
+    }
+}
+
+#[derive(Debug)]
+pub struct EnumType {
+    pub spec: NameSpecification,
+    pub variants: RwLock<Vec<(String, Vec<Type>)>>,
+}
+
+impl PartialEq for EnumType {
     fn eq(&self, other: &Self) -> bool {
         self.spec == other.spec
     }
@@ -36,6 +49,7 @@ pub enum TypeKind {
     UnknownReference, // An internal detail before generics is correctly implemented
     Array(Type),
     Struct(StructType),
+    Enum(EnumType),
     Identifier(String), 
     Function(FunctionType),
     //Function,
@@ -117,6 +131,10 @@ pub fn is_struct(ty: &Type) -> bool {
     matches!(ty.inner.kind, TypeKind::Struct(_))
 }
 
+pub fn is_enum(ty: &Type) -> bool {
+    matches!(ty.inner.kind, TypeKind::Enum(_))
+}
+
 pub fn is_function(ty: &Type) -> bool {
     matches!(ty.inner.kind, TypeKind::Function(_))
 }
@@ -130,6 +148,14 @@ pub fn clone_struct_fields(ty: &Type) -> Vec<(String, Type)> {
         struct_type.fields.read().unwrap().clone()
     } else {
         panic!("Type is not a struct");
+    }
+}
+
+pub fn get_max_enum_values(ty: &Type) -> usize {
+    if let TypeKind::Enum(enum_type) = &ty.inner.kind {
+        enum_type.variants.read().unwrap().iter().map(|(_, values)| values.len()).max().unwrap_or(0)
+    } else {
+        panic!("Type is not an enum");
     }
 }
 
@@ -182,6 +208,13 @@ pub fn struct_type(spec: NameSpecification, fields: Vec<(String, Type)>, functio
         spec,
         fields: RwLock::new(fields),
         functions: RwLock::new(functions),
+    }))
+}
+
+pub fn enum_type(spec: NameSpecification, variants: Vec<(String, Vec<Type>)>) -> Type {
+    create_type(TypeKind::Enum(EnumType {
+        spec,
+        variants: RwLock::new(variants),
     }))
 }
 

@@ -93,7 +93,26 @@ impl<'a> FuncGen<'a> {
         self.store_expr(&a.destination);
     }
 
-    fn call(&mut self, c: &Box<ast::Call>) {
+    fn enum_literal(&mut self, typ: &types::Type, i: usize, values: &Vec<ast::Expr>) {
+        let enum_size = types::get_max_enum_values(typ);
+        self.bld.new_object(enum_size + 1);
+        self.bld.load_const_int(i as i64);
+        self.bld.dup(1);
+        self.bld.set_object(0, types::integer());
+
+        for (i, value) in values.iter().enumerate() {
+            self.expr(value);
+            self.bld.dup(1);
+            self.bld.set_object(i + 1, value.typ.clone());
+        }
+    }
+
+    fn call(&mut self, c: &ast::Call, e: &ast::Expr) {
+        if let Some(i) = c.enum_idx {
+            self.enum_literal(&e.typ, i, &c.parameters);
+            return;
+        }
+
         self.bld.check_yield();
         // when it is a struct/interface function call, we need to load self first
         if let ast::ExprKind::Selector(s) = &c.function.kind {
@@ -142,6 +161,10 @@ impl<'a> FuncGen<'a> {
     }
     
     fn selector(&mut self, e: &ast::Expr, s: &ast::Selector) {
+        if let Some(i) = s.enum_idx {
+            self.enum_literal(&e.typ, i, &Vec::new());
+            return;
+        }
         self.expr(&s.value);
         self.bld.get_object(s.idx, e.typ.clone());
     }
@@ -200,7 +223,7 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::BinaryExpr(b) => self.binary_expr(e, b),
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u),
             ast::ExprKind::Assign(a) => self.assign(a),
-            ast::ExprKind::Call(c) => self.call(c),
+            ast::ExprKind::Call(c) => self.call(c, e),
             ast::ExprKind::Integer(i) => self.integer(i),
             ast::ExprKind::Number(f) => self.number(f),
             ast::ExprKind::Boolean(b) => self.boolean(b),

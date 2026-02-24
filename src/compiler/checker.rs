@@ -26,9 +26,11 @@ pub enum SemaErrorReason {
     NonBoolInLogicalExpression,
     TypeNotFound,
     StructFieldNotFound,
-    UsingSelectorOnNonStructType,
+    InvalidUsageOfSelector,
     CannotFindSelectorInStruct,
+    CannotFindVariantInEnum,
     CannotUseSelfOutsideOfMethod,
+    EnumVariantValueTypesIncompatible,
 }
 
 #[derive(Debug)]
@@ -90,6 +92,14 @@ fn collect_types(program: &ast::Program) -> TypeCollection {
                 let typ = types::struct_type(name_spec.clone(), Vec::new(), Vec::new());
                 collection.types.insert(name_spec, typ);
             }
+            for enum_ in file.enums.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: enum_.id.clone(),
+                };
+                let typ = types::enum_type(name_spec.clone(), Vec::new());
+                collection.types.insert(name_spec, typ);
+            }
         }
     }
 
@@ -131,6 +141,23 @@ fn check_types(program: &ast::Program, collection: &TypeCollection) -> SemaResul
                         struct_type.functions.write().unwrap().push((func.signature.id.clone(), function_type));
                     } else {
                         unreachable!();
+                    }
+                }
+            }
+            for enum_ in file.enums.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: enum_.id.clone(),
+                };
+                let typ = collection.types.get(&name_spec).unwrap().clone();
+                for variant in enum_.variants.iter() {
+                    let mut field_types = Vec::new();
+                    for field in variant.variant_types.iter() {
+                        let field_type = type_lookup(&field, &collection, &package.id, &file.imports)?;
+                        field_types.push(field_type);
+                    }
+                    if let types::TypeKind::Enum(enum_type) = &typ.inner.kind {
+                        enum_type.variants.write().unwrap().push((variant.id.clone(), field_types));
                     }
                 }
             }
@@ -315,6 +342,10 @@ impl<'a> FuncTypeInference<'a> {
         Err(SemaError { reason, loc })
     }
 
+    pub fn find_type(&self, name: &str) -> Option<Type> {
+        self.types.get(&self.imports, self.package_id, &name.to_string()).cloned()
+    }
+
     fn binary_expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
         let b = match &mut e.kind {
             ast::ExprKind::BinaryExpr(b) => b,
@@ -443,9 +474,6 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Selector(s) => {
                 self.expr(&mut s.value, None)?;
 
-                if !types::is_struct(&s.value.typ) {
-                    return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, s.value.loc);
-                }
                 if let types::TypeKind::Struct(struct_type) = s.value.typ.kind() {
                     match struct_type.functions.read().unwrap().iter().find(|f| f.0 == s.selector.id) {
                         Some(f) => {
@@ -480,8 +508,26 @@ impl<'a> FuncTypeInference<'a> {
                         },
                         None => return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc),
                     }
+                } else if let types::TypeKind::Enum(enum_type) = s.value.typ.kind() {
+                    match enum_type.variants.read().unwrap().iter().enumerate().find(|v| v.1.0 == s.selector.id) {
+                        Some((i, values)) => {
+                            // Assign this expr the type of the enum
+                            e.typ = s.value.typ.clone();
+
+                            for (arg, param) in c.parameters.iter_mut().zip(values.1.iter()) {
+                                self.expr(arg, Some(param.clone()))?;
+                                if types::compare(&arg.typ, &param) == types::ComparisonResult::Incompatible {
+                                    return self.error_loc(SemaErrorReason::EnumVariantValueTypesIncompatible, e.loc);
+                                }
+                            }
+
+                            c.enum_idx = Some(i);
+                            self.ok()
+                        },
+                        None => return self.error_loc(SemaErrorReason::CannotFindVariantInEnum, e.loc),
+                    }
                 } else {
-                    unreachable!();
+                    return self.error_loc(SemaErrorReason::InvalidUsageOfSelector, s.value.loc);
                 }
             },
             _ => unimplemented!("Function calls must be direct(by name) for now"),
@@ -511,6 +557,9 @@ impl<'a> FuncTypeInference<'a> {
         };
         if let Some(typ) = self.find_var(&i.id) {
             e.typ = typ.clone().into();
+            self.ok()
+        } else if let Some(typ) = self.find_type(&i.id) {
+            e.typ = typ;
             self.ok()
         } else {
             self.error_loc(SemaErrorReason::VariableNotFound, e.loc)
@@ -551,10 +600,6 @@ impl<'a> FuncTypeInference<'a> {
 
         self.expr(&mut s.value, None)?;
 
-        if !types::is_struct(&s.value.typ) {
-            return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
-        }
-
         if let types::TypeKind::Struct(struct_type) = s.value.typ.kind() {
             if let Some((i, (_, ty))) = struct_type.fields.read().unwrap().iter().enumerate().find(|a| a.1.0 == s.selector.id) {
                 e.typ = ty.clone();
@@ -562,6 +607,17 @@ impl<'a> FuncTypeInference<'a> {
             } else {
                 return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc);
             }
+        }        
+        else if let types::TypeKind::Enum(enum_type) = s.value.typ.kind() {
+           if let Some((i, _)) = enum_type.variants.read().unwrap().iter().enumerate().find(|a| a.1.0 == s.selector.id) {
+               e.typ = s.value.typ.clone();
+               s.enum_idx = Some(i);
+           } else {
+               return self.error_loc(SemaErrorReason::CannotFindVariantInEnum, e.loc);
+           }
+        }  
+        else {
+            return self.error_loc(SemaErrorReason::InvalidUsageOfSelector, e.loc);
         }
 
         self.ok()
@@ -612,7 +668,7 @@ impl<'a> FuncTypeInference<'a> {
 
         // maybe there need to be a module look up mapping to know which structs we want
         // does the struct exist?
-        let struct_def = match self.types.get(self.imports, self.package_id, &id.id) {
+        let struct_def = match self.find_type(&id.id) {
             Some(s) => s.clone(),
             None => return self.error_loc(SemaErrorReason::TypeNotFound, e.loc),
         };
@@ -708,7 +764,7 @@ impl<'a> FuncTypeInference<'a> {
         self.expr(&mut s.value, None)?;
 
         if !types::is_struct(&s.value.typ) {
-            return self.error_loc(SemaErrorReason::UsingSelectorOnNonStructType, e.loc);
+            return self.error_loc(SemaErrorReason::InvalidUsageOfSelector, e.loc);
         }
 
         if let types::TypeKind::Struct(struct_type) = s.value.typ.kind() {

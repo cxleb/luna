@@ -1,0 +1,11 @@
+enum Test {
+    NoFields,
+    OneField(int),
+    TwoFields(int, string)   
+}
+
+func main() {
+    let no_fields = Test.NoFields;
+    let one_fields = Test.OneField(10);
+    let two_fields = Test.TwoFields(10, "Hi!");
+}

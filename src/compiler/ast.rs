@@ -53,6 +53,7 @@ pub struct Call {
     pub parameters: Vec<Expr>,
     // filled in by the checker for direct calls, used for codegen
     pub symbol_name: Option<String>, 
+    pub enum_idx: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -90,8 +91,9 @@ pub struct Subscript {
 pub struct Selector {
     pub value: Expr,
     pub selector: Identifier,
-    pub idx: usize // the offset of the field within the struct, 
+    pub idx: usize, // the offset of the field within the struct, 
                  // saves us computing it twice and some complexity
+    pub enum_idx: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -238,10 +240,27 @@ pub struct Struct {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct EnumVariant {
+    pub loc: SourceLoc,
+    pub id: String,
+    pub variant_types: Vec<Box<Type>>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Enum {
+    pub loc: SourceLoc,
+    pub id: String,
+    pub variants: Vec<EnumVariant>,
+    pub typ: types::Type,
+}
+
+
+#[derive(Debug, Default, Clone)]
 pub struct File {
     pub id: String,
     pub functions: Vec<Box<Func>>,
     pub structs: Vec<Box<Struct>>,
+    pub enums: Vec<Box<Enum>>,
     pub imports: Vec<String>,
 }
 

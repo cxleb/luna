@@ -113,10 +113,58 @@ impl<'a> Parser<'a> {
                     let struct_ = self.parse_struct()?;
                     file.structs.push(struct_);
                 }
+                TokenKind::Keyword(Keywords::Enum) => {
+                    let enum_ = self.parse_enum()?;
+                    file.enums.push(enum_);
+                }
                 _ => return self.error(ParserErrorReason::ExpectedTopLevelDefinition),
             }
         }
         Ok(file)
+    }
+
+    pub fn parse_enum(&mut self) -> ParserResult<Box<Enum>> {
+        let loc = self.source_loc();
+        self.expect(TokenKind::Keyword(Keywords::Enum))?;
+        let id = self.expect(TokenKind::Identifier)?;
+        let mut enum_ = Box::new(Enum {
+            loc,
+            id: id.get_string(),
+            variants: Vec::new(),
+            typ: types::Type::default(),
+        });
+        self.expect(TokenKind::Punctuation(Punctuation::LeftBrace))?;
+        while !self.test(TokenKind::Punctuation(Punctuation::RightBrace)) {
+            let variant_loc = self.source_loc();
+            let variant_id_token = self.expect(TokenKind::Identifier)?;
+            let variant_id = variant_id_token.get_string();
+            let mut variant_types = Vec::new();
+            if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
+                _ = self.next();
+                while !self.test(TokenKind::Punctuation(Punctuation::RightParenthesis)) {
+                    let ty = self.parse_type()?;
+                    variant_types.push(ty);
+                    if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                        self.expect(TokenKind::Punctuation(Punctuation::Comma))?;
+                    } else {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::Punctuation(Punctuation::RightParenthesis))?;
+            }
+            enum_.variants.push(EnumVariant {
+                loc: variant_loc,
+                id: variant_id,
+                variant_types,
+            });
+            if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                _ = self.next();
+            } else {
+                break;
+            }
+        }
+        self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
+        Ok(enum_)
     }
 
     pub fn parse_struct(&mut self) -> ParserResult<Box<Struct>> {
@@ -410,10 +458,11 @@ impl<'a> Parser<'a> {
                     ExprKind::Selector(Box::new(Selector {
                         value: expr,
                         selector: Identifier { id },
-                        idx: 0
+                        idx: 0,
+                        enum_idx: None
                     })),
                     loc,
-                );
+                );              
             }
             else if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
                 self.next()?;
@@ -431,7 +480,8 @@ impl<'a> Parser<'a> {
                     ExprKind::Call(Box::new(Call { 
                         function: expr, 
                         parameters,
-                        symbol_name: None
+                        symbol_name: None,
+                        enum_idx: None
                     })),
                     loc,
                 );
@@ -679,6 +729,20 @@ mod tests {
         assert_eq!(struct_.fields[1].type_annotation, Box::new(ast::Type::Integer));
         assert_eq!(struct_.functions.len(), 1);
         assert_eq!(struct_.functions[0].signature.id, "method");
+    }
+
+    #[test]
+    fn test_parse_enum() {
+        use crate::compiler::parser::Parser;
+
+        let mut parser = Parser::new("enum MyEnum { Variant1, Variant2(int) }");
+        let enum_ = parser.parse_enum().unwrap();
+        assert_eq!(enum_.id, "MyEnum");
+        assert_eq!(enum_.variants.len(), 2);
+        assert_eq!(enum_.variants[0].id, "Variant1");
+        assert_eq!(enum_.variants[0].variant_types.len(), 0);
+        assert_eq!(enum_.variants[1].id, "Variant2");
+        assert_eq!(enum_.variants[1].variant_types.len(), 1);
     }
 
     #[test]
