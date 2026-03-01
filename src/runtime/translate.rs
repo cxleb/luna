@@ -2,7 +2,7 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::{ir::{self, StringMap}, runtime::string, types};
-use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I64}}, isa::CallConv, verify_function};
+use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, JumpTableData, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I32, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use super::cranelift::data_context::{DataDescription};
 use super::cranelift::module::{Linkage, Module};
@@ -91,7 +91,7 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
         builder.switch_to_block(blocks[i]);
         
         for inst in block.ins.iter() {
-            match inst {
+            match &inst {
                 ir::Inst::Nop => {}
                 ir::Inst::Dup(i) => {
                     let val = *stack.iter().rev().nth(*i).unwrap();
@@ -277,8 +277,16 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let cond = stack.pop().unwrap();
                     builder.ins().brif(cond, blocks[*c], &[], blocks[*a], &[]);
                 }
-                &ir::Inst::Br(target) => {
-                    builder.ins().jump(blocks[target], &[]);
+                ir::Inst::Br(target) => {
+                    builder.ins().jump(blocks[*target], &[]);
+                }
+                ir::Inst::BrTable(def, a) => {
+                    let val = stack.pop().unwrap();
+                    let val = builder.ins().ireduce(I32, val);
+                    let table = a.iter().map(|b| builder.func.dfg.block_call(blocks[*b], &[])).collect::<Vec<_>>();
+                    let jump_table = JumpTableData::new(builder.func.dfg.block_call(blocks[*def], &[]), &table);
+                    let jt = builder.create_jump_table(jump_table);
+                    builder.ins().br_table(val, jt);
                 }
                 ir::Inst::Ret => {
                     let ret_vals = stack.iter().rev().take(func.signature.ret_types.len()).cloned().collect::<Vec<_>>();
@@ -361,7 +369,7 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     translate_call(ctx, &mut builder, &mut stack, "__check_yield");
                 }
             }
-        }
+        }    
     }
 
     // This is the panic block

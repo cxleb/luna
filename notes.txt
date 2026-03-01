@@ -8,13 +8,18 @@
 - captures functions(closures?)
 - Implement a concept of "api" so we can have std library
 - Fix interface so it can either be a cli thing or embedded.
-- Implement discriminated enums 
 - Implement error handling(blocker: discriminated enums)
 - Implement multiple modules (import and export syntax?)
 - Templates
 - Casting types
+- For loops (do we want an iterator API for this?)
+- Tasks (and Tasks API)
+- Switch statement for non enums
+- Implement proper pattern matching
+- Refactor AST to be arena allocated
 
 done:
+- Implement discriminated enums 
 - struct methods
 - Implement garbage collector
 - Implement structs

@@ -256,6 +256,9 @@ impl<'a> Parser<'a> {
         } else if self.test(TokenKind::Keyword(Keywords::While)) {
             let while_ = self.parse_while()?;
             return Ok(Stmt::While(while_));
+        } else if self.test(TokenKind::Keyword(Keywords::Switch)) {
+            let switch = self.parse_switch()?;
+            return Ok(Stmt::Switch(switch));
         } else if self.test(TokenKind::Punctuation(Punctuation::LeftBrace)) {
             let block = self.parse_block_statement()?;
             return Ok(Stmt::Block(block));
@@ -307,6 +310,37 @@ impl<'a> Parser<'a> {
             loc,
             condition,
             consequent,
+        }))
+    }
+
+    fn parse_switch(&mut self) -> ParserResult<Box<SwitchStmt>> {
+        let loc = self.source_loc();
+        self.expect(TokenKind::Keyword(Keywords::Switch))?;
+        let old_nest_level = self.nest_level;
+        self.nest_level = -1;
+        let value = self.parse_expression()?;
+        self.nest_level = old_nest_level;
+
+        let mut cases = Vec::new();
+        self.expect(TokenKind::Punctuation(Punctuation::LeftBrace))?;
+        while !self.test(TokenKind::Punctuation(Punctuation::RightBrace)) {
+            let pattern = self.parse_pattern()?;
+            self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
+            let block = self.parse_block_statement()?;
+            if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                self.next()?;
+            }
+            cases.push(CaseStmt {
+                pattern,
+                block
+            });
+        }
+        self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
+        
+        Ok(Box::new(SwitchStmt { 
+            loc, 
+            value, 
+            cases
         }))
     }
 
@@ -643,6 +677,38 @@ impl<'a> Parser<'a> {
     }
 
     /////////////////////////////
+    /// PATTERNS
+    /////////////////////////////
+
+    fn parse_pattern(&mut self) -> ParserResult<Box<Pattern>> {
+        let loc = self.source_loc();
+
+        self.expect(TokenKind::Punctuation(Punctuation::Dot))?;
+        let id_token = self.expect(TokenKind::Identifier)?;
+        let id = id_token.get_string();
+        
+        let mut values = Vec::new();
+        if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
+            self.next()?;
+            while !self.test(TokenKind::Punctuation(Punctuation::RightParenthesis)) {
+                let value_token = self.expect(TokenKind::Identifier)?;
+                values.push(value_token.get_string());
+                if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                    self.next()?;
+                } else {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Punctuation(Punctuation::RightParenthesis))?;
+        }
+        Ok(Box::new(Pattern {
+            loc,
+            id,
+            values,
+        }))
+    }
+
+    /////////////////////////////
     /// TYPES
     /////////////////////////////
 
@@ -773,6 +839,20 @@ mod tests {
         let mut parser = Parser::new("while x < 10 {}");
         let _while = parser.parse_while().unwrap();
         //assert_eq!(while_.consequent.stmts.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_switch() {
+        use crate::compiler::parser::Parser;
+
+        let mut parser = Parser::new("switch x { .Variant1: {} .Variant2(value): {} }");
+        let switch = parser.parse_switch().unwrap();
+        assert_eq!(switch.cases.len(), 2);
+        assert_eq!(switch.cases[0].pattern.id, "Variant1");
+        assert_eq!(switch.cases[0].pattern.values.len(), 0);
+        assert_eq!(switch.cases[1].pattern.id, "Variant2");
+        assert_eq!(switch.cases[1].pattern.values.len(), 1);
+        assert_eq!(switch.cases[1].pattern.values[0], "value");
     }
 
     #[test]

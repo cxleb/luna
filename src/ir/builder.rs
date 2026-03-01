@@ -43,6 +43,10 @@ impl FuncBuilder {
         self.current_block = block;
     }
 
+    pub fn current_block(&mut self) -> BlockRef {
+        self.current_block
+    }
+
     pub fn push_scope(&mut self) {
         self.variable_scopes.push(HashMap::new());
     }
@@ -218,6 +222,10 @@ impl FuncBuilder {
 
     pub fn condbr(&mut self, then_block: BlockRef, else_block: BlockRef) {
         self.append_inst(super::Inst::CondBr(then_block, else_block));
+    }
+
+    pub fn br_table(&mut self, default_block: BlockRef, blocks: Vec<BlockRef>) {
+        self.append_inst(super::Inst::BrTable(default_block, blocks));
     }
 
     pub fn call(&mut self, id: String) {

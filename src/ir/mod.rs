@@ -46,6 +46,7 @@ pub enum Inst {
     //StoreNumber(u64),
     CondBr(BlockRef, BlockRef), // branch if 0
     Br(BlockRef),
+    BrTable(BlockRef, Vec<BlockRef>),
     Ret,
     // Pops the necessary arguments off the stack, e.g a(10, 10) will pop 2 
     Call(String),

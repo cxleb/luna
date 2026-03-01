@@ -171,6 +171,27 @@ pub struct WhileStmt {
 }
 
 #[derive(Debug, Clone)]
+pub struct Pattern {
+    pub loc: SourceLoc,
+    pub id: String,
+    pub values: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CaseStmt {
+    // pattern??
+    pub pattern: Box<Pattern>,
+    pub block: Box<BlockStmt>
+}
+
+#[derive(Debug, Clone)]
+pub struct SwitchStmt {
+    pub loc: SourceLoc,
+    pub value: Expr,
+    pub cases: Vec<CaseStmt>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ForStmt {
     pub loc: SourceLoc,
     pub id: String,
@@ -196,6 +217,7 @@ pub enum Stmt {
     Return(Box<ReturnStmt>),
     VarDecl(Box<VarDeclStmt>),
     While(Box<WhileStmt>),
+    Switch(Box<SwitchStmt>),
     For(Box<ForStmt>),
     Block(Box<BlockStmt>),
     ExprStmt(Box<ExprStmt>),

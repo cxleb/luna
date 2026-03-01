@@ -31,6 +31,9 @@ pub enum SemaErrorReason {
     CannotFindVariantInEnum,
     CannotUseSelfOutsideOfMethod,
     EnumVariantValueTypesIncompatible,
+    InvalidSwitchCasePattern,
+    EnumVariantNotFound,
+    EnumVariantPatternFieldCountMismatch,
 }
 
 #[derive(Debug)]
@@ -874,6 +877,35 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     }
 
+    fn switch_stmt(&mut self, s: &mut ast::SwitchStmt) -> SemaResult<()> {
+        self.expr(&mut s.value, None)?;
+        if types::is_enum(&s.value.typ) {
+            let enum_type = match &s.value.typ.kind() {
+                types::TypeKind::Enum(enum_type) => enum_type,
+                _ => unreachable!()
+            };
+            for case in s.cases.iter_mut() {
+                match enum_type.variants.read().unwrap().iter().find(|v| v.0 == case.pattern.id) {
+                   Some(v) => {
+                        if case.pattern.values.len() != v.1.len() {
+                            return self.error_loc(SemaErrorReason::EnumVariantPatternFieldCountMismatch, case.pattern.loc);
+                        }
+                        self.push_scope();
+                        for (typ, name) in v.1.iter().zip(case.pattern.values.iter()) {
+                        self.create_var(name.clone(), typ);
+                        }
+                        self.block_stmt(&mut case.block)?;
+                        self.pop_scope();
+                   },
+                   None => return self.error_loc(SemaErrorReason::EnumVariantNotFound, case.pattern.loc),
+                };
+            }
+        } else {
+            unimplemented!();
+        }
+        self.ok()
+    }
+
     fn stmt(&mut self, s: &mut ast::Stmt) -> SemaResult<()> {
         match s {
             ast::Stmt::Block(b) => self.block_stmt(b),
@@ -883,6 +915,7 @@ impl<'a> FuncTypeInference<'a> {
             ast::Stmt::Return(r) => self.return_stmt(r),
             ast::Stmt::VarDecl(v) => self.var_decl_stmt(v),
             ast::Stmt::While(w) => self.while_stmt(w),
+            ast::Stmt::Switch(s) => self.switch_stmt(s)
         }
     }
 

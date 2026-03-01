@@ -386,6 +386,79 @@ impl<'a> FuncGen<'a> {
         }
     }
 
+    fn switch_stmt(&mut self, s: &ast::SwitchStmt) -> bool {
+        let mut did_return = s.cases.len() > 0;
+
+        let finish_block = self.bld.new_block();
+        let mut blocks = Vec::new();
+        let prev_block = self.bld.current_block();
+
+        self.expr(&s.value);
+
+        if types::is_enum(&s.value.typ) {
+            self.bld.dup(0);
+            self.bld.get_object(0, types::integer());
+
+            let enum_type = match &s.value.typ.kind() {
+                types::TypeKind::Enum(enum_type) => enum_type,
+                _ => unreachable!()
+            };
+            for variant in enum_type.variants.read().unwrap().iter() {
+                match s.cases.iter().find(|case| case.pattern.id == variant.0) {
+                    Some(case) => {
+
+                        let block = self.bld.new_block();
+                        self.bld.switch_to_block(block);
+                        self.bld.push_scope();
+                        for ((i, typ), name) in variant.1.iter().enumerate().zip(case.pattern.values.iter()) {
+                            let var = self.bld.create_var(name.clone(), typ.clone());
+                            self.bld.dup(0);
+                            self.bld.get_object(i + 1, typ.clone());
+                            self.bld.store(var);
+                        }
+                        did_return &= self.block_stmt(&case.block);
+                        self.bld.pop_scope();
+                        self.bld.br(finish_block);
+                        blocks.push(block);
+                    },
+                    None => {
+                        blocks.push(finish_block);
+                    },
+                };
+            }
+            // for case in s.cases.iter() {
+            //     let block = self.bld.new_block();
+            //     self.bld.switch_to_block(block);
+            //     match enum_type.variants.read().unwrap().iter().find(|v| v.0 == case.pattern.id) {
+            //        Some(v) => {
+            //             self.bld.push_scope();
+            //             for ((i, typ), name) in v.1.iter().enumerate().zip(case.pattern.values.iter()) {
+            //                 let var = self.bld.create_var(name.clone(), typ.clone());
+            //                 self.bld.dup(0);
+            //                 self.bld.get_object(i + 1, typ.clone());
+            //                 self.bld.store(var);
+            //             }
+            //             did_return &= self.block_stmt(&case.block);
+            //             self.bld.pop_scope();
+            //        },
+            //        None => panic!(),
+            //     };
+            //     self.bld.br(finish_block);
+            //     blocks.push(block);
+            // }
+        } else {
+            unimplemented!();
+        }
+
+        self.bld.switch_to_block(prev_block);
+        self.bld.br_table(finish_block, blocks);
+        self.bld.switch_to_block(finish_block);
+
+        println!("did return? {}", did_return);
+        
+        did_return
+    }
+
     fn stmt(&mut self, s: &ast::Stmt) -> bool {
         match s {
             ast::Stmt::Block(b) => self.block_stmt(&b),
@@ -395,6 +468,7 @@ impl<'a> FuncGen<'a> {
             ast::Stmt::Return(r) => self.return_stmt(&r),
             ast::Stmt::VarDecl(v) => self.var_decl_stmt(&v),
             ast::Stmt::While(w) => self.while_stmt(&w),
+            ast::Stmt::Switch(s) => self.switch_stmt(&s),
         }
     }
 
@@ -466,6 +540,8 @@ pub fn emit_program(program: &ast::Program) -> Box<ir::Module> {
             }
         }
     }
+
+    //println!("Generated IR: {:#?}", ir_module);
 
     Box::new(ir_module)
 }

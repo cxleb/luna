@@ -1,0 +1,23 @@
+
+enum Enum {
+    one,
+    two,
+    three(int, string)
+}
+
+func main() {
+    let a = Enum.three(67, "Six Seven");
+    switch a {
+        .one: {
+            println("One");
+        }
+        .two: {
+            println("Two");
+        }
+        .three(a, b): { // ??
+            println(b);
+            println("Three");
+        }
+    }
+    println("Hello, World!");
+}
