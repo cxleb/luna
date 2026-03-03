@@ -1,7 +1,7 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::{ir::{self, StringMap}, runtime::string, types};
+use crate::{ir::{self, StringMap}, runtime::string};
 use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, JumpTableData, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I32, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use super::cranelift::data_context::{DataDescription};
@@ -53,7 +53,7 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
     }
 
     for (var, func_var) in variables.iter().zip(func.variables.iter()) {
-        if types::is_reference(&func_var.typ) {
+        if matches!(func_var.typ, crate::ir::Type::Reference) {
             builder.declare_var_needs_stack_map(*var);
         }
     }

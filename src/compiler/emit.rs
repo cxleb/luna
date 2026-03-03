@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::compiler::ast;
 use crate::ir::builder::FuncBuilder;
-use crate::ir::{self, BlockRef, StringMap, VariableRef};
+use crate::ir::{self, BlockRef, StringMap, VariableRef, Type};
 use crate::types;
 
 
@@ -184,7 +184,7 @@ impl SwitchEmitter {
     /// * The default block
     pub fn emit(self, bx: &mut FuncBuilder, default: BlockRef) {
         let contiguous_case_ranges = self.collect_contiguous_case_ranges();
-        let temp = bx.create_temp(types::integer());
+        let temp = bx.create_temp(Type::Integer);
         bx.store(temp);
         Self::build_search_tree(bx, temp, default, &contiguous_case_ranges);
     }
@@ -224,6 +224,21 @@ impl ContiguousCaseRange {
         } else {
             None
         }
+    }
+}
+
+fn translate_type(ty: &crate::types::Type) -> ir::Type {
+    match ty.kind() {
+        crate::types::TypeKind::Integer => ir::Type::Integer,
+        crate::types::TypeKind::Bool => ir::Type::Bool,
+        crate::types::TypeKind::Number => ir::Type::Number,
+        _ => ir::Type::Reference
+    }
+}
+
+impl Into<ir::Type> for crate::types::Type {
+    fn into(self) -> ir::Type {
+        translate_type(&self)
     }
 }
 
@@ -322,12 +337,12 @@ impl<'a> FuncGen<'a> {
         self.bld.new_object(enum_size + 1);
         self.bld.load_const_int(i as i64);
         self.bld.dup(1);
-        self.bld.set_object(0, types::integer());
+        self.bld.set_object(0, Type::Integer);
 
         for (i, value) in values.iter().enumerate() {
             self.expr(value);
             self.bld.dup(1);
-            self.bld.set_object(i + 1, value.typ.clone());
+            self.bld.set_object(i + 1, value.typ.clone().into());
         }
     }
 
@@ -381,7 +396,7 @@ impl<'a> FuncGen<'a> {
     fn subscript(&mut self, e: &ast::Expr, l: &Box<ast::Subscript>) {
         self.expr(&l.index);
         self.expr(&l.value);
-        self.bld.load_array(e.typ.clone());
+        self.bld.load_array(e.typ.clone().into());
     }
     
     fn selector(&mut self, e: &ast::Expr, s: &ast::Selector) {
@@ -390,7 +405,7 @@ impl<'a> FuncGen<'a> {
             return;
         }
         self.expr(&s.value);
-        self.bld.get_object(s.idx, e.typ.clone());
+        self.bld.get_object(s.idx, e.typ.clone().into());
     }
 
     fn array_literal(&mut self, a: &Box<ast::ArrayLiteral>) {
@@ -399,7 +414,7 @@ impl<'a> FuncGen<'a> {
             self.expr(literal);
             self.bld.load_const_int(i as i64);
             self.bld.dup(2);
-            self.bld.store_array(literal.typ.clone());
+            self.bld.store_array(literal.typ.clone().into());
         }
     }
 
@@ -427,7 +442,7 @@ impl<'a> FuncGen<'a> {
                     }
                 }
                 self.bld.dup(1);
-                self.bld.set_object(i, field_type.clone());
+                self.bld.set_object(i, field_type.clone().into());
             }
         } else {
             panic!("Trying to emit object literal but type was not struct!")
@@ -464,12 +479,12 @@ impl<'a> FuncGen<'a> {
     fn store_subscript(&mut self, e: &ast::Expr, l: &Box<ast::Subscript>) {
         self.expr(&l.index);
         self.expr(&l.value);
-        self.bld.store_array(e.typ.clone());
+        self.bld.store_array(e.typ.clone().into());
     }
 
     fn store_selector(&mut self, e: &ast::Expr, s: &ast::Selector) {
         self.expr(&s.value);
-        self.bld.set_object(s.idx, e.typ.clone());
+        self.bld.set_object(s.idx, e.typ.clone().into());
     }
 
     fn store_identifier(&mut self, _e: &ast::Expr, i: &Box<ast::Identifier>) {
@@ -584,7 +599,7 @@ impl<'a> FuncGen<'a> {
         self.expr(&v.value);
         let id = self
             .bld
-            .create_var(v.id.clone(), v.value.typ.clone());
+            .create_var(v.id.clone(), v.value.typ.clone().into());
         self.bld.store(id);
         false
     }
@@ -633,10 +648,10 @@ impl<'a> FuncGen<'a> {
         let mut switch_emitter = SwitchEmitter::new();
 
         if types::is_enum(&s.value.typ) {
-            let temp = self.bld.create_temp(types::unknown_reference());
+            let temp = self.bld.create_temp(Type::Reference);
             self.bld.store(temp);
             self.bld.load(temp);
-            self.bld.get_object(0, types::integer());
+            self.bld.get_object(0, Type::Integer);
 
             for case in s.cases.iter() {
                 match &case.pattern.kind {
@@ -645,9 +660,9 @@ impl<'a> FuncGen<'a> {
                         self.bld.switch_to_block(block);
                         self.bld.push_scope();
                         for (i, (name, typ)) in values.iter().enumerate() {
-                            let var = self.bld.create_var(name.clone(), typ.clone());
+                            let var = self.bld.create_var(name.clone(), typ.clone().into());
                             self.bld.load(temp);
-                            self.bld.get_object(i + 1, typ.clone());
+                            self.bld.get_object(i + 1, typ.clone().into());
                             self.bld.store(var);
                         }
                         did_return &= self.block_stmt(&case.block);
@@ -700,8 +715,8 @@ impl<'a> FuncGen<'a> {
 
     fn generate(func: &Box<ast::Func>, str_map: &'a mut StringMap) -> Self {
         let signature = ir::Signature {
-            ret_types: func.typ_.returns.iter().cloned().collect(),
-            parameters: func.typ_.params.iter().cloned().collect()
+            ret_types: func.typ_.returns.iter().map(|t| t.clone().into()).collect(),
+            parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect()
         };
         let mut s = Self {
             str_map,
@@ -711,7 +726,7 @@ impl<'a> FuncGen<'a> {
         s.bld.push_scope();
         // add params as variables for scope purposes
         for (p, sig_p) in func.signature.params.iter().zip(func.typ_.params.iter()) {
-            s.bld.create_var(p.id.clone(), sig_p.clone());
+            s.bld.create_var(p.id.clone(), sig_p.clone().into());
         }
         if !s.block_stmt(&func.body) {
             s.bld.ret();
@@ -722,10 +737,10 @@ impl<'a> FuncGen<'a> {
 
     fn generate_struct_func(func: &Box<ast::Func>, str_map: &'a mut StringMap, struct_type: types::Type) -> Self {
         let mut signature = ir::Signature {
-            ret_types: func.typ_.returns.iter().cloned().collect(),
-            parameters: func.typ_.params.iter().cloned().collect()
+            ret_types: func.typ_.returns.iter().map(|t| t.clone().into()).collect(),
+            parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect()
         };
-        signature.parameters.insert(0, struct_type.clone());
+        signature.parameters.insert(0, struct_type.clone().into());
         let mut s = Self {
             str_map,
             bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature),
@@ -733,9 +748,9 @@ impl<'a> FuncGen<'a> {
         };
         s.bld.push_scope();
         // add params as variables for scope purposes
-        s.self_var = Some(s.bld.create_var("".into(), struct_type.clone()));
+        s.self_var = Some(s.bld.create_var("".into(), struct_type.clone().into()));
         for (p, sig_p) in func.signature.params.iter().zip(func.typ_.params.iter()) {
-            s.bld.create_var(p.id.clone(), sig_p.clone());
+            s.bld.create_var(p.id.clone(), sig_p.clone().into());
         }
         if !s.block_stmt(&func.body) {
             s.bld.ret();

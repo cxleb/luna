@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ir::{Block, BlockRef, Signature, StringRef, VariableRef};
-use crate::types::Type;
-
+use crate::ir::{Block, BlockRef, Signature, StringRef, VariableRef, Type};
 pub struct FuncBuilder {
     func: super::Function,
     current_block: usize,

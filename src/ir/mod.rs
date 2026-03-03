@@ -1,10 +1,16 @@
-use crate::types::Type;
-
 pub mod builder;
 
 pub type BlockRef = usize;
 pub type VariableRef = usize;
 pub type StringRef = usize;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Type {
+    Integer,
+    Number,
+    Bool,
+    Reference,
+}
 
 #[derive(Debug, Clone)]
 pub enum Inst {

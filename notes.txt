@@ -1,7 +1,6 @@
 - Add source length to AST
 - Debug information is generated alongside bytecode
 - Fix tokeniser(stop copying strings)
-- refactor IR to remove need on type system
 - Implement interfaces (use structual typing like go) (blocker: ir refactor, struct methods)
 - String templates (blocker: interface)
 - Make functions a const value
@@ -14,14 +13,16 @@
 - Casting types
 - For loops (do we want an iterator API for this?)
 - Tasks (and Tasks API)
-- Implement proper pattern matching
 - Refactor AST to be arena allocated
 - Dont run GC on every check yield
 - GC api?
 - Assert should become a compiler construct, test condition and jump to panic block
-- Convert types to have a method set removing the need for structs to maintain a list of methods. 
+- Convert types to have a method set removing the need for structs to maintain a list of methods.
+- Int ranges in switches 
 
 done:
+- refactor IR to remove need on type system
+- Implement proper pattern matching
 - Switch statement for non enums
 - Switch for enum.
 - Implement discriminated enums 

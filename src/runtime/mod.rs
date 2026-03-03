@@ -5,7 +5,7 @@ use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetI
 //use cranelift_module::{FuncId, Module};
 use target_lexicon::Triple;
 
-use crate::{builtins::Builtins, ir::Signature, runtime::{gc::GarbageCollector, translate::TranslateSignature}};
+use crate::{builtins::Builtins, ir::{self, Signature}, runtime::{gc::GarbageCollector, translate::TranslateSignature}};
 
 mod translate;
 mod gc;
@@ -175,12 +175,11 @@ impl JitContext {
         &*self.isa
     }
 
-    fn translate_type(&self, ty: &crate::types::Type) -> cranelift_codegen::ir::Type {
-        match ty.kind() {
-            crate::types::TypeKind::Integer => I64,
-            crate::types::TypeKind::Bool => I8,
-            crate::types::TypeKind::Number => F64,
-
+    fn translate_type(&self, ty: &crate::ir::Type) -> cranelift_codegen::ir::Type {
+        match ty {
+            crate::ir::Type::Integer => I64,
+            crate::ir::Type::Bool => I8,
+            crate::ir::Type::Number => F64,
             _ => cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple()), // pointer?
         }
     }
@@ -203,9 +202,9 @@ impl JitContext {
             signatures.push(TranslateSignature {
                 id: format!("_Lbuiltins_{}", func.id),
                 signature: Signature {
-                    parameters: func.parameters.clone(),
+                    parameters: func.parameters.iter().map(|t| t.clone().into()).collect(),
                     ret_types: match &func.returns {
-                        Some(ret) => vec![ret.clone()],
+                        Some(ret) => vec![ret.clone().into()],
                         None => vec![]
                     }
                 }
@@ -223,15 +222,15 @@ impl JitContext {
         signatures.push(TranslateSignature {
             id: "__create_array".into(),
             signature: Signature {
-                parameters: vec![crate::types::integer()],
-                ret_types: vec![crate::types::unknown_reference()],
+                parameters: vec![ir::Type::Integer],
+                ret_types: vec![ir::Type::Reference],
             }
         });
         signatures.push(TranslateSignature {
             id: "__create_object".into(),
             signature: Signature {
-                parameters: vec![crate::types::integer()],
-                ret_types: vec![crate::types::unknown_reference()],
+                parameters: vec![ir::Type::Integer],
+                ret_types: vec![ir::Type::Reference],
             }
         });
         signatures.push(TranslateSignature {
