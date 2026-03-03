@@ -63,6 +63,13 @@ impl FuncBuilder {
         id
     }
 
+    pub fn create_temp(&mut self, typ: Type) -> VariableRef {
+        let id = self.variables;
+        self.variables += 1;
+        self.func.variables.push(super::Variable { id, typ });
+        id
+    }
+
     pub fn find_var(&self, name: &String) -> Option<VariableRef> {
         for scope in self.variable_scopes.iter().rev() {
             if let Some(id) = scope.get(name) {

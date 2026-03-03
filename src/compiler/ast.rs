@@ -170,18 +170,30 @@ pub struct WhileStmt {
     pub consequent: Stmt,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum PatternKind {
+    CatchAll,
+    EnumVariant{
+        id: String,
+        values: Vec<(String, types::Type)>,
+    },
+    Integer(i64),
+    IntegerRange(i64, i64), 
+    String(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct Pattern {
     pub loc: SourceLoc,
-    pub id: String,
-    pub values: Vec<String>,
+    pub kind: PatternKind,
 }
 
 #[derive(Debug, Clone)]
 pub struct CaseStmt {
     // pattern??
     pub pattern: Box<Pattern>,
-    pub block: Box<BlockStmt>
+    pub block: Box<BlockStmt>,
+    pub case_idx: i64,
 }
 
 #[derive(Debug, Clone)]

@@ -171,7 +171,6 @@ pub enum TokenKind {
     TemplateMiddle,
     TemplateTail,
     Regex,
-    Underscore,
 }
 
 #[derive(Debug, Clone, PartialEq)]

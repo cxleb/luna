@@ -10,15 +10,20 @@
 - Fix interface so it can either be a cli thing or embedded.
 - Implement error handling(blocker: discriminated enums)
 - Implement multiple modules (import and export syntax?)
-- Templates
+- Generics
 - Casting types
 - For loops (do we want an iterator API for this?)
 - Tasks (and Tasks API)
-- Switch statement for non enums
 - Implement proper pattern matching
 - Refactor AST to be arena allocated
+- Dont run GC on every check yield
+- GC api?
+- Assert should become a compiler construct, test condition and jump to panic block
+- Convert types to have a method set removing the need for structs to maintain a list of methods. 
 
 done:
+- Switch statement for non enums
+- Switch for enum.
 - Implement discriminated enums 
 - struct methods
 - Implement garbage collector

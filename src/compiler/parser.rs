@@ -14,6 +14,7 @@ pub enum ParserErrorReason {
     UnknownBinaryOperator,
     UnexpectedEOF,
     ExpectedExpression,
+    ExpectedPattern,
 }
 
 #[derive(Debug)]
@@ -332,7 +333,8 @@ impl<'a> Parser<'a> {
             }
             cases.push(CaseStmt {
                 pattern,
-                block
+                block,
+                case_idx: 0,
             });
         }
         self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
@@ -683,28 +685,45 @@ impl<'a> Parser<'a> {
     fn parse_pattern(&mut self) -> ParserResult<Box<Pattern>> {
         let loc = self.source_loc();
 
-        self.expect(TokenKind::Punctuation(Punctuation::Dot))?;
-        let id_token = self.expect(TokenKind::Identifier)?;
-        let id = id_token.get_string();
-        
-        let mut values = Vec::new();
-        if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
+        let kind = if self.test(TokenKind::Punctuation(Punctuation::Underscore)) {
             self.next()?;
-            while !self.test(TokenKind::Punctuation(Punctuation::RightParenthesis)) {
-                let value_token = self.expect(TokenKind::Identifier)?;
-                values.push(value_token.get_string());
-                if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
-                    self.next()?;
-                } else {
-                    break;
+            PatternKind::CatchAll
+        } else if self.test(TokenKind::IntegerLiteral) {
+            let token = self.next()?;
+            let value = token.get_int();
+            PatternKind::Integer(value)
+        } else if self.test(TokenKind::StringLiteral) {
+            let token = self.next()?;
+            let value = token.get_string();
+            PatternKind::String(value)
+        } else if self.test(TokenKind::Punctuation(Punctuation::Dot)) {
+            self.expect(TokenKind::Punctuation(Punctuation::Dot))?;
+            let id_token = self.expect(TokenKind::Identifier)?;
+            let id = id_token.get_string();
+            
+            let mut values = Vec::new();
+            if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
+                self.next()?;
+                while !self.test(TokenKind::Punctuation(Punctuation::RightParenthesis)) {
+                    let value_token = self.expect(TokenKind::Identifier)?;
+                    values.push((value_token.get_string(), types::bad()));
+                    if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                        self.next()?;
+                    } else {
+                        break;
+                    }
                 }
+                self.expect(TokenKind::Punctuation(Punctuation::RightParenthesis))?;
             }
-            self.expect(TokenKind::Punctuation(Punctuation::RightParenthesis))?;
-        }
+
+            PatternKind::EnumVariant { id, values }
+        } else {
+            return self.error(ParserErrorReason::ExpectedPattern);
+        };
+
         Ok(Box::new(Pattern {
             loc,
-            id,
-            values,
+            kind
         }))
     }
 
@@ -842,17 +861,40 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_pattern() {
+        use crate::compiler::parser::Parser;
+
+        // let mut parser = Parser::new(".Variant");
+        // let pattern = parser.parse_pattern().unwrap();
+        // assert_eq!(pattern.kind, crate::compiler::ast::PatternKind::EnumVariant{id: "Variant".into(), values: vec![]});
+        
+        // let mut parser = Parser::new(".Variant(a, b, c)");
+        // let pattern = parser.parse_pattern().unwrap();
+        // assert_eq!(pattern.kind, crate::compiler::ast::PatternKind::EnumVariant{id: "Variant".into(), values: vec!["a".into(), "b".into(), "c".into()]});
+        
+        let mut parser = Parser::new("_");
+        let pattern = parser.parse_pattern().unwrap();
+        assert_eq!(pattern.kind, crate::compiler::ast::PatternKind::CatchAll);
+
+        // let mut parser = Parser::new("123");
+        // let pattern = parser.parse_pattern().unwrap();
+        // assert_eq!(pattern.kind, crate::compiler::ast::PatternKind::Integer(123));
+
+        // let mut parser = Parser::new("\"Steven!\"");
+        // let pattern = parser.parse_pattern().unwrap();
+        // assert_eq!(pattern.kind, crate::compiler::ast::PatternKind::String("Steven!".into()))
+    }
+
+    #[test]
     fn test_parse_switch() {
         use crate::compiler::parser::Parser;
+        use crate::types;
 
         let mut parser = Parser::new("switch x { .Variant1: {} .Variant2(value): {} }");
         let switch = parser.parse_switch().unwrap();
         assert_eq!(switch.cases.len(), 2);
-        assert_eq!(switch.cases[0].pattern.id, "Variant1");
-        assert_eq!(switch.cases[0].pattern.values.len(), 0);
-        assert_eq!(switch.cases[1].pattern.id, "Variant2");
-        assert_eq!(switch.cases[1].pattern.values.len(), 1);
-        assert_eq!(switch.cases[1].pattern.values[0], "value");
+        assert_eq!(switch.cases[0].pattern.kind, crate::compiler::ast::PatternKind::EnumVariant{id: "Variant1".into(), values: vec![]});
+        assert_eq!(switch.cases[1].pattern.kind, crate::compiler::ast::PatternKind::EnumVariant{id: "Variant2".into(), values: vec![("value".into(), types::bad())]});
     }
 
     #[test]

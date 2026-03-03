@@ -1,23 +1,42 @@
-
-enum Enum {
-    one,
-    two,
-    three(int, string)
-}
-
 func main() {
-    let a = Enum.three(67, "Six Seven");
+    let a = 20;
     switch a {
-        .one: {
-            println("One");
+        0: {
+            assert(a == 0);
         }
-        .two: {
-            println("Two");
+        10: {
+            assert(a == 10);
         }
-        .three(a, b): { // ??
-            println(b);
-            println("Three");
+        20: {
+            assert(a == 20);
         }
     }
-    println("Hello, World!");
+    let a = 1;
+    switch a {
+        0: {
+            assert(a == 0);
+        }
+        1: {
+            assert(a == 1);
+        }
+        2: {
+            assert(a == 2);
+        }
+    }
+    a = 1;
+    switch a {
+        0: {
+            assert(a == 0);
+        }
+        _: {
+            assert(a != 0);
+        }
+    }
+    switch a {
+        _: {
+            assert(true);
+        }
+    }
+    switch a {
+    }
 }

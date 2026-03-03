@@ -103,7 +103,7 @@ impl<'a> Tokeniser<'a> {
         if c.is_alphabetic() || c == '_' {
             let str = self.source.accum(|c, _| c.is_alphanumeric() || c == '_');
             if str == "_" {
-                Some(Token::new(loc, TokenKind::Underscore))
+                Some(Token::new(loc, TokenKind::Punctuation(Punctuation::Underscore)))
             } else if let Some(token) = keyword(str) {
                 Some(Token::new(loc, TokenKind::Keyword(token)))
             } else {
@@ -736,7 +736,7 @@ mod test {
     fn test_single_underscore_token() {
         let mut file = Tokeniser::new("_");
         let token = file.next(TokeniserMode::Div).unwrap();
-        assert_eq!(token.kind, TokenKind::Underscore);
+        assert_eq!(token.kind, TokenKind::Punctuation(Punctuation::Underscore));
     }
 
     #[test]

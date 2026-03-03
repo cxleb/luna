@@ -34,6 +34,7 @@ pub enum SemaErrorReason {
     InvalidSwitchCasePattern,
     EnumVariantNotFound,
     EnumVariantPatternFieldCountMismatch,
+    InvalidPatternKind,
 }
 
 #[derive(Debug)]
@@ -885,20 +886,49 @@ impl<'a> FuncTypeInference<'a> {
                 _ => unreachable!()
             };
             for case in s.cases.iter_mut() {
-                match enum_type.variants.read().unwrap().iter().find(|v| v.0 == case.pattern.id) {
-                   Some(v) => {
-                        if case.pattern.values.len() != v.1.len() {
-                            return self.error_loc(SemaErrorReason::EnumVariantPatternFieldCountMismatch, case.pattern.loc);
-                        }
-                        self.push_scope();
-                        for (typ, name) in v.1.iter().zip(case.pattern.values.iter()) {
-                        self.create_var(name.clone(), typ);
-                        }
-                        self.block_stmt(&mut case.block)?;
-                        self.pop_scope();
-                   },
-                   None => return self.error_loc(SemaErrorReason::EnumVariantNotFound, case.pattern.loc),
-                };
+                match &mut case.pattern.kind {
+                    ast::PatternKind::CatchAll => {
+                        self.block_stmt(&mut case.block)?;  
+                    },
+                    ast::PatternKind::EnumVariant{id, values} => {
+                        match enum_type.variants.read().unwrap().iter().enumerate().find(|v| v.1.0 == *id) {
+                            Some(v) => {
+                                if values.len() != v.1.1.len() {
+                                    return self.error_loc(SemaErrorReason::EnumVariantPatternFieldCountMismatch, case.pattern.loc);
+                                }
+                                self.push_scope();
+                                for (typ, (name, val_typ)) in v.1.1.iter().zip(values.iter_mut()) {
+                                    self.create_var(name.clone(), typ);
+                                    *val_typ = typ.clone();
+                                }
+                                self.block_stmt(&mut case.block)?;
+                                self.pop_scope();
+                                case.case_idx = v.0 as i64;
+                            },
+                            None => return self.error_loc(SemaErrorReason::EnumVariantNotFound, case.pattern.loc),
+                        };
+                    }
+                    _ => {
+                        return self.error_loc(SemaErrorReason::InvalidPatternKind, case.pattern.loc);
+                    }
+                }
+            }
+        } else if types::is_integer(&s.value.typ) {
+            for case in s.cases.iter_mut() {
+                match &case.pattern.kind {
+                    ast::PatternKind::CatchAll => {
+                        self.block_stmt(&mut case.block)?;  
+                    },
+                    ast::PatternKind::Integer(_) => {
+                        self.block_stmt(&mut case.block)?;  
+                    },
+                    ast::PatternKind::IntegerRange(_, _) => {
+                        self.block_stmt(&mut case.block)?;  
+                    },
+                    _ => {
+                        return self.error_loc(SemaErrorReason::InvalidPatternKind, case.pattern.loc);
+                    }
+                }
             }
         } else {
             unimplemented!();

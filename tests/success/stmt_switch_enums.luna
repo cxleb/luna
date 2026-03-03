@@ -1,0 +1,33 @@
+
+enum Enum {
+    one,
+    two,
+    three(int, string)
+}
+
+func main() {
+    let a = Enum.three(67, "Six Seven");
+    switch a {
+        .one: {
+            assert(false);
+        }
+        .two: {
+            assert(false);
+        }
+        .three(a, b): {
+            assert(a == 67);
+        }
+        _: {
+            assert(false);
+        }
+    }
+    a = Enum.two;
+    switch a {
+        .one: {
+            assert(false);
+        }
+        _: {
+            assert(true);
+        }
+    }
+}

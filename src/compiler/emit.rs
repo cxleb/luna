@@ -1,7 +1,231 @@
+use std::collections::HashMap;
+
 use crate::compiler::ast;
 use crate::ir::builder::FuncBuilder;
-use crate::ir::{self, StringMap};
+use crate::ir::{self, BlockRef, StringMap, VariableRef};
 use crate::types;
+
+
+// This implementation is a copy of cranelift's switch api.
+// Redone to target our IR, which has the same building blocks as CLIR but 
+// we dont want to implement this in the runtime translate, its better here 
+// so its runtime agnostic 
+// https://github.com/bytecodealliance/wasmtime/blob/f6b2700cc89118308faadc08e72092642928f9cf/cranelift/frontend/src/switch.rs#L42
+struct SwitchEmitter {
+    cases: HashMap<i64, BlockRef>,
+}
+
+impl SwitchEmitter {
+    /// Create a new empty switch
+    pub fn new() -> Self {
+        Self {
+            cases: HashMap::new(),
+        }
+    }
+
+    /// Set a switch entry
+    pub fn set_entry(&mut self, index: i64, block: BlockRef) {
+        let prev = self.cases.insert(index, block);
+        assert!(prev.is_none(), "Tried to set the same entry {index} twice");
+    }
+
+
+
+    /// Turn the `cases` `HashMap` into a list of `ContiguousCaseRange`s.
+    ///
+    /// # Postconditions
+    ///
+    /// * Every entry will be represented.
+    /// * The `ContiguousCaseRange`s will not overlap.
+    /// * Between two `ContiguousCaseRange`s there will be at least one entry index.
+    /// * No `ContiguousCaseRange`s will be empty.
+    fn collect_contiguous_case_ranges(self) -> Vec<ContiguousCaseRange> {
+        let mut cases = self.cases.into_iter().collect::<Vec<(_, _)>>();
+        cases.sort_by_key(|&(index, _)| index);
+
+        let mut contiguous_case_ranges: Vec<ContiguousCaseRange> = vec![];
+        let mut last_index = None;
+        for (index, block) in cases {
+            match last_index {
+                None => contiguous_case_ranges.push(ContiguousCaseRange::new(index)),
+                Some(last_index) => {
+                    if index > last_index + 1 {
+                        contiguous_case_ranges.push(ContiguousCaseRange::new(index));
+                    }
+                }
+            }
+            contiguous_case_ranges
+                .last_mut()
+                .unwrap()
+                .blocks
+                .push(block);
+            last_index = Some(index);
+        }
+
+        contiguous_case_ranges
+    }
+
+    /// Binary search for the right `ContiguousCaseRange`.
+    fn build_search_tree<'a>(
+        bx: &mut FuncBuilder,
+        temp: VariableRef,
+        otherwise: BlockRef,
+        contiguous_case_ranges: &'a [ContiguousCaseRange],
+    ) {
+        // If no switch cases were added to begin with, we can just emit `jump otherwise`.
+        if contiguous_case_ranges.is_empty() {
+            bx.br(otherwise);
+            return;
+        }
+
+        // Avoid allocation in the common case
+        if contiguous_case_ranges.len() <= 3 {
+            Self::build_search_branches(bx, otherwise, temp, contiguous_case_ranges);
+            return;
+        }
+
+        let mut stack = Vec::new();
+        stack.push((None, contiguous_case_ranges));
+
+        while let Some((block, contiguous_case_ranges)) = stack.pop() {
+            if let Some(block) = block {
+                bx.switch_to_block(block);
+            }
+
+            if contiguous_case_ranges.len() <= 3 {
+                Self::build_search_branches(bx, temp, otherwise, contiguous_case_ranges);
+            } else {
+                let split_point = contiguous_case_ranges.len() / 2;
+                let (left, right) = contiguous_case_ranges.split_at(split_point);
+
+                let left_block = bx.new_block();
+                let right_block = bx.new_block();
+
+                let first_index = right[0].first_index;
+                bx.load(temp);
+                bx.load_const_int(first_index);
+                bx.geq_int();
+                bx.condbr(right_block, left_block);
+
+                stack.push((Some(left_block), left));
+                stack.push((Some(right_block), right));
+            }
+        }
+    }
+
+    /// Linear search for the right `ContiguousCaseRange`.
+    fn build_search_branches<'a>(
+        bx: &mut FuncBuilder,
+        otherwise: BlockRef,
+        temp: VariableRef,
+        contiguous_case_ranges: &'a [ContiguousCaseRange],
+    ) {
+        for (ix, range) in contiguous_case_ranges.iter().enumerate().rev() {
+            let alternate = if ix == 0 {
+                otherwise
+            } else {
+                bx.new_block()
+            };
+
+            if range.first_index == 0 {
+                assert_eq!(alternate, otherwise);
+
+                if let Some(block) = range.single_block() {
+                    bx.load(temp);
+                    bx.condbr(otherwise, block);
+                } else {
+                    Self::build_jump_table(bx, otherwise, temp, 0, &range.blocks);
+                }
+            } else {
+                if let Some(block) = range.single_block() {
+                    bx.load(temp);
+                    bx.load_const_int(range.first_index);
+                    bx.eq_int();
+                    bx.condbr(block, alternate);
+                } else {
+                    let jt_block = bx.new_block();
+                    bx.load(temp);
+                    bx.load_const_int(range.first_index);
+                    bx.geq_int();
+                    bx.condbr(jt_block, alternate);
+                    bx.switch_to_block(jt_block);
+                    Self::build_jump_table(bx, otherwise, temp, range.first_index, &range.blocks);
+                }
+            }
+
+            if alternate != otherwise {
+                bx.switch_to_block(alternate);
+            }
+        }
+    }
+
+    fn build_jump_table(
+        bx: &mut FuncBuilder,
+        otherwise: BlockRef,
+        temp: VariableRef,
+        first_index: i64,
+        blocks: &[BlockRef],
+    ) {
+        bx.load(temp);
+
+        if first_index != 0 {
+            bx.load_const_int(first_index.wrapping_neg());
+            bx.sub_int();
+        };
+
+        bx.br_table(otherwise, blocks.into());
+    }
+
+    /// Build the switch
+    ///
+    /// # Arguments
+    ///
+    /// * The function builder to emit to
+    /// * The default block
+    pub fn emit(self, bx: &mut FuncBuilder, default: BlockRef) {
+        let contiguous_case_ranges = self.collect_contiguous_case_ranges();
+        let temp = bx.create_temp(types::integer());
+        bx.store(temp);
+        Self::build_search_tree(bx, temp, default, &contiguous_case_ranges);
+    }
+}
+
+/// This represents a contiguous range of cases to switch on.
+///
+/// For example 10 => block1, 11 => block2, 12 => block7 will be represented as:
+///
+/// ```plain
+/// ContiguousCaseRange {
+///     first_index: 10,
+///     blocks: vec![Block::from_u32(1), Block::from_u32(2), Block::from_u32(7)]
+/// }
+/// ```
+#[derive(Debug)]
+struct ContiguousCaseRange {
+    /// The entry index of the first case. Eg. 10 when the entry indexes are 10, 11, 12 and 13.
+    first_index: i64,
+
+    /// The blocks to jump to sorted in ascending order of entry index.
+    blocks: Vec<BlockRef>,
+}
+
+impl ContiguousCaseRange {
+    fn new(first_index: i64) -> Self {
+        Self {
+            first_index,
+            blocks: Vec::new(),
+        }
+    }
+
+    /// Returns `Some` block when there is only a single block in this range.
+    fn single_block(&self) -> Option<BlockRef> {
+        if self.blocks.len() == 1 {
+            Some(self.blocks[0])
+        } else {
+            None
+        }
+    }
+}
 
 struct FuncGen<'a> {
     bld: FuncBuilder,
@@ -388,74 +612,76 @@ impl<'a> FuncGen<'a> {
 
     fn switch_stmt(&mut self, s: &ast::SwitchStmt) -> bool {
         let mut did_return = s.cases.len() > 0;
+        let prev_block = self.bld.current_block();
 
         let finish_block = self.bld.new_block();
-        let mut blocks = Vec::new();
-        let prev_block = self.bld.current_block();
+        //let mut blocks = Vec::new();
 
         self.expr(&s.value);
 
+        let default = if let Some(c) = s.cases.iter().find(|c| matches!(c.pattern.kind, ast::PatternKind::CatchAll)) {
+            let catch_all = self.bld.new_block();
+            self.bld.switch_to_block(catch_all);
+            did_return &= self.block_stmt(&c.block);
+            self.bld.br(finish_block);
+            self.bld.switch_to_block(prev_block);
+            catch_all
+        } else {
+            finish_block
+        };
+
+        let mut switch_emitter = SwitchEmitter::new();
+
         if types::is_enum(&s.value.typ) {
-            self.bld.dup(0);
+            let temp = self.bld.create_temp(types::unknown_reference());
+            self.bld.store(temp);
+            self.bld.load(temp);
             self.bld.get_object(0, types::integer());
 
-            let enum_type = match &s.value.typ.kind() {
-                types::TypeKind::Enum(enum_type) => enum_type,
-                _ => unreachable!()
-            };
-            for variant in enum_type.variants.read().unwrap().iter() {
-                match s.cases.iter().find(|case| case.pattern.id == variant.0) {
-                    Some(case) => {
-
+            for case in s.cases.iter() {
+                match &case.pattern.kind {
+                    ast::PatternKind::EnumVariant { id:_, values } => {
                         let block = self.bld.new_block();
                         self.bld.switch_to_block(block);
                         self.bld.push_scope();
-                        for ((i, typ), name) in variant.1.iter().enumerate().zip(case.pattern.values.iter()) {
+                        for (i, (name, typ)) in values.iter().enumerate() {
                             let var = self.bld.create_var(name.clone(), typ.clone());
-                            self.bld.dup(0);
+                            self.bld.load(temp);
                             self.bld.get_object(i + 1, typ.clone());
                             self.bld.store(var);
                         }
                         did_return &= self.block_stmt(&case.block);
                         self.bld.pop_scope();
                         self.bld.br(finish_block);
-                        blocks.push(block);
-                    },
-                    None => {
-                        blocks.push(finish_block);
-                    },
-                };
+                        switch_emitter.set_entry(case.case_idx, block);
+                    }
+                    _ => {}
+                }
             }
-            // for case in s.cases.iter() {
-            //     let block = self.bld.new_block();
-            //     self.bld.switch_to_block(block);
-            //     match enum_type.variants.read().unwrap().iter().find(|v| v.0 == case.pattern.id) {
-            //        Some(v) => {
-            //             self.bld.push_scope();
-            //             for ((i, typ), name) in v.1.iter().enumerate().zip(case.pattern.values.iter()) {
-            //                 let var = self.bld.create_var(name.clone(), typ.clone());
-            //                 self.bld.dup(0);
-            //                 self.bld.get_object(i + 1, typ.clone());
-            //                 self.bld.store(var);
-            //             }
-            //             did_return &= self.block_stmt(&case.block);
-            //             self.bld.pop_scope();
-            //        },
-            //        None => panic!(),
-            //     };
-            //     self.bld.br(finish_block);
-            //     blocks.push(block);
-            // }
+        } else if types::is_integer(&s.value.typ) {
+            for case in s.cases.iter() {
+                match &case.pattern.kind {
+                    ast::PatternKind::Integer(i) => {
+                        let block = self.bld.new_block();
+                        self.bld.switch_to_block(block);
+                        did_return &= self.block_stmt(&case.block);
+                        self.bld.br(finish_block);
+                        self.bld.switch_to_block(prev_block);
+                        
+                        switch_emitter.set_entry(*i, block);
+                    },
+                    ast::PatternKind::IntegerRange(_, _) => unimplemented!(),
+                    _ => {}
+                }
+            }
         } else {
             unimplemented!();
         }
 
         self.bld.switch_to_block(prev_block);
-        self.bld.br_table(finish_block, blocks);
+        switch_emitter.emit(&mut self.bld, default);
         self.bld.switch_to_block(finish_block);
 
-        println!("did return? {}", did_return);
-        
         did_return
     }
 
