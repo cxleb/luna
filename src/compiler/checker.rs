@@ -443,6 +443,14 @@ impl<'a> FuncTypeInference<'a> {
 
         match &mut c.function.kind {
             ast::ExprKind::Identifier(i) => {
+                if i.id == "assert" {
+                    if c.parameters.len() != 1 {
+                        return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
+                    }
+                    self.expr(&mut c.parameters[0], None)?;
+                    return self.ok();
+                }
+
                 let (func_signature, name_spec) = match self.functions.get(self.imports, self.package_id, &i.id) {
                     Some(s) => s,
                     None => return self.error_loc(SemaErrorReason::FunctionNotFound, e.loc),

@@ -385,6 +385,13 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                 ir::Inst::CheckYield => {
                     translate_call(ctx, &mut builder, &mut stack, "__check_yield");
                 }
+                ir::Inst::Assert => {
+                    let condition = stack.pop().unwrap();
+                    let continue_block = builder.create_block();
+                    let panic_message = construct_panic_message(ctx, &mut builder, source_locs, source_loc.unwrap(), str_map, "Assertion Failed.");
+                    builder.ins().brif(condition, continue_block, &[], panic_block, &vec![BlockArg::Value(panic_message)]);
+                    builder.switch_to_block(continue_block);
+                }
             }
         }    
     }

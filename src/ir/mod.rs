@@ -70,6 +70,8 @@ pub enum Inst {
     /// Check if this task should yield control (inserted at loop backedges and function prologue)
     /// This is a no-op if no yield is needed, or calls __yield() if the scheduler has marked this task
     CheckYield,
+
+    Assert
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

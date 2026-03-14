@@ -361,6 +361,14 @@ impl<'a> FuncGen<'a> {
             return;
         }
 
+        if let ast::ExprKind::Identifier(id) = &c.function.kind {
+            if id.id == "assert" {
+                self.expr(&c.parameters[0]);
+                self.bld.assert();
+                return;
+            }
+        }
+
         self.bld.check_yield();
         // when it is a struct/interface function call, we need to load self first
         if let ast::ExprKind::Selector(s) = &c.function.kind {

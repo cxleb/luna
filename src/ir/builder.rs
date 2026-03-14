@@ -288,6 +288,10 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::CheckYield);
     }
 
+    pub fn assert(&mut self) {
+        self.append_inst(super::Inst::Assert);
+    }
+
     pub fn finish(self) -> Box<super::Function> {
         return Box::new(self.func);
     }
