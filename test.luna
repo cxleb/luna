@@ -1,8 +1,5 @@
 func main() {
-    let a = 10;
-    switch a {
-        _:  {
+    let a = [10];
 
-        }
-    }
+    printint(a[2]);
 }

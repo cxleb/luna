@@ -1,10 +1,11 @@
 pub mod builder;
+pub mod iter;
 
 pub type BlockRef = usize;
 pub type VariableRef = usize;
 pub type StringRef = usize;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
     Integer,
     Number,
@@ -12,7 +13,7 @@ pub enum Type {
     Reference,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Inst {
     Nop,
     Dup(usize), // Duplicates the top - i of the stack
@@ -71,10 +72,30 @@ pub enum Inst {
     CheckYield,
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SourceLoc {
+    pub file: StringRef,
+    pub line: usize,
+    pub col: usize,
+}
+
+// Contains all source locations because cranelift gives us a single integer for a source location!! argh
+#[derive(Debug, Clone, Default)]
+pub struct SourceLocs {
+    pub locations: Vec<SourceLoc>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Block {
     pub id: BlockRef,
+    pub source_locs: Vec<(usize, usize)>,
     pub ins: Vec<Inst>,
+}
+
+impl<'a> Block {
+    pub fn iter(&'a self) -> iter::BlockIter<'a> {
+        iter::BlockIter::new(self)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -101,7 +122,8 @@ pub struct Function {
 #[derive(Debug, Clone)]
 pub struct Module {
     pub funcs: Vec<Function>,
-    pub string_map: StringMap
+    pub string_map: StringMap,
+    pub source_locs: SourceLocs
 }
 
 #[derive(Debug, Clone)]

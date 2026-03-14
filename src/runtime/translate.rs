@@ -1,8 +1,8 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::{ir::{self, StringMap}, runtime::string};
-use cranelift_codegen::{Context, ir::{AbiParam, Block, InstBuilder, JumpTableData, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I32, I64}}, isa::CallConv, verify_function};
+use crate::{ir::{self, SourceLocs, StringMap}, runtime::string};
+use cranelift_codegen::{Context, ir::{AbiParam, Block, BlockArg, InstBuilder, JumpTableData, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I32, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use super::cranelift::data_context::{DataDescription};
 use super::cranelift::module::{Linkage, Module};
@@ -22,7 +22,22 @@ fn translate_signature(ctx: &super::JitContext, signature: &crate::ir::Signature
     }
 }
 
-pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest: &mut Context, signatures: &Vec<TranslateSignature>, str_map: &StringMap) {
+fn construct_panic_message(ctx: &mut super::JitContext, builder: &mut cranelift_frontend::FunctionBuilder, source_locs: &SourceLocs, source_loc: usize, str_map: &StringMap, reason: &str) -> cranelift_codegen::ir::Value {
+    let source_loc = source_locs.locations[source_loc].clone();
+    let panic_message = format!("Panic at {}:{}:{}: {}", str_map.get(source_loc.file), source_loc.line, source_loc.col, reason);
+
+    let data_id = ctx.module.declare_anonymous_data(false, false).expect("Failed to create anonymous data");
+    
+    let mut data_desc = DataDescription::new();
+    data_desc.clear();
+    data_desc.define(string::convert_to_interal_string(&panic_message)); 
+    ctx.module.define_data(data_id, &data_desc).expect("Could not define data");
+
+    let local_data_id = ctx.module.declare_data_in_func(data_id, builder.func);
+    builder.ins().symbol_value(I64, local_data_id)
+}
+
+pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest: &mut Context, signatures: &Vec<TranslateSignature>, str_map: &StringMap, source_locs: &SourceLocs) {
     let mut translated = &mut dest.func;
     translated.signature = translate_signature(ctx, &func.signature, translated.signature.call_conv);
     //translated.name = cranelift_codegen::ir::UserFuncName::user(0, func.id);
@@ -86,11 +101,11 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
     };
 
     let panic_block = builder.create_block();
-
+    
     for (i, block) in func.blocks.iter().enumerate() {
         builder.switch_to_block(blocks[i]);
         
-        for inst in block.ins.iter() {
+        for (inst, source_loc) in block.iter() {
             match &inst {
                 ir::Inst::Nop => {}
                 ir::Inst::Dup(i) => {
@@ -314,7 +329,8 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let index_ok_size = builder.ins().icmp(IntCC::SignedLessThan, index, array_size);
                     let index_ok = builder.ins().band(index_ok_size, index_ok_zero);
                     // jump to continue block if we are allg otherwise panic block
-                    builder.ins().brif(index_ok, continue_block, &[], panic_block, &[]);
+                    let panic_message = construct_panic_message(ctx, &mut builder, source_locs, source_loc.unwrap(), str_map, "Out of bounds.");
+                    builder.ins().brif(index_ok, continue_block, &[], panic_block, &vec![BlockArg::Value(panic_message)]);
 
                     builder.switch_to_block(continue_block);
                     // load the value now we know the array index is ok
@@ -337,7 +353,8 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let index_ok_size = builder.ins().icmp(IntCC::SignedLessThan, index, array_size);
                     let index_ok = builder.ins().band(index_ok_size, index_ok_zero);
                     // jump to continue block if we are allg otherwise panic block
-                    builder.ins().brif(index_ok, continue_block, &[], panic_block, &[]);
+                    let panic_message = construct_panic_message(ctx, &mut builder, source_locs, source_loc.unwrap(), str_map, "Out of bounds.");
+                    builder.ins().brif(index_ok, continue_block, &[], panic_block, &vec![BlockArg::Value(panic_message)]);
 
                     builder.switch_to_block(continue_block);
                     // store the value now we know the array index is ok
@@ -374,6 +391,8 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
 
     // This is the panic block
     builder.switch_to_block(panic_block);
+    let message = builder.append_block_param(panic_block, ctx.translate_type(&ir::Type::Reference));
+    stack.push(message);
     translate_call(ctx, &mut builder, &mut stack, "__panic"); 
     builder.ins().trap(TrapCode::user(1).expect("Could not get trap code"));
 

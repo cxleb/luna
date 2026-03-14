@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::compiler::ast;
+use crate::compiler::{SourceLoc, ast};
 use crate::ir::builder::FuncBuilder;
-use crate::ir::{self, BlockRef, StringMap, VariableRef, Type};
+use crate::ir::{self, BlockRef, StringMap, StringRef, Type, VariableRef};
 use crate::types;
 
 
@@ -243,12 +243,21 @@ impl Into<ir::Type> for crate::types::Type {
 }
 
 struct FuncGen<'a> {
-    bld: FuncBuilder,
+    interned_file_name: StringRef,
+    bld: FuncBuilder<'a>,
     str_map: &'a mut StringMap,
     self_var: Option<ir::VariableRef>,
 }
 
 impl<'a> FuncGen<'a> {
+    fn emit_source_loc(&mut self, source_loc: SourceLoc) {
+        self.bld.source_loc(crate::ir::SourceLoc {
+            file: self.interned_file_name,
+            line: source_loc.line,
+            col: source_loc.col
+        });
+    }
+
     fn binary_expr(&mut self, e: &ast::Expr, b: &Box<ast::BinaryExpr>) {
         match e.typ.kind() {
             crate::types::TypeKind::Number => {
@@ -458,6 +467,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn expr(&mut self, e: &ast::Expr) {
+        self.emit_source_loc(e.loc);
         match &e.kind {
             ast::ExprKind::BinaryExpr(b) => self.binary_expr(e, b),
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u),
@@ -499,6 +509,7 @@ impl<'a> FuncGen<'a> {
     // aka l values
     fn store_expr(&mut self, e: &ast::Expr) {
         //println!("here {:?}", e);
+        self.emit_source_loc(e.loc);
         match &e.kind {
             ast::ExprKind::Subscript(l) => self.store_subscript(e, l),
             ast::ExprKind::Selector(l) => self.store_selector(e, l),
@@ -517,6 +528,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn block_stmt(&mut self, b: &Box<ast::BlockStmt>) -> bool {
+        self.emit_source_loc(b.loc);
         let mut did_return = false;
         self.bld.push_scope();
         for s in b.stmts.iter() {
@@ -530,16 +542,19 @@ impl<'a> FuncGen<'a> {
     }
 
     fn expr_stmt(&mut self, e: &Box<ast::ExprStmt>) -> bool {
+        self.emit_source_loc(e.loc);
         self.expr(&e.expr);
         // todo: pop value off stack if not used, there may be multiple values on stack
         false
     }
 
-    fn for_stmt(&mut self, _f: &Box<ast::ForStmt>) -> bool {
+    fn for_stmt(&mut self, f: &Box<ast::ForStmt>) -> bool {
+        self.emit_source_loc(f.loc);
         unimplemented!()
     }
 
     fn if_stmt(&mut self, f: &Box<ast::IfStmt>) -> bool {
+        self.emit_source_loc(f.loc);
         if let Some(alternate) = &f.alternate {
             let consequent_block = self.bld.new_block();
             let alternate_block = self.bld.new_block();
@@ -588,6 +603,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn return_stmt(&mut self, r: &Box<ast::ReturnStmt>) -> bool {
+        self.emit_source_loc(r.loc);
         if let Some(r) = &r.value {
             self.expr(r);
         }
@@ -596,6 +612,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn var_decl_stmt(&mut self, v: &Box<ast::VarDeclStmt>) -> bool {
+        self.emit_source_loc(v.loc);
         self.expr(&v.value);
         let id = self
             .bld
@@ -605,6 +622,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn while_stmt(&mut self, w: &Box<ast::WhileStmt>) -> bool {
+        self.emit_source_loc(w.loc);
         let condition_block = self.bld.new_block();
         let body_block = self.bld.new_block();
         let finish_block = self.bld.new_block();
@@ -626,6 +644,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn switch_stmt(&mut self, s: &ast::SwitchStmt) -> bool {
+        self.emit_source_loc(s.loc);
         let mut did_return = s.cases.len() > 0;
         let prev_block = self.bld.current_block();
 
@@ -713,15 +732,16 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn generate(func: &Box<ast::Func>, str_map: &'a mut StringMap) -> Self {
+    fn generate(func: &Box<ast::Func>, ir_module: &'a mut ir::Module, interned_file_name: StringRef) -> Self {
         let signature = ir::Signature {
             ret_types: func.typ_.returns.iter().map(|t| t.clone().into()).collect(),
             parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect()
         };
         let mut s = Self {
-            str_map,
-            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature),
+            str_map: &mut ir_module.string_map,
+            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature, &mut ir_module.source_locs),
             self_var: None,
+            interned_file_name
         };
         s.bld.push_scope();
         // add params as variables for scope purposes
@@ -735,16 +755,17 @@ impl<'a> FuncGen<'a> {
         s
     }
 
-    fn generate_struct_func(func: &Box<ast::Func>, str_map: &'a mut StringMap, struct_type: types::Type) -> Self {
+    fn generate_struct_func(func: &Box<ast::Func>, ir_module: &'a mut ir::Module, struct_type: types::Type, interned_file_name: StringRef) -> Self {
         let mut signature = ir::Signature {
             ret_types: func.typ_.returns.iter().map(|t| t.clone().into()).collect(),
             parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect()
         };
         signature.parameters.insert(0, struct_type.clone().into());
         let mut s = Self {
-            str_map,
-            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature),
+            str_map: &mut ir_module.string_map,
+            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature, &mut ir_module.source_locs),
             self_var: None,
+            interned_file_name
         };
         s.bld.push_scope();
         // add params as variables for scope purposes
@@ -765,17 +786,18 @@ impl<'a> FuncGen<'a> {
 }
 
 pub fn emit_program(program: &ast::Program) -> Box<ir::Module> {
-    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![] };
+    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![], source_locs: Default::default() };
     
     for package in program.packages.iter() {
         for file in package.files.iter() {
+            let interned_file_name = ir_module.string_map.intern(&file.id);
             for func in file.functions.iter() {
-                let ir_func = FuncGen::generate(func, &mut ir_module.string_map).finish();
+                let ir_func = FuncGen::generate(func, &mut ir_module, interned_file_name).finish();
                 ir_module.funcs.push(*ir_func);
             }
             for _struct in file.structs.iter() {
                 for func in _struct.functions.iter() {
-                    let ir_func = FuncGen::generate_struct_func(func, &mut ir_module.string_map, _struct.typ.clone()).finish();
+                    let ir_func = FuncGen::generate_struct_func(func, &mut ir_module, _struct.typ.clone(), interned_file_name).finish();
                     ir_module.funcs.push(*ir_func);
                 }
             }

@@ -1,12 +1,10 @@
 - Add source length to AST
-- Debug information is generated alongside bytecode
 - Fix tokeniser(stop copying strings)
 - Implement interfaces (use structual typing like go) (blocker: ir refactor, struct methods, method sets)
 - String templates (blocker: interface)
 - Make functions a const value
 - captures functions(closures?)
 - Implement a concept of "api" so we can have std library
-- Fix interface so it can either be a cli thing or embedded.
 - Implement error handling(blocker: discriminated enums, generics)
 - Implement multiple modules (import and export syntax?, how does the extension syntax work?)
 - Generics
@@ -17,11 +15,14 @@
 - Refactor AST to be arena allocated
 - Dont run GC on every check yield
 - GC api?
+- Fix panic to only kill the process, not the entire program
 - Assert should become a compiler construct, test condition and jump to panic block (blocker: debug info)
 - Convert types to have a method set removing the need for structs to maintain a list of methods.
 - Int ranges in switches 
 
 done:
+- Debug information is generated alongside bytecode
+- Fix interface so it can either be a cli thing or embedded.
 - refactor IR to remove need on type system
 - Implement proper pattern matching
 - Switch statement for non enums

@@ -42,7 +42,8 @@ pub fn add_root_file(compiler: Arc<Mutex<Compiler>>, filename: &str) {
             Ok(src) => {
                 let mut parser = parser::Parser::new(&src);
                 match parser.parse_file() {
-                    Ok(file) => {
+                    Ok(mut file) => {
+                        file.id = filename.clone();
                         compiler_clone.lock().unwrap().program.packages[0].files.push(file);
                     }
                     Err(e) => {

@@ -1,15 +1,17 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
-use crate::ir::{Block, BlockRef, Signature, StringRef, VariableRef, Type};
-pub struct FuncBuilder {
+use crate::{ir::{Block, BlockRef, Signature, SourceLocs, StringRef, Type, VariableRef}};
+pub struct FuncBuilder<'a> {
     func: super::Function,
     current_block: usize,
     variables: VariableRef,
     variable_scopes: Vec<HashMap<String, VariableRef>>,
+    source_locs: &'a mut SourceLocs,
+    last_source_loc: Option<usize>,
 }
 
-impl FuncBuilder {
-    pub fn new(id: String, signature: Signature) -> Self {
+impl<'a> FuncBuilder<'a> {
+    pub fn new(id: String, signature: Signature, source_locs: &'a mut SourceLocs) -> Self {
         Self {
             func: super::Function {
                 id,
@@ -18,11 +20,14 @@ impl FuncBuilder {
                 blocks: vec![Block {
                     id: 0,
                     ins: Vec::new(),
+                    source_locs: Default::default()
                 }],
             },
             current_block: 0,
             variables: 0,
             variable_scopes: Vec::new(),
+            source_locs,
+            last_source_loc: None
         }
     }
 
@@ -30,9 +35,15 @@ impl FuncBuilder {
     /// do that
     pub fn new_block(&mut self) -> BlockRef {
         let r = self.func.blocks.len();
+        let source_locs = if let Some(last) = self.last_source_loc {
+            vec![(0, last)]
+        } else {
+            Vec::new()
+        };
         self.func.blocks.push(Block {
             id: r,
-            ins: Vec::new(),
+            ins: Default::default(),
+            source_locs
         });
         r
     }
@@ -75,6 +86,14 @@ impl FuncBuilder {
             }
         }
         None
+    }
+
+    pub fn source_loc(&mut self, source_loc: super::SourceLoc) {
+        let next_source_loc = self.source_locs.locations.len();
+        self.last_source_loc = Some(self.source_locs.locations.len());
+        self.source_locs.locations.push(source_loc);
+        let next_ins = self.func.blocks[self.current_block].ins.len();
+        self.func.blocks[self.current_block].source_locs.push((next_ins, next_source_loc));
     }
 
     pub fn append_inst(&mut self, inst: super::Inst) {

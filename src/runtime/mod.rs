@@ -54,8 +54,10 @@ struct Fiber {
     entry_point: *const u8,
 }
 
-pub extern "C" fn panic(_: *mut RuntimeContext) {
-    panic!("Temporary Panic Handler!");
+pub extern "C" fn panic(_: *mut RuntimeContext, message: *const u8) {
+    let message = string::convert_from_internal_string(message);
+    eprintln!("{}", message);
+    std::process::exit(1);
 }
 
 pub extern "C" fn create_array(ctx: *mut RuntimeContext, size: i64) -> *const i64 {
@@ -198,6 +200,7 @@ impl JitContext {
                 signature: func.signature.clone()
             });
         }
+
         for func in self.builtins.functions.iter() {
             signatures.push(TranslateSignature {
                 id: format!("_Lbuiltins_{}", func.id),
@@ -211,11 +214,10 @@ impl JitContext {
             });
         }
 
-
         signatures.push(TranslateSignature {
             id: "__panic".into(),
             signature: Signature {
-                parameters: vec![],
+                parameters: vec![ir::Type::Reference],
                 ret_types: vec![],
             }
         });
@@ -242,7 +244,7 @@ impl JitContext {
         });
 
         let translated = module.funcs.iter().map(|func| {
-            translate::translate_function(self, &func, &mut context, &signatures, &module.string_map);
+            translate::translate_function(self, &func, &mut context, &signatures, &module.string_map, &module.source_locs);
             let id = self.module.declare_function(&func.id, cranelift::module::Linkage::Local, &context.func.signature).unwrap();
             self.module.define_function(id, &mut context).unwrap();
             self.module.clear_context(&mut context);
