@@ -364,6 +364,7 @@ impl<'a> FuncGen<'a> {
         if let ast::ExprKind::Identifier(id) = &c.function.kind {
             if id.id == "assert" {
                 self.expr(&c.parameters[0]);
+                self.emit_source_loc(e.loc);
                 self.bld.assert();
                 return;
             }

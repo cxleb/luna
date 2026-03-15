@@ -512,6 +512,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 self.expect(TokenKind::Punctuation(Punctuation::RightParenthesis))?;
+                let loc = expr.loc; 
                 expr = self.expr(
                     ExprKind::Call(Box::new(Call { 
                         function: expr, 
@@ -519,7 +520,7 @@ impl<'a> Parser<'a> {
                         symbol_name: None,
                         enum_idx: None
                     })),
-                    loc,
+                    loc
                 );
             } else {
                 return Ok(expr);

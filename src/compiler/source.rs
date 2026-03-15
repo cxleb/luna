@@ -38,7 +38,7 @@ impl<'a> Source<'a> {
         let char = self.contents.next()?;
         self.col_no += 1;
         if char == '\n' {
-            self.col_no = 0;
+            self.col_no = 1;
             self.line_no += 1;
         }
         Some(char)

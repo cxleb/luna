@@ -1,13 +1,13 @@
 use std::{collections::HashMap};
 
-use crate::{ir::{Block, BlockRef, Signature, SourceLocs, StringRef, Type, VariableRef}};
+use crate::ir::{Block, BlockRef, Signature, SourceLocs, StringRef, Type, VariableRef};
 pub struct FuncBuilder<'a> {
     func: super::Function,
     current_block: usize,
     variables: VariableRef,
     variable_scopes: Vec<HashMap<String, VariableRef>>,
     source_locs: &'a mut SourceLocs,
-    last_source_loc: Option<usize>,
+    next_source_loc: Option<usize> ,
 }
 
 impl<'a> FuncBuilder<'a> {
@@ -27,7 +27,7 @@ impl<'a> FuncBuilder<'a> {
             variables: 0,
             variable_scopes: Vec::new(),
             source_locs,
-            last_source_loc: None
+            next_source_loc: None
         }
     }
 
@@ -35,15 +35,10 @@ impl<'a> FuncBuilder<'a> {
     /// do that
     pub fn new_block(&mut self) -> BlockRef {
         let r = self.func.blocks.len();
-        let source_locs = if let Some(last) = self.last_source_loc {
-            vec![(0, last)]
-        } else {
-            Vec::new()
-        };
         self.func.blocks.push(Block {
             id: r,
             ins: Default::default(),
-            source_locs
+            source_locs: Vec::new(),
         });
         r
     }
@@ -90,13 +85,22 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn source_loc(&mut self, source_loc: super::SourceLoc) {
         let next_source_loc = self.source_locs.locations.len();
-        self.last_source_loc = Some(self.source_locs.locations.len());
+        self.next_source_loc = Some(next_source_loc);
         self.source_locs.locations.push(source_loc);
-        let next_ins = self.func.blocks[self.current_block].ins.len();
-        self.func.blocks[self.current_block].source_locs.push((next_ins, next_source_loc));
     }
 
     pub fn append_inst(&mut self, inst: super::Inst) {
+        if let Some(source_loc) = self.next_source_loc {
+            let next_ins = self.func.blocks[self.current_block].ins.len();
+            // check if the last source loc is the same, if it is not append the source loc
+            if let Some((_, last_source_loc)) = self.func.blocks[self.current_block].source_locs.last() {
+                if *last_source_loc != source_loc {
+                    self.func.blocks[self.current_block].source_locs.push((next_ins, source_loc));
+                }
+            } else {
+                self.func.blocks[self.current_block].source_locs.push((next_ins, source_loc));
+            }
+        }
         self.func.blocks[self.current_block].ins.push(inst);
     }
 
