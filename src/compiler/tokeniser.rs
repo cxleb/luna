@@ -90,9 +90,9 @@ impl<'a> Tokeniser<'a> {
         self.clone().next(mode)
     }
 
-    pub fn next(&mut self, mode: TokeniserMode) -> Option<Token> {
+    pub fn next_inner(&mut self, mode: TokeniserMode) -> Option<Token> {
         self.eat_whitespace()?;
-
+        
         let loc = SourceLoc {
             col: self.col_no(),
             line: self.line_no(),
@@ -465,6 +465,12 @@ impl<'a> Tokeniser<'a> {
             };
             Some(Token::new(loc, TokenKind::Punctuation(tok)))
         }
+    }
+
+    pub fn next(&mut self, mode: TokeniserMode) -> Option<Token> {
+        let tok = self.next_inner(mode);
+        self.eat_whitespace();
+        tok
     }
 
     pub fn line_no(&self) -> usize {
