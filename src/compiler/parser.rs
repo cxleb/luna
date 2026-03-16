@@ -359,12 +359,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var_decl_statement(&mut self) -> ParserResult<Box<VarDeclStmt>> {
-        let (is_const, loc) = if self.test(TokenKind::Keyword(Keywords::Const)) {
-            let tok = self.expect(TokenKind::Keyword(Keywords::Const))?;
-            (true, tok.loc)
+        let loc = self.source_loc();
+        let is_const = if self.test(TokenKind::Keyword(Keywords::Const)) {
+            self.expect(TokenKind::Keyword(Keywords::Const))?;
+            true
         } else {
-            let tok = self.expect(TokenKind::Keyword(Keywords::Let))?;
-            (false, tok.loc)
+            self.expect(TokenKind::Keyword(Keywords::Let))?;
+            false
         };
         let id_token = self.expect(TokenKind::Identifier)?;
         let id = id_token.get_string();
