@@ -1,9 +1,26 @@
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, RwLock};
+use std::hash::Hash;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
+// Define a static global counter
+static TYPE_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn get_next_id() -> usize {
+    // Increment and return the new value safely
+    TYPE_ID_COUNTER.fetch_add(1, Ordering::SeqCst) + 1
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct NameSpecification {
     pub package: String,
+    pub name: String,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub struct MethodSpecification {
+    pub package: String,
+    pub typ: Type,
     pub name: String,
 }
 
@@ -17,14 +34,6 @@ pub struct FunctionType {
 pub struct StructType {
     pub spec: NameSpecification,
     pub fields: RwLock<Vec<(String, Type)>>,
-    pub functions: RwLock<Vec<(String, FunctionType)>>,
-}
-
-
-impl PartialEq for StructType {
-    fn eq(&self, other: &Self) -> bool {
-        self.spec == other.spec
-    }
 }
 
 #[derive(Debug)]
@@ -33,13 +42,7 @@ pub struct EnumType {
     pub variants: RwLock<Vec<(String, Vec<Type>)>>,
 }
 
-impl PartialEq for EnumType {
-    fn eq(&self, other: &Self) -> bool {
-        self.spec == other.spec
-    }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum TypeKind {
     Bad,
     Integer,
@@ -57,12 +60,13 @@ pub enum TypeKind {
     //Struct,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Inner {
-    pub kind: TypeKind,
+    pub hash: usize,
+    pub kind: TypeKind
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Type {
     pub inner: Arc<Inner>,
 }
@@ -87,6 +91,22 @@ impl Default for Type {
     }
 }
 
+impl Hash for Type {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.inner.hash.hash(state);
+    }
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.hash == other.inner.hash
+    }
+}
+
+impl Eq for Type {
+
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ComparisonResult {
     Same,
@@ -95,7 +115,7 @@ pub enum ComparisonResult {
 }
 
 pub fn compare(a: &Type, b: &Type) -> ComparisonResult {
-    if a.inner.kind == b.inner.kind {
+    if a == b {
         ComparisonResult::Same
     } else {
         ComparisonResult::Incompatible
@@ -161,7 +181,25 @@ pub fn get_max_enum_values(ty: &Type) -> usize {
 
 pub fn create_type(kind: TypeKind) -> Type {
     Type {
-        inner: Arc::new(Inner { kind }),
+        inner: Arc::new(Inner { kind, hash: get_next_id() }),
+    }
+}
+
+pub fn name(typ: &Type) -> String {
+    match &typ.inner.kind {
+        TypeKind::Bad => "bad".into(),
+        TypeKind::Integer => "integer".into(),
+        TypeKind::Number => "number".into(),
+        TypeKind::String => "string".into(),
+        TypeKind::Bool => "bool".into(),
+        TypeKind::UnknownReference => "unknown_reference".into(),
+        TypeKind::Array(element_type) => format!("[]{}", name(element_type)),
+        TypeKind::Struct(struct_type) => format!("{}.{}", struct_type.spec.package, struct_type.spec.name),
+        TypeKind::Enum(enum_type) => format!("{}.{}", enum_type.spec.package, enum_type.spec.name),
+        TypeKind::Identifier(id) => id.clone(),
+        TypeKind::Function(func_type) => format!("fn({}) -> ({})", 
+            func_type.params.iter().map(|t| name(t)).collect::<Vec<_>>().join(", "), 
+            func_type.returns.iter().map(|t| name(t)).collect::<Vec<_>>().join(", "))
     }
 }
 
@@ -196,18 +234,27 @@ pub fn unknown_reference() -> Type {
 }
 
 pub fn array(element_type: Type) -> Type {
-    create_type(TypeKind::Array(element_type))
+    // memoize the array so that hash is the same for the given element type
+    // this is not a performance thing
+    static ARRAY_TYPES: OnceLock<RwLock<HashMap<usize, Type>>> = OnceLock::new();
+    let array_types = ARRAY_TYPES.get_or_init(|| RwLock::new(HashMap::new()));
+    let mut array_types = array_types.write().unwrap();
+    if let Some(array_type) = array_types.get(&element_type.inner.hash) {
+        return array_type.clone();
+    }
+    let array_type = create_type(TypeKind::Array(element_type.clone()));
+    array_types.insert(element_type.inner.hash, array_type.clone());
+    array_type
 }
 
 pub fn identifier(id: String) -> Type {
     create_type(TypeKind::Identifier(id))
 }
 
-pub fn struct_type(spec: NameSpecification, fields: Vec<(String, Type)>, functions: Vec<(String, FunctionType)>) -> Type {
+pub fn struct_type(spec: NameSpecification, fields: Vec<(String, Type)>) -> Type {
     create_type(TypeKind::Struct(StructType {
         spec,
         fields: RwLock::new(fields),
-        functions: RwLock::new(functions),
     }))
 }
 

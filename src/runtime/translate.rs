@@ -81,7 +81,7 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
         builder: &mut cranelift_frontend::FunctionBuilder, 
         stack: &mut Vec<cranelift_codegen::ir::Value>, 
         id: &str| {
-        let sig = signatures.iter().find(|s| s.id == *id).unwrap();
+        let sig = signatures.iter().find(|s| s.id == *id).expect(format!("Could not find signature for {}", id).as_str());
         if !declared_signatures.contains_key(id) {
             let signature = translate_signature(ctx, &sig.signature, call_conv);
             let func_id = ctx.module.declare_function(&sig.id, Linkage::Import, &signature).expect("Failed to declare function");
