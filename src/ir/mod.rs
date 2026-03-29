@@ -4,6 +4,7 @@ pub mod iter;
 pub type BlockRef = usize;
 pub type VariableRef = usize;
 pub type StringRef = usize;
+pub type GlobalRef = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
@@ -44,6 +45,7 @@ pub enum Inst {
     LoadConstNumber(f64),
     LoadConstBool(bool),
     LoadConstString(StringRef),
+    LoadGlobal(GlobalRef),
     Truncate, // Convert number to integer
     Promote,   // Convert integer to number
     Load(VariableRef),
@@ -57,7 +59,7 @@ pub enum Inst {
     Ret,
     // Pops the necessary arguments off the stack, e.g a(10, 10) will pop 2 
     Call(String),
-    IndirectCall, // top of the stack is the function to call.
+    IndirectCall(Signature), // top of the stack is the function to call, arity is the number of arguments (not including the function pointer)
 
     NewArray(usize),
     LoadArray(Type), // Pops the index and array
@@ -106,7 +108,7 @@ pub struct Variable {
     pub typ: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Signature {
     pub ret_types: Vec<Type>,
     pub parameters: Vec<Type>,
@@ -125,6 +127,7 @@ pub struct Function {
 pub struct Module {
     pub funcs: Vec<Function>,
     pub string_map: StringMap,
+    pub global_value_map: GlobalValueMap,
     pub source_locs: SourceLocs
 }
 
@@ -150,5 +153,35 @@ impl StringMap {
 
     pub fn get(&self, index: StringRef) -> &str {
         self.map.get(index).map(|s| s.as_str()).unwrap()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GlobalValue {
+    VirtualTable(Vec<String>), // method names in order
+} 
+
+#[derive(Debug, Clone)]
+pub struct GlobalValueMap {
+    map: Vec<GlobalValue>
+}
+
+impl GlobalValueMap {
+    pub fn new() -> Self {
+        GlobalValueMap {
+            map: Vec::new()
+        }
+    }
+
+    pub fn intern(&mut self, v: GlobalValue) -> GlobalRef {
+        if let Some((i, _)) = self.map.iter().enumerate().find(|(_, existing)| *existing == &v) {
+            return i;
+        }
+        self.map.push(v);
+        self.map.len() - 1
+    }
+
+    pub fn get(&self, index: GlobalRef) -> &GlobalValue {
+        self.map.get(index).unwrap()
     }
 }

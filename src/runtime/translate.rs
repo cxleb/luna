@@ -1,8 +1,8 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::{ir::{self, SourceLocs, StringMap}, runtime::string};
-use cranelift_codegen::{Context, ir::{AbiParam, Block, BlockArg, InstBuilder, JumpTableData, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I32, I64}}, isa::CallConv, verify_function};
+use crate::{ir::{self, GlobalValueMap, SourceLocs, StringMap}, runtime::{string}};
+use cranelift_codegen::{Context, binemit::CodeOffset, ir::{AbiParam, Block, BlockArg, InstBuilder, JumpTableData, MemFlags, Signature, TrapCode, condcodes::{FloatCC, IntCC}, types::{I8, I32, I64}}, isa::CallConv, verify_function};
 use cranelift_frontend::Variable;
 use super::cranelift::data_context::{DataDescription};
 use super::cranelift::module::{Linkage, Module};
@@ -37,7 +37,7 @@ fn construct_panic_message(ctx: &mut super::JitContext, builder: &mut cranelift_
     builder.ins().symbol_value(I64, local_data_id)
 }
 
-pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest: &mut Context, signatures: &Vec<TranslateSignature>, str_map: &StringMap, source_locs: &SourceLocs) {
+pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest: &mut Context, signatures: &Vec<TranslateSignature>, str_map: &StringMap, source_locs: &SourceLocs, globals: &GlobalValueMap) {
     let mut translated = &mut dest.func;
     translated.signature = translate_signature(ctx, &func.signature, translated.signature.call_conv);
     //translated.name = cranelift_codegen::ir::UserFuncName::user(0, func.id);
@@ -266,6 +266,26 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                     let addr = builder.ins().symbol_value(I64, local_data_id);
                     stack.push(addr);
                 }
+                ir::Inst::LoadGlobal(value) => {
+                    let data_id = ctx.module.declare_anonymous_data(false, false).expect("Failed to create anonymous data");
+                    data_desc.clear();
+                    match globals.get(*value) {
+                        ir::GlobalValue::VirtualTable(functions) => {
+                            data_desc.define_zeroinit(functions.len() * 8);
+                            for (i, func) in functions.iter().enumerate() {
+                                let sig = signatures.iter().find(|s| s.id == *func).expect(format!("Could not find signature for {}", func).as_str());
+                                let signature = translate_signature(ctx, &sig.signature, call_conv);
+                                let func_id = ctx.module.declare_function(&sig.id, Linkage::Import, &signature).expect("Failed to declare function");
+                                let func_ref = ctx.module.declare_func_in_data(func_id, &mut data_desc);
+                                data_desc.write_function_addr((i * 8) as CodeOffset, func_ref);
+                            }
+                        }
+                    }
+                    ctx.module.define_data(data_id, &data_desc).expect("Could not define data");
+                    let local_data_id = ctx.module.declare_data_in_func(data_id, builder.func);
+                    let addr = builder.ins().symbol_value(I64, local_data_id);
+                    stack.push(addr);    
+                }
                 ir::Inst::Truncate => {
                     let val = stack.pop().unwrap();
                     let res = builder.ins().fcvt_to_sint(I64, val);
@@ -311,7 +331,19 @@ pub fn translate_function(ctx: &mut super::JitContext, func: &ir::Function, dest
                 ir::Inst::Call(id) => {
                     translate_call(ctx, &mut builder, &mut stack, &id);
                 }
-                ir::Inst::IndirectCall => todo!(),
+                ir::Inst::IndirectCall(signature) => {
+                    let mut args = stack.iter().rev().take(signature.parameters.len()).cloned().collect::<Vec<_>>();
+                    args.reverse();
+                    stack.truncate(stack.len() - args.len());
+                    args.insert(0, runtime_ctx);
+                    let func = stack.pop().unwrap();
+                    let signature = translate_signature(ctx, signature, call_conv);
+                    let sig_ref = builder.import_signature(signature);
+                    let call = builder.ins().call_indirect(sig_ref, func, &args);
+                    for r in builder.inst_results(call) {
+                        stack.push(*r);
+                    }
+                },
                 ir::Inst::NewArray(size) => {
                     let val = builder.ins().iconst(I64, *size as i64);
                     stack.push(val);

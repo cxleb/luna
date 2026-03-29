@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::compiler::{SourceLoc, ast};
+use crate::compiler::{SourceLoc, ast, mangle};
 use crate::ir::builder::FuncBuilder;
-use crate::ir::{self, BlockRef, StringMap, StringRef, Type, VariableRef};
+use crate::ir::{self, BlockRef, GlobalRef, GlobalValueMap, Signature, StringMap, StringRef, Type, VariableRef};
 use crate::types;
 
 
@@ -246,6 +246,7 @@ struct FuncGen<'a> {
     interned_file_name: StringRef,
     bld: FuncBuilder<'a>,
     str_map: &'a mut StringMap,
+    global_map: &'a mut GlobalValueMap,
     self_var: Option<ir::VariableRef>,
 }
 
@@ -256,6 +257,17 @@ impl<'a> FuncGen<'a> {
             line: source_loc.line,
             col: source_loc.col
         });
+    }
+
+    fn generate_interface_vtable(
+        &mut self,
+        interface: &crate::types::InterfaceType,
+        typ: &types::Type) -> GlobalRef
+    {
+        let v = interface.methods.read().unwrap().iter().map(|(id, _)| {
+            mangle::mangle_method_name(id, typ)
+        }).collect::<Vec<_>>();
+        self.global_map.intern(ir::GlobalValue::VirtualTable(v))
     }
 
     fn binary_expr(&mut self, e: &ast::Expr, b: &Box<ast::BinaryExpr>) {
@@ -371,18 +383,49 @@ impl<'a> FuncGen<'a> {
         }
 
         self.bld.check_yield();
-        // when it is a struct/interface function call, we need to load self first
-        if let ast::ExprKind::Selector(s) = &c.function.kind {
-            self.expr(&s.value);
-        }
-        for arg in c.parameters.iter() {
-            self.expr(arg);
-        }
         if let Some(name) = &c.symbol_name {
+            // when it is a struct function call, we need to load self first
+            if let ast::ExprKind::Selector(s) = &c.function.kind {
+                self.expr(&s.value);
+            }
+            for arg in c.parameters.iter() {
+                self.expr(arg);
+            }
             self.bld.call(name.clone());
+        } else if types::is_interface(&c.function.typ) {
+            if let ast::ExprKind::Selector(s) = &c.function.kind {
+                self.expr(&s.value);
+                // load and store interface object in temp
+                // this will probably be optimized out by register allocation but it makes codegen easier
+                let interface_id = self.bld.create_temp(Type::Reference);
+                self.bld.store(interface_id);
+                // load vtable and function pointer
+                self.bld.load(interface_id);
+                self.bld.get_object(1, Type::Reference);
+                let idx = types::get_interface_func_index(&c.function.typ, &s.selector.id);
+                self.bld.get_object(idx, Type::Reference);
+                // load self
+                self.bld.load(interface_id);
+                self.bld.get_object(0, Type::Reference);
+                // load args    
+                for arg in c.parameters.iter() {
+                    self.expr(arg);
+                }
+                let mut signature = Signature { 
+                    parameters: c.parameters.iter().map(|p| p.typ.clone().into()).collect(), 
+                    ret_types: vec![e.typ.clone().into()] 
+                };
+                signature.parameters.insert(0, ir::Type::Reference);
+                self.bld.indirect_call(signature);
+            } else {
+                panic!("Trying to call an interface method but the function was not a selector!");
+            }
         } else {
             self.expr(&c.function);
-            self.bld.indirect_call();
+            self.bld.indirect_call(Signature { 
+                parameters: c.parameters.iter().map(|p| p.typ.clone().into()).collect(), 
+                ret_types: vec![e.typ.clone().into()] 
+             });
         }
     }
 
@@ -475,6 +518,22 @@ impl<'a> FuncGen<'a> {
         }
     }
 
+    fn cast(&mut self, c: &ast::Cast) {
+        match c.target_type.kind() {
+            crate::types::TypeKind::Interface(interface) => {
+                self.bld.new_object(2);
+                self.expr(&c.value);
+                self.bld.dup(1);
+                self.bld.set_object(0, Type::Reference);
+                let vtable = self.generate_interface_vtable(interface, &c.value.typ);
+                self.bld.load_global(vtable);
+                self.bld.dup(1);
+                self.bld.set_object(1, Type::Reference);
+            }
+            _ => unimplemented!()
+        }
+    }
+
     fn expr(&mut self, e: &ast::Expr) {
         self.emit_source_loc(e.loc);
         match &e.kind {
@@ -486,6 +545,7 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::Number(f) => self.number(f),
             ast::ExprKind::Boolean(b) => self.boolean(b),
             ast::ExprKind::StringLiteral(s) => self.string_literal(s),
+            ast::ExprKind::Cast(c) => self.cast(c),
             ast::ExprKind::Identifier(i) => self.identifier(i),
             ast::ExprKind::Subscript(l) => self.subscript(e, l),
             ast::ExprKind::Selector(l) => self.selector(e, l),
@@ -748,6 +808,7 @@ impl<'a> FuncGen<'a> {
         };
         let mut s = Self {
             str_map: &mut ir_module.string_map,
+            global_map: &mut ir_module.global_value_map,
             bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature, &mut ir_module.source_locs),
             self_var: None,
             interned_file_name
@@ -772,6 +833,7 @@ impl<'a> FuncGen<'a> {
         signature.parameters.insert(0, struct_type.clone().into());
         let mut s = Self {
             str_map: &mut ir_module.string_map,
+            global_map: &mut ir_module.global_value_map,
             bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature, &mut ir_module.source_locs),
             self_var: None,
             interned_file_name
@@ -795,7 +857,7 @@ impl<'a> FuncGen<'a> {
 }
 
 pub fn emit_program(program: &ast::Program) -> Box<ir::Module> {
-    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![], source_locs: Default::default() };
+    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![], source_locs: Default::default(), global_value_map: GlobalValueMap::new() };
     
     for package in program.packages.iter() {
         for file in package.files.iter() {

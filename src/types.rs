@@ -17,13 +17,6 @@ pub struct NameSpecification {
     pub name: String,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct MethodSpecification {
-    pub package: String,
-    pub typ: Type,
-    pub name: String,
-}
-
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FunctionType {
     pub params: Vec<Type>,
@@ -43,6 +36,12 @@ pub struct EnumType {
 }
 
 #[derive(Debug)]
+pub struct InterfaceType {
+    pub spec: NameSpecification,
+    pub methods: RwLock<Vec<(String, FunctionType)>>,
+}
+
+#[derive(Debug)]
 pub enum TypeKind {
     Bad,
     Integer,
@@ -53,17 +52,15 @@ pub enum TypeKind {
     Array(Type),
     Struct(StructType),
     Enum(EnumType),
-    Identifier(String), 
     Function(FunctionType),
-    //Function,
-    //Interface,
-    //Struct,
+    Interface(InterfaceType),
 }
 
 #[derive(Debug)]
 pub struct Inner {
     pub hash: usize,
-    pub kind: TypeKind
+    pub kind: TypeKind,
+    pub method_set: RwLock<Vec<(String, FunctionType)>>,
 }
 
 #[derive(Debug)]
@@ -74,6 +71,19 @@ pub struct Type {
 impl Type {
     pub fn kind(&self) -> &TypeKind {
         &self.inner.kind
+    }
+
+    pub fn add_method(&self, name: &str, f: FunctionType) {
+        self.inner.method_set.write().unwrap().push((name.into(), f));
+    }
+
+    pub fn get_method(&self, name: &str) -> Option<FunctionType> {
+        if let TypeKind::Interface(interface) = &self.inner.kind {
+            if let Some((_, method)) = interface.methods.read().unwrap().iter().find(|(n, _)| n == name) {
+                return Some(method.clone());
+            }
+        }
+        Some(self.inner.method_set.read().unwrap().iter().find(|(n, _)| n == name)?.1.clone())
     }
 }
 
@@ -103,28 +113,69 @@ impl PartialEq for Type {
     }
 }
 
-impl Eq for Type {
-
-}
+impl Eq for Type {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ComparisonResult {
     Same,
-    Downcastable,
+    Upcastable,
     Incompatible,
 }
 
+pub fn interface_assignable(i: &InterfaceType, typ: &Type) -> bool {
+    if i.methods.read().unwrap().is_empty() {
+        return true;
+    }
+
+    for f in i.methods.read().unwrap().iter() {
+        if let Some(method) = typ.get_method(&f.0) {
+            if f.1 != method {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    } 
+
+    true
+}
+
+/// Compares two types
+/// If one can be an interface, the interface should be `a`
 pub fn compare(a: &Type, b: &Type) -> ComparisonResult {
     if a == b {
-        ComparisonResult::Same
-    } else {
-        ComparisonResult::Incompatible
+        return ComparisonResult::Same;
     }
+
+    if let TypeKind::Array(a_elem_typ) = a.kind() {
+        if let TypeKind::Array(b_elem_typ) = b.kind() {
+            let r = compare(a_elem_typ, b_elem_typ);
+            if r == ComparisonResult::Same {
+                return r;
+            }
+        }   
+    }
+
+    if let TypeKind::Interface(i) = a.kind() {
+        if interface_assignable(i, b) {
+            return ComparisonResult::Upcastable;
+        }
+    }
+
+    return ComparisonResult::Incompatible; 
 }
 
 /// Is type numeric (integer or number)
 pub fn is_numeric(ty: &Type) -> bool {
     matches!(ty.inner.kind, TypeKind::Integer | TypeKind::Number)
+}
+
+pub fn is_bad(ty: &Type) -> bool {
+    matches!(ty.inner.kind, TypeKind::Bad)
+}
+
+pub fn is_unknown_reference(ty: &Type) -> bool {
+    matches!(ty.inner.kind, TypeKind::UnknownReference)
 }
 
 pub fn is_number(ty: &Type) -> bool {
@@ -160,7 +211,11 @@ pub fn is_function(ty: &Type) -> bool {
 }
 
 pub fn is_reference(ty: &Type) -> bool {
-    matches!(ty.inner.kind, TypeKind::UnknownReference | TypeKind::Struct(_) | TypeKind::Array(_))
+    matches!(ty.inner.kind, TypeKind::UnknownReference | TypeKind::Struct(_) | TypeKind::Array(_) | TypeKind::Interface(_) )
+}
+
+pub fn is_interface(ty: &Type) -> bool {
+    matches!(ty.inner.kind, TypeKind::Interface(_))
 }
 
 pub fn clone_struct_fields(ty: &Type) -> Vec<(String, Type)> {
@@ -179,9 +234,25 @@ pub fn get_max_enum_values(ty: &Type) -> usize {
     }
 }
 
+pub fn get_interface_func_index(ty: &Type, id: &str) -> usize {
+    if let TypeKind::Interface(interface) = ty.kind() {
+        interface.methods
+            .read()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m.0 == *id)
+            .map(|(i, _)| i)
+            .next()
+            .unwrap_or_else(|| panic!("Function not found in interface"))
+    } else {
+        panic!("Type is not an interface");
+    }
+}
+
 pub fn create_type(kind: TypeKind) -> Type {
     Type {
-        inner: Arc::new(Inner { kind, hash: get_next_id() }),
+        inner: Arc::new(Inner { kind, hash: get_next_id(), method_set: RwLock::new(Vec::new()) }),
     }
 }
 
@@ -196,10 +267,10 @@ pub fn name(typ: &Type) -> String {
         TypeKind::Array(element_type) => format!("[]{}", name(element_type)),
         TypeKind::Struct(struct_type) => format!("{}.{}", struct_type.spec.package, struct_type.spec.name),
         TypeKind::Enum(enum_type) => format!("{}.{}", enum_type.spec.package, enum_type.spec.name),
-        TypeKind::Identifier(id) => id.clone(),
         TypeKind::Function(func_type) => format!("fn({}) -> ({})", 
             func_type.params.iter().map(|t| name(t)).collect::<Vec<_>>().join(", "), 
-            func_type.returns.iter().map(|t| name(t)).collect::<Vec<_>>().join(", "))
+            func_type.returns.iter().map(|t| name(t)).collect::<Vec<_>>().join(", ")),
+        TypeKind::Interface(interface_type) => format!("{}.{}", interface_type.spec.package, interface_type.spec.name),
     }
 }
 
@@ -247,10 +318,6 @@ pub fn array(element_type: Type) -> Type {
     array_type
 }
 
-pub fn identifier(id: String) -> Type {
-    create_type(TypeKind::Identifier(id))
-}
-
 pub fn struct_type(spec: NameSpecification, fields: Vec<(String, Type)>) -> Type {
     create_type(TypeKind::Struct(StructType {
         spec,
@@ -267,4 +334,11 @@ pub fn enum_type(spec: NameSpecification, variants: Vec<(String, Vec<Type>)>) ->
 
 pub fn function_type(params: Vec<Type>, returns: Vec<Type>) -> Type {
     create_type(TypeKind::Function(FunctionType { params, returns }))
+}
+
+pub fn interface_type(spec: NameSpecification, methods: Vec<(String, FunctionType)>) -> Type {
+    create_type(TypeKind::Interface(InterfaceType {
+        spec,
+        methods: RwLock::new(methods),
+    }))
 }

@@ -12,6 +12,7 @@ pub mod source;
 pub mod token;
 pub mod tokeniser;
 pub mod checker;
+pub mod mangle;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SourceLoc {

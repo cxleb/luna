@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use crate::builtins::Builtins;
+use crate::compiler::mangle;
 use crate::compiler::{SourceLoc, ast};
-use crate::types::{self, MethodSpecification, NameSpecification, Type, clone_struct_fields};
+use crate::types::{self, NameSpecification, Type, clone_struct_fields};
 
 #[derive(Debug)]
 pub enum SemaErrorReason {
@@ -35,6 +36,7 @@ pub enum SemaErrorReason {
     EnumVariantNotFound,
     EnumVariantPatternFieldCountMismatch,
     InvalidPatternKind,
+    ExpressionCannotBeCasted,
 }
 
 #[derive(Debug)]
@@ -104,6 +106,22 @@ fn collect_types(program: &ast::Program) -> TypeCollection {
                 let typ = types::enum_type(name_spec.clone(), Vec::new());
                 collection.types.insert(name_spec, typ);
             }
+            for enum_ in file.enums.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: enum_.id.clone(),
+                };
+                let typ = types::enum_type(name_spec.clone(), Vec::new());
+                collection.types.insert(name_spec, typ);
+            }
+            for interface in file.interfaces.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: interface.id.clone(),
+                };
+                let typ = types::interface_type(name_spec.clone(), Vec::new());
+                collection.types.insert(name_spec, typ);
+            }
         }
     }
 
@@ -146,6 +164,28 @@ fn check_types(program: &ast::Program, collection: &TypeCollection) -> SemaResul
                     }
                 }
             }
+            for interface in file.interfaces.iter() {
+                let name_spec = NameSpecification {
+                    package: package.id.clone(),
+                    name: interface.id.clone(),
+                };
+                let typ = collection.types.get(&name_spec).unwrap().clone();
+                for method in interface.methods.iter() {
+                    let mut params = Vec::new();
+                    for param in method.params.iter() {
+                        let param_type = type_lookup(&param.type_annotation, &collection, &package.id, &file.imports)?;
+                        params.push(param_type);
+                    }
+                    let mut returns = Vec::new();
+                    for return_type in method.return_type.iter() {
+                        let return_type = type_lookup(&return_type, &collection, &package.id, &file.imports)?;
+                        returns.push(return_type);
+                    }
+                    if let types::TypeKind::Interface(interface_type) = &typ.inner.kind {
+                        interface_type.methods.write().unwrap().push((method.id.clone(), types::FunctionType { params, returns }));
+                    }
+                }
+            }
         }
     }
     Ok(())
@@ -165,7 +205,7 @@ fn type_lookup(ast_type: &ast::Type, collection: &TypeCollection, package_id: &s
 
 struct FunctionCollection {
     functions: HashMap<NameSpecification, types::FunctionType>,
-    methods: HashMap<MethodSpecification, types::FunctionType>,
+    //methods: HashMap<MethodSpecification, types::FunctionType>,
 }
 
 impl FunctionCollection {
@@ -196,43 +236,11 @@ impl FunctionCollection {
         };
         self.functions.get(&name_spec)
     }
-
-    // Find a function in the collection
-    pub fn get_method(&self, imports: &Vec<String>, typ: &Type, package: &str, name: &String) -> Option<(&types::FunctionType, MethodSpecification)> {
-        if let Some(func_typ) = self.get_exact_method(typ, package, name) {
-            return Some((func_typ, MethodSpecification {
-                package: package.into(),
-                typ: typ.clone(),
-                name: name.clone(),
-            }));
-        }
-        for import in imports {
-            let method_spec = MethodSpecification {
-                package: import.clone(),
-                typ: typ.clone(),
-                name: name.clone(),
-            };
-            if let Some(typ) = self.methods.get(&method_spec) {
-                return Some((typ, method_spec));
-            }
-        }
-        None
-    }
-
-    pub fn get_exact_method(&self, typ: &Type, package: &str, name: &str) -> Option<&types::FunctionType> {
-        let method_spec = MethodSpecification {
-            package: package.into(),
-            typ: typ.clone(),
-            name: name.into()
-        };
-        self.methods.get(&method_spec)
-    }
 }
 
 fn collect_functions(program: &ast::Program, builtins: &Builtins, collection: &TypeCollection) -> SemaResult<FunctionCollection> {
     let mut function_collection = FunctionCollection {
-        functions: HashMap::new(),
-        methods: HashMap::new()
+        functions: HashMap::new()
     };
 
     // collect the builtin functions into the builtin package(which is implicitly imported)
@@ -298,28 +306,13 @@ fn collect_functions(program: &ast::Program, builtins: &Builtins, collection: &T
                         returns,
                     };
 
-                    let method_spec = MethodSpecification {
-                        package: package.id.clone(),
-                        typ: typ.clone(),
-                        name: func.signature.id.clone(),
-                    };
-                    function_collection.methods.insert(method_spec, function_type);
+                    typ.add_method(&func.signature.id, function_type)
                 }
             }
         }
     }
 
     Ok(function_collection)
-}
-
-fn mangle_name(name_spec: &NameSpecification) -> String {
-    // For now, we will just mangle by prefixing with the package name, but in the future we will need to mangle generics and stuff too
-    format!("_L{}_{}", name_spec.package, name_spec.name)
-}
-
-fn mangle_name_struct(method_spec: &MethodSpecification) -> String {
-    // For now, we will just mangle by prefixing with the package name, but in the future we will need to mangle generics and stuff too
-    format!("_L{}_{}_{}", method_spec.package, types::name(&method_spec.typ), method_spec.name)
 }
 
 struct FuncTypeInference<'a> {
@@ -399,14 +392,14 @@ impl<'a> FuncTypeInference<'a> {
             _ => panic!()
         };
         
-        self.expr(&mut b.lhs, type_hint.clone())?;
-        self.expr(&mut b.rhs, type_hint.clone())?;
-
         match b.kind {
             ast::BinaryExprKind::Add |
             ast::BinaryExprKind::Subtract |
             ast::BinaryExprKind::Multiply |
             ast::BinaryExprKind::Divide => {
+                self.expr(&mut b.lhs, type_hint.clone())?;
+                self.expr(&mut b.rhs, type_hint.clone())?;
+
                 let mut typ = b.lhs.typ.clone();
                 
                 if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
@@ -436,6 +429,9 @@ impl<'a> FuncTypeInference<'a> {
             ast::BinaryExprKind::GreaterThan |
             ast::BinaryExprKind::LessThanEqual |
             ast::BinaryExprKind::GreaterThanEqual => {
+                self.expr(&mut b.lhs, None)?;
+                self.expr(&mut b.rhs, None)?;
+
                 if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
                     return self.error_loc(SemaErrorReason::IncompatibleTypesInBinaryExpression, e.loc);
                 }
@@ -444,6 +440,9 @@ impl<'a> FuncTypeInference<'a> {
             }
             ast::BinaryExprKind::LogicalAnd |
             ast::BinaryExprKind::LogicalOr => {
+                self.expr(&mut b.lhs, None)?;
+                self.expr(&mut b.rhs, None)?;
+
                 if !types::is_bool(&b.lhs.typ) {
                     return self.error_loc(SemaErrorReason::NonBoolInLogicalExpression, b.lhs.loc);
                 }
@@ -470,8 +469,7 @@ impl<'a> FuncTypeInference<'a> {
         
         self.expr(&mut a.value, type_hint)?;
         self.store_expr(&mut a.destination)?;
-        if types::compare(&a.value.typ, &a.destination.typ) == types::ComparisonResult::Incompatible {
-            println!("Assignment type mismatch: {:?} != {:?}", a.value.typ, a.destination.typ);
+        if types::compare(&a.destination.typ, &a.value.typ) == types::ComparisonResult::Incompatible {
             return self.error_loc(SemaErrorReason::AssignmentTypesIncompatible, e.loc);
         }
         e.typ = a.destination.typ.clone();  
@@ -510,12 +508,12 @@ impl<'a> FuncTypeInference<'a> {
                 // Sema check arguements, then check argument types
                 for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
                     self.expr(arg, Some(param.clone()))?;
-                    if types::compare(&arg.typ, &param) == types::ComparisonResult::Incompatible {
-                        return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
+                    if types::compare(&param, &arg.typ) == types::ComparisonResult::Incompatible {
+                        return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, arg.loc);
                     }
                 }
 
-                c.symbol_name = Some(mangle_name(&name_spec));
+                c.symbol_name = Some(mangle::mangle_name(&name_spec));
 
                 // Assign this expr the return type of the function
                 if let Some(typ) = func_signature.returns.first() {
@@ -529,9 +527,42 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Selector(s) => {
                 self.expr(&mut s.value, None)?;
 
-                if let types::TypeKind::Struct(_) = s.value.typ.kind() {
-                    if let Some((f, m)) = self.functions.get_method(self.imports, &s.value.typ, self.package_id, &s.selector.id) {
-                        let func_signature = &f;
+                if types::is_struct(&s.value.typ) {
+                    if let Some(func_signature) = s.value.typ.get_method(&s.selector.id) {
+                        //let func_signature = &f;
+                        
+                        // Do some basic argument count checking
+                        if func_signature.params.len() < c.parameters.len() {
+                            return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
+                        }
+                        if func_signature.params.len() > c.parameters.len() {
+                            return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
+                        }
+
+                        // Sema check arguements, then check argument types
+                        for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
+                            self.expr(arg, Some(param.clone()))?;
+                            if types::compare(&param, &arg.typ) == types::ComparisonResult::Incompatible {
+                                return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
+                            }
+                        }
+
+                        // Assign this expr the return type of the function
+                        if let Some(typ) = func_signature.returns.first() {
+                            e.typ = typ.clone();
+                        } else {
+                            e.typ = types::bad();
+                        }
+
+                        c.symbol_name = Some(mangle::mangle_method_name(&s.selector.id, &s.value.typ));
+
+                        return self.ok();
+                    } else {
+                        return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc);
+                    }
+                } else if types::is_interface(&s.value.typ) {
+                    if let Some(func_signature) = s.value.typ.get_method(&s.selector.id) {
+                        //let func_signature = &f;
                         
                         // Do some basic argument count checking
                         if func_signature.params.len() < c.parameters.len() {
@@ -555,8 +586,7 @@ impl<'a> FuncTypeInference<'a> {
                         } else {
                             e.typ = types::bad();
                         }
-
-                        c.symbol_name = Some(mangle_name_struct(&m));
+                        c.function.typ = s.value.typ.clone();
 
                         return self.ok();
                     } else {
@@ -695,11 +725,22 @@ impl<'a> FuncTypeInference<'a> {
                 }
             }
         } else {
-            self.expr(&mut l.literals[0], type_hint)?;
+            let inner = type_hint.and_then(|t| {
+                if let types::TypeKind::Array(element_type) = t.kind() {
+                    Some(element_type.clone())
+                } else {
+                    None
+                }
+            });
+
+            // Process the first element to determine the type of the array, 
+            // then check the rest of the elements are the same type
+            self.expr(&mut l.literals[0], inner)?;
             let element_type = l.literals[0].typ.clone();
+
             for literal in l.literals.iter_mut().skip(1) {
                 self.expr(literal, Some(element_type.clone()))?;
-                if types::compare(&literal.typ, &element_type) == types::ComparisonResult::Incompatible {
+                if types::compare(&element_type,&literal.typ) == types::ComparisonResult::Incompatible {
                     return self.error_loc(SemaErrorReason::IncompatibleTypesInBinaryExpression, e.loc);
                 }
             }
@@ -745,7 +786,7 @@ impl<'a> FuncTypeInference<'a> {
             // run sema on the field value
             self.expr(&mut field.value, Some(struct_field.1.clone()))?;
             // check the type matches
-            if types::compare(&field.value.typ, &struct_field.1) == types::ComparisonResult::Incompatible {
+            if types::compare(&struct_field.1, &field.value.typ) == types::ComparisonResult::Incompatible {
                 return self.error_loc(SemaErrorReason::AssignmentTypesIncompatible, field.loc);
             }
         }
@@ -765,22 +806,48 @@ impl<'a> FuncTypeInference<'a> {
     } 
 
     fn expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
-        match &mut e.kind {
-            ast::ExprKind::BinaryExpr(_) => self.binary_expr(e, type_hint),
-            ast::ExprKind::UnaryExpr(u) => self.unary_expr(u, type_hint),
-            ast::ExprKind::Assign(_) => self.assign(e, type_hint),
-            ast::ExprKind::Call(_) => self.call(e, type_hint),
-            ast::ExprKind::Integer(i) => self.integer(i, type_hint),
-            ast::ExprKind::Number(f) => self.number(f, type_hint),
-            ast::ExprKind::Boolean(b) => self.boolean(b, type_hint),
-            ast::ExprKind::StringLiteral(s) => self.string_literal(s, type_hint),
-            ast::ExprKind::Identifier(_) => self.identifier(e, type_hint),
-            ast::ExprKind::Subscript(_) => self.subscript(e, type_hint),
-            ast::ExprKind::Selector(_) => self.selector(e, type_hint),
-            ast::ExprKind::ArrayLiteral(_) => self.array_literal(e, type_hint),
-            ast::ExprKind::ObjectLiteral(_) => self.object_literal(e, type_hint),
+        let checked_e = match &mut e.kind {
+            ast::ExprKind::BinaryExpr(_) => self.binary_expr(e, type_hint.clone()),
+            ast::ExprKind::UnaryExpr(u) => self.unary_expr(u, type_hint.clone()),
+            ast::ExprKind::Assign(_) => self.assign(e, type_hint.clone()),
+            ast::ExprKind::Call(_) => self.call(e, type_hint.clone()),
+            ast::ExprKind::Integer(i) => self.integer(i, type_hint.clone()),
+            ast::ExprKind::Number(f) => self.number(f, type_hint.clone()),
+            ast::ExprKind::Boolean(b) => self.boolean(b, type_hint.clone()),
+            ast::ExprKind::StringLiteral(s) => self.string_literal(s, type_hint.clone()),
+            ast::ExprKind::Identifier(_) => self.identifier(e, type_hint.clone()),
+            ast::ExprKind::Subscript(_) => self.subscript(e, type_hint.clone()),
+            ast::ExprKind::Selector(_) => self.selector(e, type_hint.clone()),
+            ast::ExprKind::ArrayLiteral(_) => self.array_literal(e, type_hint.clone()),
+            ast::ExprKind::ObjectLiteral(_) => self.object_literal(e, type_hint.clone()),
             ast::ExprKind::_Self => self._self(e),
+            ast::ExprKind::Cast(_) => unimplemented!("Cast expressions not implemented yet"),
+        };
+
+        if checked_e.is_err() {
+            return checked_e;
         }
+
+        // Wraps implicit casts
+        if let Some(expected) = type_hint {
+            match types::compare(&expected, &e.typ) {
+                types::ComparisonResult::Incompatible => {
+                    return self.error_loc(SemaErrorReason::ExpressionCannotBeCasted, e.loc);
+                }
+                types::ComparisonResult::Upcastable => {
+                    // wrap the expression in a cast expression
+                    let original_expr = e.clone();
+                    e.kind = ast::ExprKind::Cast(Box::new(ast::Cast {
+                        value: original_expr,
+                        target_type: expected.clone(),
+                    }));
+                    e.typ = expected;
+                }
+                _ => {}
+            }
+        } 
+
+        self.ok()
     }
 
     fn store_subscript(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
@@ -890,7 +957,7 @@ impl<'a> FuncTypeInference<'a> {
         if let Some(return_type) = self.own_signature.returns.first().cloned() {
             if let Some(r) = &mut r.value {
                 self.expr(r, Some(return_type.clone()))?;
-                if types::compare(&r.typ, &return_type) == types::ComparisonResult::Incompatible {
+                if types::compare(&return_type, &r.typ) == types::ComparisonResult::Incompatible {
                     return self.error_loc(SemaErrorReason::IncompatibleTypesInReturnValue, r.loc);
                 }
             } else {
@@ -1018,7 +1085,7 @@ fn check_file(file: &mut Box<ast::File>, package_id: &str, collection: &TypeColl
         func.typ_ = own_signature.clone();
         FuncTypeInference::new(&file.imports, collection, own_signature, functions, package_id).check(func)?;
 
-        func.signature.symbol_name = mangle_name(&NameSpecification {
+        func.signature.symbol_name = mangle::mangle_name(&NameSpecification {
             package: package_id.into(),
             name: func.signature.id.clone(),
         });
@@ -1028,9 +1095,9 @@ fn check_file(file: &mut Box<ast::File>, package_id: &str, collection: &TypeColl
         let typ = collection.get_exact(package_id, &_struct.id).unwrap().clone();
         _struct.typ = typ.clone();
         for func in _struct.functions.iter_mut() {
-            let own_signature = functions.get_exact_method(&typ, package_id, &func.signature.id).unwrap();
+            let own_signature = typ.get_method(&func.signature.id).unwrap();
             func.typ_ = own_signature.clone();
-            func.signature.symbol_name = mangle_name_struct(&&MethodSpecification { package: package_id.into(), typ: typ.clone(), name: func.signature.id.clone() });
+            func.signature.symbol_name = mangle::mangle_method_name(&func.signature.id, &typ);
             FuncTypeInference::new_for_method(&file.imports, collection, &own_signature, functions, package_id, typ.clone()).check(func)?;
         }
     }

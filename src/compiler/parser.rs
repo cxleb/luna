@@ -1,6 +1,5 @@
 use crate::{
-    compiler::{SourceLoc, ast::*, token::*, tokeniser::*},
-    types::{self},
+    compiler::{SourceLoc, ast::*, token::*, tokeniser::*}, types::{self}
 };
 
 #[derive(Debug)]
@@ -118,10 +117,34 @@ impl<'a> Parser<'a> {
                     let enum_ = self.parse_enum()?;
                     file.enums.push(enum_);
                 }
+                TokenKind::Keyword(Keywords::Interface) => {
+                    let interface = self.parse_interface()?;
+                    file.interfaces.push(interface);
+                }
                 _ => return self.error(ParserErrorReason::ExpectedTopLevelDefinition),
             }
         }
         Ok(file)
+    }
+
+    pub fn parse_interface(&mut self) -> ParserResult<Box<Interface>> {
+        let loc = self.source_loc();
+        self.expect(TokenKind::Keyword(Keywords::Interface))?;
+        let id = self.expect(TokenKind::Identifier)?;
+        let mut interface = Box::new(Interface {
+            loc,
+            id: id.get_string(),
+            methods: Vec::new(),
+            typ: types::Type::default(),
+        });
+        self.expect(TokenKind::Punctuation(Punctuation::LeftBrace))?;
+        while !self.test(TokenKind::Punctuation(Punctuation::RightBrace)) {
+            let method = self.parse_function_signature()?;
+            self.expect(TokenKind::Punctuation(Punctuation::SemiColon))?;
+            interface.methods.push(method);
+        }
+        self.expect(TokenKind::Punctuation(Punctuation::RightBrace))?;
+        Ok(interface)
     }
 
     pub fn parse_enum(&mut self) -> ParserResult<Box<Enum>> {
@@ -206,19 +229,19 @@ impl<'a> Parser<'a> {
         Ok(struct_)
     }
 
-    pub fn parse_function(&mut self) -> ParserResult<Box<Func>> {
-        let mut function = Box::new(Func::default());
-        function.loc = self.source_loc();
+    pub fn parse_function_signature(&mut self) -> ParserResult<FuncSignature> {
+        let mut signature = FuncSignature::default();
+
         self.expect(TokenKind::Keyword(Keywords::Func))?;
         let id = self.expect(TokenKind::Identifier)?;
-        function.signature.id = id.get_string();
+        signature.id = id.get_string();
         self.expect(TokenKind::Punctuation(Punctuation::LeftParenthesis))?;
         while !self.test(TokenKind::Punctuation(Punctuation::RightParenthesis)) {
             let param_id = self.expect(TokenKind::Identifier)?;
             let param_id = param_id.get_string();
             self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
             let param_type = self.parse_type()?;
-            function.signature.params.push(Param {
+            signature.params.push(Param {
                 id: param_id,
                 type_annotation: param_type,
             });
@@ -232,8 +255,15 @@ impl<'a> Parser<'a> {
         if self.test(TokenKind::Punctuation(Punctuation::Colon)) {
             self.expect(TokenKind::Punctuation(Punctuation::Colon))?;
             let return_type = self.parse_type()?;
-            function.signature.return_type = Some(return_type);
+            signature.return_type = Some(return_type);
         }
+        Ok(signature)
+    }
+
+    pub fn parse_function(&mut self) -> ParserResult<Box<Func>> {
+        let mut function = Box::new(Func::default());
+        function.signature = self.parse_function_signature()?;
+        function.loc = self.source_loc();
         let body = self.parse_block_statement()?;
         function.body = body;
         Ok(function)
@@ -829,6 +859,20 @@ mod tests {
         assert_eq!(enum_.variants[0].variant_types.len(), 0);
         assert_eq!(enum_.variants[1].id, "Variant2");
         assert_eq!(enum_.variants[1].variant_types.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_interface() {
+        use crate::compiler::parser::Parser;
+
+        let mut parser = Parser::new("interface MyInterface { func method(param: string); }");
+        let interface = parser.parse_interface().unwrap();
+        assert_eq!(interface.id, "MyInterface");
+        assert_eq!(interface.methods.len(), 1);
+        assert_eq!(interface.methods[0].id, "method");
+        assert_eq!(interface.methods[0].params.len(), 1);
+        assert_eq!(interface.methods[0].params[0].id, "param");
+        assert_eq!(interface.methods[0].params[0].type_annotation, Box::new(crate::compiler::ast::Type::String));
     }
 
     #[test]

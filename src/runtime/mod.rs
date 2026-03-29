@@ -244,7 +244,7 @@ impl JitContext {
         });
 
         let translated = module.funcs.iter().map(|func| {
-            translate::translate_function(self, &func, &mut context, &signatures, &module.string_map, &module.source_locs);
+            translate::translate_function(self, &func, &mut context, &signatures, &module.string_map, &module.source_locs, &module.global_value_map);
             let id = self.module.declare_function(&func.id, cranelift::module::Linkage::Local, &context.func.signature).unwrap();
             self.module.define_function(id, &mut context).unwrap();
             self.module.clear_context(&mut context);

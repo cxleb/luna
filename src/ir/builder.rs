@@ -1,6 +1,6 @@
 use std::{collections::HashMap};
 
-use crate::ir::{Block, BlockRef, Signature, SourceLocs, StringRef, Type, VariableRef};
+use crate::ir::{Block, BlockRef, GlobalRef, Signature, SourceLocs, StringRef, Type, VariableRef};
 pub struct FuncBuilder<'a> {
     func: super::Function,
     current_block: usize,
@@ -216,6 +216,10 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::LoadConstString(s));
     }
 
+    pub fn load_global(&mut self, g: GlobalRef) {
+        self.append_inst(super::Inst::LoadGlobal(g));
+    }
+
     pub fn truncate(&mut self) {
         self.append_inst(super::Inst::Truncate);
     }
@@ -260,8 +264,8 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::Call(id));
     }
 
-    pub fn indirect_call(&mut self) {
-        self.append_inst(super::Inst::IndirectCall);
+    pub fn indirect_call(&mut self, signature: Signature) {
+        self.append_inst(super::Inst::IndirectCall(signature));
     }
 
     pub fn new_array(&mut self, size: usize) {

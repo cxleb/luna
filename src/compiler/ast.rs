@@ -115,6 +115,12 @@ pub struct ObjectLiteral {
 }
 
 #[derive(Debug, Clone)]
+pub struct Cast{
+    pub value: Expr,
+    pub target_type: types::Type,
+}
+
+#[derive(Debug, Clone)]
 pub enum ExprKind {
     BinaryExpr(Box<BinaryExpr>),
     UnaryExpr(Box<UnaryExpr>),
@@ -129,6 +135,7 @@ pub enum ExprKind {
     Selector(Box<Selector>),
     ArrayLiteral(Box<ArrayLiteral>),
     ObjectLiteral(Box<ObjectLiteral>),
+    Cast(Box<Cast>),
     _Self,
 }
 
@@ -290,11 +297,20 @@ pub struct Enum {
 
 
 #[derive(Debug, Default, Clone)]
+pub struct Interface {
+    pub loc: SourceLoc,
+    pub id: String,
+    pub methods: Vec<FuncSignature>,
+    pub typ: types::Type,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct File {
     pub id: String,
     pub functions: Vec<Box<Func>>,
     pub structs: Vec<Box<Struct>>,
     pub enums: Vec<Box<Enum>>,
+    pub interfaces: Vec<Box<Interface>>,
     pub imports: Vec<String>,
 }
 

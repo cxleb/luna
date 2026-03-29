@@ -5,14 +5,10 @@ interface AsInt {
 struct Example {
     a: int,
     b: int,
-
-    func as_int(): int {
-        return self.a + self.b;
-    }
 }
 
 func use_as_int(the_int: AsInt) {
-    printint(the_int.as_int());
+    assert(the_int.as_int() == 30);
 }
 
 func main() {
