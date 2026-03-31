@@ -1,0 +1,35 @@
+interface MathOps {
+    func add(a: int, b: int): int;
+    func is_positive(value: int): bool;
+}
+
+struct Calculator {
+    bias: int,
+
+    func add(a: int, b: int): int {
+        return a + b + self.bias;
+    }
+
+    func is_positive(value: int): bool {
+        return value > 0;
+    }
+}
+
+func verify_math_ops(ops: MathOps) {
+    assert(ops.add(2, 3) == 10);
+    assert(ops.is_positive(1));
+
+    if ops.is_positive(0) {
+        assert(false);
+    } else {
+        assert(true);
+    }
+}
+
+func main() {
+    let calculator = Calculator {
+        bias: 5
+    };
+
+    verify_math_ops(calculator);
+}

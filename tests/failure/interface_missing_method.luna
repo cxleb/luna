@@ -1,0 +1,24 @@
+interface RequiresTwoMethods {
+    func first(): int;
+    func second(): int;
+}
+
+struct OnlyOneMethod {
+    value: int,
+
+    func first(): int {
+        return self.value;
+    }
+}
+
+func takes_interface(input: RequiresTwoMethods) {
+    assert(input.first() == 10);
+}
+
+func main() {
+    let sample = OnlyOneMethod {
+        value: 10
+    };
+
+    takes_interface(sample);
+}

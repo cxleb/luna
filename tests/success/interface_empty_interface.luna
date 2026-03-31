@@ -1,0 +1,17 @@
+interface Marker {}
+
+struct Payload {
+    value: int,
+}
+
+func accepts_anything(value: Marker) {
+    assert(true);
+}
+
+func main() {
+    let payload = Payload {
+        value: 42
+    };
+
+    accepts_anything(payload);
+}

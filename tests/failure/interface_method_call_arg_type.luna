@@ -1,0 +1,18 @@
+interface Scaler {
+    func scale(value: number): number;
+}
+
+struct Doubler {
+    func scale(value: number): number {
+        return value * 2.0;
+    }
+}
+
+func use_scaler(scaler: Scaler) {
+    scaler.scale(true);
+}
+
+func main() {
+    let doubler = Doubler {};
+    use_scaler(doubler);
+}

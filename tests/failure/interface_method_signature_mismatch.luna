@@ -1,0 +1,23 @@
+interface IntProcessor {
+    func process(value: int): int;
+}
+
+struct NumberProcessor {
+    multiplier: number,
+
+    func process(value: number): int {
+        return 10;
+    }
+}
+
+func run_processor(processor: IntProcessor) {
+    assert(processor.process(3) == 10);
+}
+
+func main() {
+    let processor = NumberProcessor {
+        multiplier: 2.0
+    };
+
+    run_processor(processor);
+}
