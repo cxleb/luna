@@ -37,6 +37,7 @@ pub enum SemaErrorReason {
     EnumVariantPatternFieldCountMismatch,
     InvalidPatternKind,
     ExpressionCannotBeCasted,
+    TemplateSubstitutionMustBeString
 }
 
 #[derive(Debug)]
@@ -62,6 +63,10 @@ impl TypeCollection {
             return Some(typ);
         } 
 
+        if let Some(typ) = self.get_exact("builtins", name) {
+            return Some(typ);
+        }
+
         for import in imports {
             let name_spec = NameSpecification {
                 package: import.clone(),
@@ -83,10 +88,23 @@ impl TypeCollection {
     }
 }
 
+fn builtin_types(collection: &mut TypeCollection) {
+    let string_name_spec = NameSpecification {
+        package: "builtins".into(),
+        name: "String".into(),
+    };
+    let string_interface = types::interface_type(string_name_spec.clone(), vec![
+        ("string".into(), types::FunctionType { params: Vec::new(), returns: vec![types::string()] }),
+    ]);
+    collection.types.insert(string_name_spec.clone(), string_interface);
+}
+
 fn collect_types(program: &ast::Program) -> TypeCollection {
     let mut collection = TypeCollection {
         types: HashMap::new(),
     };
+
+    builtin_types(&mut collection);
 
     for package in program.packages.iter() {
         for file in package.files.iter() {
@@ -214,6 +232,12 @@ impl FunctionCollection {
         if let Some(typ) = self.get_exact(package, name) {
             return Some((typ, NameSpecification {
                 package: package.into(),
+                name: name.clone(),
+            }));
+        }
+        if let Some(typ) = self.get_exact("builtins", name) {
+            return Some((typ, NameSpecification {
+                package: "builtins".into(),
                 name: name.clone(),
             }));
         }
@@ -805,6 +829,49 @@ impl<'a> FuncTypeInference<'a> {
         self.ok()
     } 
 
+    fn template(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
+        let t = match &mut e.kind {
+            ast::ExprKind::Template(t) => t,
+            _ => panic!()
+        };
+        // check there is at least one substitution, then check all substitutions are strings, then assign type as string
+        let string_interface = self.types.get_exact("builtins", "String").expect("String interface not found");
+        
+        for expr in t.expressions.iter_mut() {
+            self.expr(expr, None)?;
+            if types::compare(string_interface, &expr.typ) == types::ComparisonResult::Incompatible {
+                return self.error_loc(SemaErrorReason::TemplateSubstitutionMustBeString, expr.loc);
+            }
+
+            // wrap the expression in a call to the string function on the string interface
+            let original_expr = expr.clone();
+            *expr = ast::Expr {
+                kind: ast::ExprKind::Call(Box::new(ast::Call {
+                    function: ast::Expr {
+                        kind: ast::ExprKind::Selector(Box::new(ast::Selector {
+                            value: original_expr,
+                            selector: ast::Identifier { id: "string".into() },
+                            idx: 0,
+                            enum_idx: None,
+                        })),
+                        typ: types::bad(), // will be filled in by the selector sema
+                        loc: expr.loc,
+                    },
+                    parameters: Vec::new(),
+                    symbol_name: None,
+                    enum_idx: None,
+                })),
+                typ: types::bad(), // will be filled in by the call sema
+                loc: expr.loc,
+            };
+            // sema check the new call expression
+            self.expr(expr, None)?;
+        }        
+
+        e.typ = types::string();
+        self.ok()
+    }
+
     fn expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
         let checked_e = match &mut e.kind {
             ast::ExprKind::BinaryExpr(_) => self.binary_expr(e, type_hint.clone()),
@@ -821,6 +888,7 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::ArrayLiteral(_) => self.array_literal(e, type_hint.clone()),
             ast::ExprKind::ObjectLiteral(_) => self.object_literal(e, type_hint.clone()),
             ast::ExprKind::_Self => self._self(e),
+            ast::ExprKind::Template(_) => self.template(e, type_hint.clone()),
             ast::ExprKind::Cast(_) => unimplemented!("Cast expressions not implemented yet"),
         };
 
@@ -1079,7 +1147,7 @@ impl<'a> FuncTypeInference<'a> {
 }
 
 fn check_file(file: &mut Box<ast::File>, package_id: &str, collection: &TypeCollection, functions: &FunctionCollection) -> SemaResult<()> {
-    file.imports.push("builtins".into());
+
     for func in file.functions.iter_mut() {
         let own_signature = functions.get_exact(package_id, &func.signature.id).unwrap();
         func.typ_ = own_signature.clone();
@@ -1123,4 +1191,3 @@ pub fn check_program(program: &mut ast::Program, builtins: &Builtins) -> SemaRes
     }
     Ok(())
 }
-

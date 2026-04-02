@@ -14,6 +14,7 @@ pub enum ParserErrorReason {
     UnexpectedEOF,
     ExpectedExpression,
     ExpectedPattern,
+    ExpectedTemplate,
 }
 
 #[derive(Debug)]
@@ -590,6 +591,38 @@ impl<'a> Parser<'a> {
                 loc: token.loc,
                 typ: types::string(),
             });
+        } else if self.test(TokenKind::TemplateHead) {
+            let mut literals = Vec::new();
+            let mut expressions = Vec::new();
+
+            let old_mode = self.mode;
+            self.mode = TokeniserMode::TemplateTail;
+
+            let token = self.next()?;
+            literals.push(token.get_string());
+
+            loop {
+                let expr = self.parse_expression()?;
+                expressions.push(expr);
+                if self.test(TokenKind::TemplateTail) {
+                    let token = self.next()?;
+                    literals.push(token.get_string());
+                    break;
+                } else if self.test(TokenKind::TemplateMiddle) {
+                    let token = self.next()?;
+                    literals.push(token.get_string());
+                } else {
+                    return self.error(ParserErrorReason::ExpectedTemplate);
+                }
+            }
+
+            self.mode = old_mode;
+
+            return Ok(Expr {
+                kind: ExprKind::Template(Box::new(Template { literals, expressions })),
+                loc: token.loc,
+                typ: types::string(),
+            });
         } else if self.test(TokenKind::Identifier) {
             let token = self.next()?;
             let id = token.get_string();
@@ -1010,5 +1043,22 @@ mod tests {
         assert_eq!(ty, Box::new(ast::Type::Array(Box::new(ast::Type::String))));
         let ty = parser.parse_type().unwrap();
         assert_eq!(ty, Box::new(ast::Type::Identifier("myStruct".into())));
+    }
+
+    #[test]
+    fn test_parse_template() {
+        use crate::compiler::parser::Parser;
+
+        let mut parser = Parser::new("\"Hello, ${name}! You have ${messages.length} new messages.\"");
+        let template = parser.parse_primary_expr().unwrap();
+        if let crate::compiler::ast::ExprKind::Template(t) = &template.kind {
+            assert_eq!(t.literals.len(), 3);
+            assert_eq!(t.literals[0], "Hello, ");
+            assert_eq!(t.literals[1], "! You have ");
+            assert_eq!(t.literals[2], " new messages.");
+            assert_eq!(t.expressions.len(), 2);
+        } else {
+            panic!("Expected template literal");
+        }
     }
 }

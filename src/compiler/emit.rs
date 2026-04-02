@@ -534,6 +534,10 @@ impl<'a> FuncGen<'a> {
         }
     }
 
+    fn template(&mut self, _t: &ast::Template) {
+        unimplemented!()
+    }
+
     fn expr(&mut self, e: &ast::Expr) {
         self.emit_source_loc(e.loc);
         match &e.kind {
@@ -552,6 +556,7 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::ArrayLiteral(a) => self.array_literal(a),
             ast::ExprKind::ObjectLiteral(o) => self.object_literal(&e.typ, o),
             ast::ExprKind::_Self => self._self(),
+            ast::ExprKind::Template(t) => self.template(t),
         }
     }
 

@@ -121,6 +121,12 @@ pub struct Cast{
 }
 
 #[derive(Debug, Clone)]
+pub struct Template {
+    pub literals: Vec<String>,
+    pub expressions: Vec<Expr>,
+}
+
+#[derive(Debug, Clone)]
 pub enum ExprKind {
     BinaryExpr(Box<BinaryExpr>),
     UnaryExpr(Box<UnaryExpr>),
@@ -136,6 +142,7 @@ pub enum ExprKind {
     ArrayLiteral(Box<ArrayLiteral>),
     ObjectLiteral(Box<ObjectLiteral>),
     Cast(Box<Cast>),
+    Template(Box<Template>),
     _Self,
 }
 

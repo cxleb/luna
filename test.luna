@@ -1,18 +1,14 @@
-interface AsInt {
-    func as_int(): int;
-}
-
 struct Example {
     a: int,
     b: int,
 
-    func as_int(): int {
-        return self.a + self.b;
+    func string(): string {
+        return "Example";
     }
 }
 
-func use_as_int(the_int: AsInt) {
-    printint(the_int.as_int());
+func use_as_int(str: String) {
+    println(str.string());
 }
 
 func main() {
