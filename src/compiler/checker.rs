@@ -24,6 +24,7 @@ pub enum SemaErrorReason {
     ValueIsNotIndexable,
     ValueCannotBeUsedAsIndex,
     AssignmentTypesIncompatible,
+    CannotAssignToConst,
     NonBoolInLogicalExpression,
     TypeNotFound,
     StructFieldNotFound,
@@ -349,7 +350,12 @@ struct FuncTypeInference<'a> {
     functions: &'a FunctionCollection,
     own_signature: &'a types::FunctionType,
     package_id: &'a str,
-    variable_scopes: Vec<HashMap<String, Box<Type>>>,
+    variable_scopes: Vec<HashMap<String, VariableBinding>>,
+}
+
+struct VariableBinding {
+    typ: Type,
+    is_const: bool,
 }
 
 impl<'a> FuncTypeInference<'a> {
@@ -385,11 +391,17 @@ impl<'a> FuncTypeInference<'a> {
         self.variable_scopes.pop();
     }
 
-    pub fn create_var(&mut self, name: String, typ: &Type) {
-        self.variable_scopes.last_mut().unwrap().insert(name, Box::new(typ.clone()));
+    pub fn create_var(&mut self, name: String, typ: &Type, is_const: bool) {
+        self.variable_scopes
+            .last_mut()
+            .unwrap()
+            .insert(name, VariableBinding {
+                typ: typ.clone(),
+                is_const,
+            });
     }
 
-    pub fn find_var(&self, name: &String) -> Option<&Type> {
+    pub fn find_var(&self, name: &String) -> Option<&VariableBinding> {
         for scope in self.variable_scopes.iter().rev() {
             if let Some(id) = scope.get(name) {
                 return Some(id);
@@ -663,8 +675,8 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Identifier(i) => i,
             _ => panic!()
         };
-        if let Some(typ) = self.find_var(&i.id) {
-            e.typ = typ.clone().into();
+        if let Some(binding) = self.find_var(&i.id) {
+            e.typ = binding.typ.clone();
             self.ok()
         } else if let Some(typ) = self.find_type(&i.id) {
             e.typ = typ;
@@ -973,8 +985,11 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Identifier(i) => i,
             _ => panic!()
         };
-        if let Some(typ) = self.find_var(&i.id) {
-            e.typ = typ.clone().into();
+        if let Some(binding) = self.find_var(&i.id) {
+            if binding.is_const {
+                return self.error_loc(SemaErrorReason::CannotAssignToConst, e.loc);
+            }
+            e.typ = binding.typ.clone();
             self.ok()
         } else {
             self.error_loc(SemaErrorReason::VariableNotFound, e.loc)
@@ -1047,12 +1062,12 @@ impl<'a> FuncTypeInference<'a> {
             if types::compare(&annotation, ret) == types::ComparisonResult::Incompatible {
                 return self.error_loc(SemaErrorReason::IncompatibleTypesInVariableDefinition, v.loc);
             }
-            self.create_var(v.id.clone(), ret);
+            self.create_var(v.id.clone(), ret, v.is_const);
         } else {
             self.expr(&mut v.value, None)?;
             let ret = &v.value.typ;
             //v.type_annotation = Some(ret.clone());
-            self.create_var(v.id.clone(), ret);
+            self.create_var(v.id.clone(), ret, v.is_const);
         }
         self.ok()
     }
@@ -1083,7 +1098,7 @@ impl<'a> FuncTypeInference<'a> {
                                 }
                                 self.push_scope();
                                 for (typ, (name, val_typ)) in v.1.1.iter().zip(values.iter_mut()) {
-                                    self.create_var(name.clone(), typ);
+                                    self.create_var(name.clone(), typ, true);
                                     *val_typ = typ.clone();
                                 }
                                 self.block_stmt(&mut case.block)?;
@@ -1138,7 +1153,7 @@ impl<'a> FuncTypeInference<'a> {
         self.push_scope();
         for p in func.signature.params.iter() {
             let annotation = type_lookup(&p.type_annotation, self.types, self.package_id, self.imports)?;
-            self.create_var(p.id.clone(), &annotation);
+            self.create_var(p.id.clone(), &annotation, false);
         }
         self.block_stmt(&mut func.body)?;
         self.pop_scope();

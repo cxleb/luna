@@ -1,0 +1,9 @@
+func main() {
+    const value = 10;
+    let copied = value;
+    assert(copied == 10);
+
+    const arr = [1, 2, 3];
+    arr[0] = 99;
+    assert(arr[0] == 99);
+}
