@@ -59,11 +59,15 @@ pub fn builtin_println(_: *mut crate::runtime::RuntimeContext, value: *const u8)
 }
 
 pub fn builtin_printint(_: *mut crate::runtime::RuntimeContext, value: i64) {
-    println!("{}", value);
+    print!("{}", value);
+}
+
+pub fn builtin_printnum(_: *mut crate::runtime::RuntimeContext, value: f64) {
+    print!("{}", value);
 }
 
 pub fn builtin_printarray(_: *mut crate::runtime::RuntimeContext, value: *const i64) {
-    println!("{:?} {}", value, unsafe { *value });
+    print!("{:?} {}", value, unsafe { *value });
 }
 
 pub fn default_builtins() -> Builtins {
@@ -71,6 +75,7 @@ pub fn default_builtins() -> Builtins {
     builtins.push_function("print", vec![types::string()], None, builtin_print);
     builtins.push_function("println", vec![types::string()], None, builtin_println);
     builtins.push_function("printint", vec![types::integer()], None, builtin_printint);
+    builtins.push_function("printnum", vec![types::number()], None, builtin_printnum);
     builtins.push_function("printarray", vec![types::array(types::integer())], None, builtin_printarray);
 
     builtins

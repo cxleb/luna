@@ -9,7 +9,7 @@ pub enum Type {
     Integer,
     Number,
     String,
-    Bool, 
+    Bool,
     Identifier(String),
     Array(Box<Type>),
     //UnknownReference, // An internal detail before generics is correctly implemented
@@ -52,7 +52,7 @@ pub struct Call {
     pub function: Expr,
     pub parameters: Vec<Expr>,
     // filled in by the checker for direct calls, used for codegen
-    pub symbol_name: Option<String>, 
+    pub symbol_name: Option<String>,
     pub enum_idx: Option<usize>,
 }
 
@@ -91,8 +91,8 @@ pub struct Subscript {
 pub struct Selector {
     pub value: Expr,
     pub selector: Identifier,
-    pub idx: usize, // the offset of the field within the struct, 
-                 // saves us computing it twice and some complexity
+    pub idx: usize, // the offset of the field within the struct,
+    // saves us computing it twice and some complexity
     pub enum_idx: Option<usize>,
 }
 
@@ -115,7 +115,7 @@ pub struct ObjectLiteral {
 }
 
 #[derive(Debug, Clone)]
-pub struct Cast{
+pub struct Cast {
     pub value: Expr,
     pub target_type: types::Type,
 }
@@ -159,7 +159,7 @@ pub struct IfStmt {
     pub test: Expr,
     pub consequent: Stmt,
     pub alternate: Option<Stmt>,
-    pub not: bool
+    pub not: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -187,12 +187,12 @@ pub struct WhileStmt {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternKind {
     CatchAll,
-    EnumVariant{
+    EnumVariant {
         id: String,
         values: Vec<(String, types::Type)>,
     },
     Integer(i64),
-    IntegerRange(i64, i64), 
+    IntegerRange(i64, i64),
     String(String),
 }
 
@@ -302,7 +302,6 @@ pub struct Enum {
     pub typ: types::Type,
 }
 
-
 #[derive(Debug, Default, Clone)]
 pub struct Interface {
     pub loc: SourceLoc,
@@ -312,18 +311,25 @@ pub struct Interface {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct Import {
+    pub package: String,
+    pub file: String,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct File {
     pub id: String,
     pub functions: Vec<Box<Func>>,
     pub structs: Vec<Box<Struct>>,
     pub enums: Vec<Box<Enum>>,
     pub interfaces: Vec<Box<Interface>>,
-    pub imports: Vec<String>,
+    pub imports: Vec<Import>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Package {
     pub id: String,
+    pub base_path: Option<std::path::PathBuf>,
     pub files: Vec<Box<File>>,
 }
 

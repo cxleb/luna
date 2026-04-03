@@ -1,17 +1,27 @@
 use std::collections::HashMap;
 
-use cranelift_codegen::{ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}, settings::Configurable};
+use cranelift_codegen::{
+    ir::types::{F64, I8, I64},
+    isa::{OwnedTargetIsa, TargetIsa},
+    settings::Configurable,
+};
 //use cranelift_jit::{JITBuilder, JITModule};
 //use cranelift_module::{FuncId, Module};
 use target_lexicon::Triple;
 
-use crate::{builtins::Builtins, ir::{self, Signature}, runtime::{gc::GarbageCollector, translate::TranslateSignature}};
+use crate::{
+    builtins::Builtins,
+    compiler::mangle,
+    ir::{self, Signature},
+    runtime::{gc::GarbageCollector, translate::TranslateSignature},
+    types::NameSpecification,
+};
 
-mod translate;
-mod gc;
-pub mod string;
 mod cranelift;
+mod gc;
 mod stack_roots;
+pub mod string;
+mod translate;
 
 use cranelift::backend::{JITBuilder, JITModule};
 use cranelift::module::{FuncId, Module};
@@ -30,7 +40,7 @@ pub struct StackMap {
 
 #[derive(Debug, Clone)]
 pub struct StackMaps {
-    pub lr_map: HashMap<usize, StackMap>
+    pub lr_map: HashMap<usize, StackMap>,
 }
 
 pub struct RuntimeContext {
@@ -88,17 +98,16 @@ pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
     unsafe {
         core::arch::asm!("mov {}, rbp", out(reg) fp);
     }
-    
+
     check_yield_common(ctx, fp);
 }
 
 #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
-pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {
-}
+pub extern "C" fn check_yield(ctx: *mut RuntimeContext) {}
 
 fn check_yield_common(ctx: *mut RuntimeContext, fp: usize) {
     let gc = unsafe { &mut (*ctx).gc };
-    
+
     if gc.should_collect() {
         let stack_maps = unsafe { &mut (*ctx).stack_maps };
         let roots = stack_roots::collect_roots(stack_maps, fp);
@@ -107,9 +116,9 @@ fn check_yield_common(ctx: *mut RuntimeContext, fp: usize) {
 
     // perform fiber switch if we need ?
 }
- 
+
 // Entry point into a task.
-pub extern "C" fn fiber_entry(t: context::Transfer) -> ! {    
+pub extern "C" fn fiber_entry(t: context::Transfer) -> ! {
     let fiber = unsafe { &mut *(t.data as *mut Fiber) };
 
     unsafe {
@@ -147,13 +156,18 @@ impl JitContext {
             .finish(shared_flags)
             .unwrap();
 
-        let mut builder = 
-            JITBuilder::new(cranelift::default_libcall_names())
-            .unwrap();
+        let mut builder = JITBuilder::new(cranelift::default_libcall_names()).unwrap();
 
         // add the builtins as look up symbols
         for func in &builtins.functions {
-            builder.symbol(format!("_Lbuiltins_{}", func.id), func.implementation);
+            builder.symbol(
+                mangle::mangle_name(&NameSpecification {
+                    package: "builtins".into(),
+                    file: "builtins".into(),
+                    name: func.id.clone(),
+                }),
+                func.implementation,
+            );
         }
 
         builder.symbol("__panic", panic as *const u8);
@@ -163,7 +177,7 @@ impl JitContext {
 
         let runtime_ctx = Box::new(RuntimeContext::new());
         let runtime_ctx = Box::into_raw(runtime_ctx);
-        
+
         Self {
             isa,
             module: JITModule::new(builder),
@@ -197,20 +211,24 @@ impl JitContext {
         for func in module.funcs.iter() {
             signatures.push(TranslateSignature {
                 id: func.id.clone(),
-                signature: func.signature.clone()
+                signature: func.signature.clone(),
             });
         }
 
         for func in self.builtins.functions.iter() {
             signatures.push(TranslateSignature {
-                id: format!("_Lbuiltins_{}", func.id),
+                id: mangle::mangle_name(&NameSpecification {
+                    package: "builtins".into(),
+                    file: "builtins".into(),
+                    name: func.id.clone(),
+                }),
                 signature: Signature {
                     parameters: func.parameters.iter().map(|t| t.clone().into()).collect(),
                     ret_types: match &func.returns {
                         Some(ret) => vec![ret.clone().into()],
-                        None => vec![]
-                    }
-                }
+                        None => vec![],
+                    },
+                },
             });
         }
 
@@ -219,60 +237,78 @@ impl JitContext {
             signature: Signature {
                 parameters: vec![ir::Type::Reference],
                 ret_types: vec![],
-            }
+            },
         });
         signatures.push(TranslateSignature {
             id: "__create_array".into(),
             signature: Signature {
                 parameters: vec![ir::Type::Integer],
                 ret_types: vec![ir::Type::Reference],
-            }
+            },
         });
         signatures.push(TranslateSignature {
             id: "__create_object".into(),
             signature: Signature {
                 parameters: vec![ir::Type::Integer],
                 ret_types: vec![ir::Type::Reference],
-            }
+            },
         });
         signatures.push(TranslateSignature {
             id: "__check_yield".into(),
             signature: Signature {
                 parameters: vec![],
                 ret_types: vec![],
-            }
+            },
         });
 
-        let translated = module.funcs.iter().map(|func| {
-            translate::translate_function(self, &func, &mut context, &signatures, &module.string_map, &module.source_locs, &module.global_value_map);
-            let id = self.module.declare_function(&func.id, cranelift::module::Linkage::Local, &context.func.signature).unwrap();
-            self.module.define_function(id, &mut context).unwrap();
-            self.module.clear_context(&mut context);
-            (id, func.id.clone())
-        }).collect::<Vec<_>>();
+        let translated = module
+            .funcs
+            .iter()
+            .map(|func| {
+                translate::translate_function(
+                    self,
+                    &func,
+                    &mut context,
+                    &signatures,
+                    &module.string_map,
+                    &module.source_locs,
+                    &module.global_value_map,
+                );
+                let id = self
+                    .module
+                    .declare_function(
+                        &func.id,
+                        cranelift::module::Linkage::Local,
+                        &context.func.signature,
+                    )
+                    .unwrap();
+                self.module.define_function(id, &mut context).unwrap();
+                self.module.clear_context(&mut context);
+                (id, func.id.clone())
+            })
+            .collect::<Vec<_>>();
 
         self.module.finalize_definitions().unwrap();
 
         for (id, name) in translated {
             let blob = self.module.get_finalized_function(id);
-            self.compiled_funcs.push(CompiledFunc { 
-                id, 
-                name, 
-                code: blob.ptr
+            self.compiled_funcs.push(CompiledFunc {
+                id,
+                name,
+                code: blob.ptr,
             });
 
             for stack_map in blob.stack_maps.iter() {
-                unsafe { 
-                    (*self.runtime_ctx) 
-                        .stack_maps
-                        .lr_map
-                        .insert(
-                            blob.ptr as usize + stack_map.offset as usize, 
-                            StackMap { map: stack_map.map.clone(), frame_to_fp_offset: blob.frame_to_fp_offset as usize }
-                        ); 
+                unsafe {
+                    (*self.runtime_ctx).stack_maps.lr_map.insert(
+                        blob.ptr as usize + stack_map.offset as usize,
+                        StackMap {
+                            map: stack_map.map.clone(),
+                            frame_to_fp_offset: blob.frame_to_fp_offset as usize,
+                        },
+                    );
                 }
             }
-
         }
     }
 
@@ -293,14 +329,15 @@ impl JitContext {
         //unsafe {
         //    let code_fn = core::mem::transmute::<_, fn(*mut RuntimeContext)>(compiled_func.code);
         //    code_fn(self.runtime_ctx);
-        //}    
+        //}
     }
 
     pub fn call_function_no_params<Returns>(&self, name: &str) -> Returns {
         let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name).unwrap();
         unsafe {
-            let code_fn = core::mem::transmute::<_, fn(*mut RuntimeContext) -> Returns>(compiled_func.code);
+            let code_fn =
+                core::mem::transmute::<_, fn(*mut RuntimeContext) -> Returns>(compiled_func.code);
             code_fn(self.runtime_ctx)
-        }    
+        }
     }
 }

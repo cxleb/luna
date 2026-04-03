@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock, RwLock};
 use std::hash::Hash;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock, RwLock};
 
 // Define a static global counter
 static TYPE_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -14,6 +14,7 @@ fn get_next_id() -> usize {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct NameSpecification {
     pub package: String,
+    pub file: String,
     pub name: String,
 }
 
@@ -47,7 +48,7 @@ pub enum TypeKind {
     Integer,
     Number,
     String,
-    Bool, 
+    Bool,
     UnknownReference, // An internal detail before generics is correctly implemented
     Array(Type),
     Struct(StructType),
@@ -74,16 +75,35 @@ impl Type {
     }
 
     pub fn add_method(&self, name: &str, f: FunctionType) {
-        self.inner.method_set.write().unwrap().push((name.into(), f));
+        self.inner
+            .method_set
+            .write()
+            .unwrap()
+            .push((name.into(), f));
     }
 
     pub fn get_method(&self, name: &str) -> Option<FunctionType> {
         if let TypeKind::Interface(interface) = &self.inner.kind {
-            if let Some((_, method)) = interface.methods.read().unwrap().iter().find(|(n, _)| n == name) {
+            if let Some((_, method)) = interface
+                .methods
+                .read()
+                .unwrap()
+                .iter()
+                .find(|(n, _)| n == name)
+            {
                 return Some(method.clone());
             }
         }
-        Some(self.inner.method_set.read().unwrap().iter().find(|(n, _)| n == name)?.1.clone())
+        Some(
+            self.inner
+                .method_set
+                .read()
+                .unwrap()
+                .iter()
+                .find(|(n, _)| n == name)?
+                .1
+                .clone(),
+        )
     }
 }
 
@@ -135,7 +155,7 @@ pub fn interface_assignable(i: &InterfaceType, typ: &Type) -> bool {
         } else {
             return false;
         }
-    } 
+    }
 
     true
 }
@@ -153,7 +173,7 @@ pub fn compare(a: &Type, b: &Type) -> ComparisonResult {
             if r == ComparisonResult::Same {
                 return r;
             }
-        }   
+        }
     }
 
     if let TypeKind::Interface(i) = a.kind() {
@@ -162,7 +182,7 @@ pub fn compare(a: &Type, b: &Type) -> ComparisonResult {
         }
     }
 
-    return ComparisonResult::Incompatible; 
+    return ComparisonResult::Incompatible;
 }
 
 /// Is type numeric (integer or number)
@@ -211,7 +231,13 @@ pub fn is_function(ty: &Type) -> bool {
 }
 
 pub fn is_reference(ty: &Type) -> bool {
-    matches!(ty.inner.kind, TypeKind::UnknownReference | TypeKind::Struct(_) | TypeKind::Array(_) | TypeKind::Interface(_) )
+    matches!(
+        ty.inner.kind,
+        TypeKind::UnknownReference
+            | TypeKind::Struct(_)
+            | TypeKind::Array(_)
+            | TypeKind::Interface(_)
+    )
 }
 
 pub fn is_interface(ty: &Type) -> bool {
@@ -228,7 +254,14 @@ pub fn clone_struct_fields(ty: &Type) -> Vec<(String, Type)> {
 
 pub fn get_max_enum_values(ty: &Type) -> usize {
     if let TypeKind::Enum(enum_type) = &ty.inner.kind {
-        enum_type.variants.read().unwrap().iter().map(|(_, values)| values.len()).max().unwrap_or(0)
+        enum_type
+            .variants
+            .read()
+            .unwrap()
+            .iter()
+            .map(|(_, values)| values.len())
+            .max()
+            .unwrap_or(0)
     } else {
         panic!("Type is not an enum");
     }
@@ -236,7 +269,8 @@ pub fn get_max_enum_values(ty: &Type) -> usize {
 
 pub fn get_interface_func_index(ty: &Type, id: &str) -> usize {
     if let TypeKind::Interface(interface) = ty.kind() {
-        interface.methods
+        interface
+            .methods
             .read()
             .unwrap()
             .iter()
@@ -252,7 +286,11 @@ pub fn get_interface_func_index(ty: &Type, id: &str) -> usize {
 
 pub fn create_type(kind: TypeKind) -> Type {
     Type {
-        inner: Arc::new(Inner { kind, hash: get_next_id(), method_set: RwLock::new(Vec::new()) }),
+        inner: Arc::new(Inner {
+            kind,
+            hash: get_next_id(),
+            method_set: RwLock::new(Vec::new()),
+        }),
     }
 }
 
@@ -265,43 +303,76 @@ pub fn name(typ: &Type) -> String {
         TypeKind::Bool => "bool".into(),
         TypeKind::UnknownReference => "unknown_reference".into(),
         TypeKind::Array(element_type) => format!("[]{}", name(element_type)),
-        TypeKind::Struct(struct_type) => format!("{}.{}", struct_type.spec.package, struct_type.spec.name),
-        TypeKind::Enum(enum_type) => format!("{}.{}", enum_type.spec.package, enum_type.spec.name),
-        TypeKind::Function(func_type) => format!("fn({}) -> ({})", 
-            func_type.params.iter().map(|t| name(t)).collect::<Vec<_>>().join(", "), 
-            func_type.returns.iter().map(|t| name(t)).collect::<Vec<_>>().join(", ")),
-        TypeKind::Interface(interface_type) => format!("{}.{}", interface_type.spec.package, interface_type.spec.name),
+        TypeKind::Struct(struct_type) => format!(
+            "{}:{}:{}",
+            struct_type.spec.package, struct_type.spec.file, struct_type.spec.name
+        ),
+        TypeKind::Enum(enum_type) => format!(
+            "{}:{}:{}",
+            enum_type.spec.package, enum_type.spec.file, enum_type.spec.name
+        ),
+        TypeKind::Function(func_type) => format!(
+            "fn({}) -> ({})",
+            func_type
+                .params
+                .iter()
+                .map(|t| name(t))
+                .collect::<Vec<_>>()
+                .join(", "),
+            func_type
+                .returns
+                .iter()
+                .map(|t| name(t))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        TypeKind::Interface(interface_type) => format!(
+            "{}:{}:{}",
+            interface_type.spec.package, interface_type.spec.file, interface_type.spec.name
+        ),
     }
 }
 
 pub fn bad() -> Type {
     static UNKNOWN_TYPE: OnceLock<Type> = OnceLock::new();
-    UNKNOWN_TYPE.get_or_init(|| create_type(TypeKind::Bad)).clone()
+    UNKNOWN_TYPE
+        .get_or_init(|| create_type(TypeKind::Bad))
+        .clone()
 }
 
 pub fn integer() -> Type {
     static INTEGER_TYPE: OnceLock<Type> = OnceLock::new();
-    INTEGER_TYPE.get_or_init(|| create_type(TypeKind::Integer)).clone()
+    INTEGER_TYPE
+        .get_or_init(|| create_type(TypeKind::Integer))
+        .clone()
 }
 
 pub fn number() -> Type {
     static NUMBER_TYPE: OnceLock<Type> = OnceLock::new();
-    NUMBER_TYPE.get_or_init(|| create_type(TypeKind::Number)).clone()
+    NUMBER_TYPE
+        .get_or_init(|| create_type(TypeKind::Number))
+        .clone()
 }
 
 pub fn bool() -> Type {
     static BOOL_TYPE: OnceLock<Type> = OnceLock::new();
-    BOOL_TYPE.get_or_init(|| create_type(TypeKind::Bool)).clone()
+    BOOL_TYPE
+        .get_or_init(|| create_type(TypeKind::Bool))
+        .clone()
 }
 
 pub fn string() -> Type {
     static STRING_TYPE: OnceLock<Type> = OnceLock::new();
-    STRING_TYPE.get_or_init(|| create_type(TypeKind::String)).clone()
+    STRING_TYPE
+        .get_or_init(|| create_type(TypeKind::String))
+        .clone()
 }
 
 pub fn unknown_reference() -> Type {
     static UNKNOWN_REFERENCE_TYPE: OnceLock<Type> = OnceLock::new();
-    UNKNOWN_REFERENCE_TYPE.get_or_init(|| create_type(TypeKind::UnknownReference)).clone()
+    UNKNOWN_REFERENCE_TYPE
+        .get_or_init(|| create_type(TypeKind::UnknownReference))
+        .clone()
 }
 
 pub fn array(element_type: Type) -> Type {
