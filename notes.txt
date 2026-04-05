@@ -7,7 +7,7 @@
 - Implement error handling(blocker: discriminated enums, generics)
 - Generics
 - Casting types
-- Extensions (blocker: type method sets)
+- Extensions, allows you to add more methods to the method set of a type (blocker: type method sets)
 - For loops (do we want an iterator API for this?) (blocker: interfaces)
 - Tasks (and Tasks API) (blocker: api)
 - Refactor AST to be arena allocated
@@ -15,12 +15,12 @@
 - GC api?
 - Fix panic to only kill the process, not the entire program
 - Int ranges in switches 
-- Const variables are const
 - Refactor out string map in place of global map
 - Refactor checker to return what kind of thing an expression evaluated to
 - export syntax 
 
 done:
+- Const variables are const
 - Implement multiple modules (import and export syntax?, how does the extension syntax work?)
 - Assert should become a compiler construct, test condition and jump to panic block (blocker: debug info)
 - Implement interfaces (use structual typing like go) (blocker: ir refactor, struct methods, method sets)

@@ -45,12 +45,14 @@ pub enum SemaErrorReason {
 pub struct SemaError {
     reason: SemaErrorReason,
     loc: SourceLoc,
+    file: String,
+    package: String,
 }
 
 type SemaResult<X> = Result<X, SemaError>;
 
 pub fn error_loc<T>(reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
-    Err(SemaError { reason, loc })
+    Err(SemaError { reason, loc, file: String::new(), package: String::new() })
 }
 
 struct TypeCollection {
@@ -284,6 +286,8 @@ fn type_lookup(
             .ok_or(SemaError {
                 reason: SemaErrorReason::TypeNotFound,
                 loc: SourceLoc::default(),
+                file: file_id.into(),
+                package: package_id.into(),
             }),
         ast::Type::Array(element_type) => Ok(types::array(type_lookup(
             element_type,
@@ -295,6 +299,8 @@ fn type_lookup(
         _ => Err(SemaError {
             reason: SemaErrorReason::TypeNotFound,
             loc: SourceLoc::default(),
+            file: file_id.into(),
+            package: package_id.into(),
         }),
     }
 }
@@ -556,7 +562,12 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     pub fn error_loc<T>(&self, reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
-        Err(SemaError { reason, loc })
+        Err(SemaError { 
+            reason, 
+            loc,
+            file: self.file_id.into(),
+            package: self.package_id.into(),
+        })
     }
 
     pub fn find_type(&self, name: &str) -> Option<Type> {
