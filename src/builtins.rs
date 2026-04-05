@@ -18,7 +18,13 @@ impl Builtins {
         }
     }
 
-    pub fn push_function<P, R>(&mut self, id: &str, params: Vec<types::Type>, ret: Option<types::Type>, implementation: fn(*mut crate::runtime::RuntimeContext, P) -> R) {
+    pub fn push_function<P, R>(
+        &mut self,
+        id: &str,
+        params: Vec<types::Type>,
+        ret: Option<types::Type>,
+        implementation: fn(*mut crate::runtime::RuntimeContext, P) -> R,
+    ) {
         let func = BuiltinFunction {
             id: id.into(),
             parameters: params,
@@ -28,7 +34,13 @@ impl Builtins {
         self.functions.push(func);
     }
 
-    pub fn push_function_2<P1, P2, R>(&mut self, id: &str, params: Vec<types::Type>, ret: Option<types::Type>, implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2) -> R) {
+    pub fn push_function_2<P1, P2, R>(
+        &mut self,
+        id: &str,
+        params: Vec<types::Type>,
+        ret: Option<types::Type>,
+        implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2) -> R,
+    ) {
         let func = BuiltinFunction {
             id: id.into(),
             parameters: params,
@@ -38,7 +50,13 @@ impl Builtins {
         self.functions.push(func);
     }
 
-    pub fn push_function_3<P1, P2, P3, R>(&mut self, id: &str, params: Vec<types::Type>, ret: Option<types::Type>, implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2, P3) -> R) {
+    pub fn push_function_3<P1, P2, P3, R>(
+        &mut self,
+        id: &str,
+        params: Vec<types::Type>,
+        ret: Option<types::Type>,
+        implementation: fn(*mut crate::runtime::RuntimeContext, P1, P2, P3) -> R,
+    ) {
         let func = BuiltinFunction {
             id: id.into(),
             parameters: params,
@@ -51,11 +69,17 @@ impl Builtins {
 
 // Default built-in functions like print, input, etc.
 pub fn builtin_print(_: *mut crate::runtime::RuntimeContext, value: *const u8) {
-    print!("{}", crate::runtime::string::convert_from_internal_string(value));
+    print!(
+        "{}",
+        crate::runtime::string::convert_from_internal_string(value)
+    );
 }
 
 pub fn builtin_println(_: *mut crate::runtime::RuntimeContext, value: *const u8) {
-    println!("{}", crate::runtime::string::convert_from_internal_string(value));
+    println!(
+        "{}",
+        crate::runtime::string::convert_from_internal_string(value)
+    );
 }
 
 pub fn builtin_printint(_: *mut crate::runtime::RuntimeContext, value: i64) {
@@ -76,7 +100,12 @@ pub fn default_builtins() -> Builtins {
     builtins.push_function("println", vec![types::string()], None, builtin_println);
     builtins.push_function("printint", vec![types::integer()], None, builtin_printint);
     builtins.push_function("printnum", vec![types::number()], None, builtin_printnum);
-    builtins.push_function("printarray", vec![types::array(types::integer())], None, builtin_printarray);
+    builtins.push_function(
+        "printarray",
+        vec![types::array(types::integer())],
+        None,
+        builtin_printarray,
+    );
 
     builtins
 }

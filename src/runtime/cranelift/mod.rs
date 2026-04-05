@@ -19,12 +19,12 @@
 //use std::string::String;
 use cranelift_codegen::ir;
 
-pub mod data_context;
-pub mod module;
-pub mod traps;
 pub mod backend;
 pub mod compiled_blob;
+pub mod data_context;
 pub mod memory;
+pub mod module;
+pub mod traps;
 
 //pub use backend::{JITBuilder, JITModule};
 //pub use memory::{

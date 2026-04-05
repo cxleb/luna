@@ -8,7 +8,7 @@ pub struct BlockIter<'a> {
     source_loc_iter: Iter<'a, (usize, usize)>,
     idx: usize,
     current_source_loc: Option<(usize, usize)>,
-    next_source_loc: Option<(usize, usize)>
+    next_source_loc: Option<(usize, usize)>,
 }
 
 impl<'a> BlockIter<'a> {
@@ -24,7 +24,7 @@ impl<'a> BlockIter<'a> {
             source_loc_iter,
             idx: 0,
             current_source_loc,
-            next_source_loc
+            next_source_loc,
         }
     }
 }
@@ -39,8 +39,8 @@ impl<'a> Iterator for BlockIter<'a> {
                     self.current_source_loc = self.next_source_loc;
                     self.next_source_loc = self.source_loc_iter.next().cloned();
                 }
-            } 
-            self.idx += 1; 
+            }
+            self.idx += 1;
             Some((ins, self.current_source_loc.map(|(_, i)| i)))
         } else {
             None
@@ -49,16 +49,22 @@ impl<'a> Iterator for BlockIter<'a> {
 }
 
 mod tests {
-    
+
     #[test]
     fn test_iter() {
         use crate::ir::{Inst, Signature, SourceLoc, SourceLocs, builder::FuncBuilder};
-        
-        let mut source_locs = SourceLocs { ..Default::default() };
-        let mut builder = FuncBuilder::new("id".into(), Signature{
-            parameters: Vec::new(),
-            ret_types: Vec::new()
-        }, &mut source_locs);
+
+        let mut source_locs = SourceLocs {
+            ..Default::default()
+        };
+        let mut builder = FuncBuilder::new(
+            "id".into(),
+            Signature {
+                parameters: Vec::new(),
+                ret_types: Vec::new(),
+            },
+            &mut source_locs,
+        );
 
         let block = builder.new_block();
         builder.switch_to_block(block);
@@ -86,14 +92,70 @@ mod tests {
         let iter = func.blocks[0].iter();
 
         let expected = vec![
-            (Inst::LoadConstInt(10), SourceLoc{file: 0, line: 1, col: 0}),
-            (Inst::LoadConstInt(11), SourceLoc{file: 0, line: 1, col: 0}),
-            (Inst::LoadConstInt(12), SourceLoc{file: 0, line: 1, col: 0}),
-            (Inst::LoadConstInt(13), SourceLoc{file: 0, line: 1, col: 0}),
-            (Inst::LoadConstInt(20), SourceLoc{file: 0, line: 2, col: 1}),
-            (Inst::LoadConstInt(21), SourceLoc{file: 0, line: 2, col: 1}),
-            (Inst::LoadConstInt(22), SourceLoc{file: 0, line: 2, col: 1}),
-            (Inst::LoadConstInt(23), SourceLoc{file: 0, line: 2, col: 1}),
+            (
+                Inst::LoadConstInt(10),
+                SourceLoc {
+                    file: 0,
+                    line: 1,
+                    col: 0,
+                },
+            ),
+            (
+                Inst::LoadConstInt(11),
+                SourceLoc {
+                    file: 0,
+                    line: 1,
+                    col: 0,
+                },
+            ),
+            (
+                Inst::LoadConstInt(12),
+                SourceLoc {
+                    file: 0,
+                    line: 1,
+                    col: 0,
+                },
+            ),
+            (
+                Inst::LoadConstInt(13),
+                SourceLoc {
+                    file: 0,
+                    line: 1,
+                    col: 0,
+                },
+            ),
+            (
+                Inst::LoadConstInt(20),
+                SourceLoc {
+                    file: 0,
+                    line: 2,
+                    col: 1,
+                },
+            ),
+            (
+                Inst::LoadConstInt(21),
+                SourceLoc {
+                    file: 0,
+                    line: 2,
+                    col: 1,
+                },
+            ),
+            (
+                Inst::LoadConstInt(22),
+                SourceLoc {
+                    file: 0,
+                    line: 2,
+                    col: 1,
+                },
+            ),
+            (
+                Inst::LoadConstInt(23),
+                SourceLoc {
+                    file: 0,
+                    line: 2,
+                    col: 1,
+                },
+            ),
         ];
 
         for ((g_i, g_sl), (e_i, e_sl)) in iter.zip(expected.iter()) {

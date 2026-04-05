@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use crate::ir::{Block, BlockRef, GlobalRef, Signature, SourceLocs, StringRef, Type, VariableRef};
 pub struct FuncBuilder<'a> {
@@ -7,7 +7,7 @@ pub struct FuncBuilder<'a> {
     variables: VariableRef,
     variable_scopes: Vec<HashMap<String, VariableRef>>,
     source_locs: &'a mut SourceLocs,
-    next_source_loc: Option<usize> ,
+    next_source_loc: Option<usize>,
 }
 
 impl<'a> FuncBuilder<'a> {
@@ -20,14 +20,14 @@ impl<'a> FuncBuilder<'a> {
                 blocks: vec![Block {
                     id: 0,
                     ins: Vec::new(),
-                    source_locs: Default::default()
+                    source_locs: Default::default(),
                 }],
             },
             current_block: 0,
             variables: 0,
             variable_scopes: Vec::new(),
             source_locs,
-            next_source_loc: None
+            next_source_loc: None,
         }
     }
 
@@ -93,12 +93,18 @@ impl<'a> FuncBuilder<'a> {
         if let Some(source_loc) = self.next_source_loc {
             let next_ins = self.func.blocks[self.current_block].ins.len();
             // check if the last source loc is the same, if it is not append the source loc
-            if let Some((_, last_source_loc)) = self.func.blocks[self.current_block].source_locs.last() {
+            if let Some((_, last_source_loc)) =
+                self.func.blocks[self.current_block].source_locs.last()
+            {
                 if *last_source_loc != source_loc {
-                    self.func.blocks[self.current_block].source_locs.push((next_ins, source_loc));
+                    self.func.blocks[self.current_block]
+                        .source_locs
+                        .push((next_ins, source_loc));
                 }
             } else {
-                self.func.blocks[self.current_block].source_locs.push((next_ins, source_loc));
+                self.func.blocks[self.current_block]
+                    .source_locs
+                    .push((next_ins, source_loc));
             }
         }
         self.func.blocks[self.current_block].ins.push(inst);

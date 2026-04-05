@@ -854,8 +854,10 @@ mod tests {
     fn test_parse_imports() {
         use crate::compiler::parser::Parser;
 
-        let mut parser =
-            Parser::new("testing", "import \"std:math/core.luna\"; import \"utils.luna\"; func main() {}");
+        let mut parser = Parser::new(
+            "testing",
+            "import \"std:math/core.luna\"; import \"utils.luna\"; func main() {}",
+        );
         let file = parser.parse_file().unwrap();
         assert_eq!(file.imports.len(), 2);
         assert_eq!(file.imports[0].package, "std");
@@ -911,8 +913,10 @@ mod tests {
         use crate::compiler::ast;
         use crate::compiler::parser::Parser;
 
-        let mut parser =
-            Parser::new("testing", "struct MyStruct { field1: string, field2: int, func method() {} }");
+        let mut parser = Parser::new(
+            "testing",
+            "struct MyStruct { field1: string, field2: int, func method() {} }",
+        );
         let struct_ = parser.parse_struct().unwrap();
         assert_eq!(struct_.id, "MyStruct");
         assert_eq!(struct_.fields.len(), 2);
@@ -948,7 +952,10 @@ mod tests {
     fn test_parse_interface() {
         use crate::compiler::parser::Parser;
 
-        let mut parser = Parser::new("testing", "interface MyInterface { func method(param: string); }");
+        let mut parser = Parser::new(
+            "testing",
+            "interface MyInterface { func method(param: string); }",
+        );
         let interface = parser.parse_interface().unwrap();
         assert_eq!(interface.id, "MyInterface");
         assert_eq!(interface.methods.len(), 1);
@@ -1114,8 +1121,10 @@ mod tests {
     fn test_parse_template() {
         use crate::compiler::parser::Parser;
 
-        let mut parser =
-            Parser::new("testing", "\"Hello, ${name}! You have ${messages.length} new messages.\"");
+        let mut parser = Parser::new(
+            "testing",
+            "\"Hello, ${name}! You have ${messages.length} new messages.\"",
+        );
         let template = parser.parse_primary_expr().unwrap();
         if let crate::compiler::ast::ExprKind::Template(t) = &template.kind {
             assert_eq!(t.literals.len(), 3);

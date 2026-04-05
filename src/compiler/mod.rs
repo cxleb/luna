@@ -41,7 +41,6 @@ pub fn new_compiler() -> Arc<Mutex<Compiler>> {
 fn ensure_package<'a>(
     program: &'a mut ast::Program,
     package_id: &str,
-
 ) -> &'a mut Box<ast::Package> {
     if let Some(index) = program
         .packages
@@ -93,8 +92,7 @@ pub fn add_file(compiler: Arc<Mutex<Compiler>>, package_id: &str, filename: &str
                     let imports = file.imports.clone();
                     {
                         let mut compiler_guard = compiler_clone.lock().unwrap();
-                        let package =
-                            ensure_package(&mut compiler_guard.program, &package_id);
+                        let package = ensure_package(&mut compiler_guard.program, &package_id);
                         package.files.push(file);
                     }
 
@@ -121,14 +119,21 @@ pub fn add_file(compiler: Arc<Mutex<Compiler>>, package_id: &str, filename: &str
 }
 
 pub fn add_root_file(compiler: Arc<Mutex<Compiler>>, filename: &str) -> String {
-    let base_path = std::path::absolute(filename).unwrap().parent().unwrap().to_path_buf();
+    let base_path = std::path::absolute(filename)
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
     {
         let mut compiler_guard = compiler.lock().unwrap();
         let package = ensure_package(&mut compiler_guard.program, "main");
         package.base_path = Some(base_path);
     }
     // strip the base path from the filename for the root file
-    let filename = std::path::Path::new(filename).file_name().and_then(|f| f.to_str()).unwrap();
+    let filename = std::path::Path::new(filename)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap();
     add_file(compiler, "main", filename);
     filename.into()
 }

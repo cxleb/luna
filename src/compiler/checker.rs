@@ -52,7 +52,12 @@ pub struct SemaError {
 type SemaResult<X> = Result<X, SemaError>;
 
 pub fn error_loc<T>(reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
-    Err(SemaError { reason, loc, file: String::new(), package: String::new() })
+    Err(SemaError {
+        reason,
+        loc,
+        file: String::new(),
+        package: String::new(),
+    })
 }
 
 struct TypeCollection {
@@ -562,8 +567,8 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     pub fn error_loc<T>(&self, reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
-        Err(SemaError { 
-            reason, 
+        Err(SemaError {
+            reason,
             loc,
             file: self.file_id.into(),
             package: self.package_id.into(),

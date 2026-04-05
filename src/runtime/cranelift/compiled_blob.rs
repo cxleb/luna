@@ -1,6 +1,6 @@
-use cranelift_codegen::binemit::Reloc;
 use super::module::ModuleReloc;
 use super::module::ModuleRelocTarget;
+use cranelift_codegen::binemit::Reloc;
 
 /// Reads a 32bit instruction at `iptr`, and writes it again after
 /// being altered by `modifier`

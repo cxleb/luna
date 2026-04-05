@@ -47,7 +47,7 @@ pub enum Inst {
     LoadConstString(StringRef),
     LoadGlobal(GlobalRef),
     Truncate, // Convert number to integer
-    Promote,   // Convert integer to number
+    Promote,  // Convert integer to number
     Load(VariableRef),
     Store(VariableRef),
     Tee(VariableRef),
@@ -57,12 +57,12 @@ pub enum Inst {
     Br(BlockRef),
     BrTable(BlockRef, Vec<BlockRef>),
     Ret,
-    // Pops the necessary arguments off the stack, e.g a(10, 10) will pop 2 
+    // Pops the necessary arguments off the stack, e.g a(10, 10) will pop 2
     Call(String),
     IndirectCall(Signature), // top of the stack is the function to call, arity is the number of arguments (not including the function pointer)
 
     NewArray(usize),
-    LoadArray(Type), // Pops the index and array
+    LoadArray(Type),  // Pops the index and array
     StoreArray(Type), // Pops the value, index, and array
 
     NewObject(usize),
@@ -73,7 +73,7 @@ pub enum Inst {
     /// This is a no-op if no yield is needed, or calls __yield() if the scheduler has marked this task
     CheckYield,
 
-    Assert
+    Assert,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -128,19 +128,17 @@ pub struct Module {
     pub funcs: Vec<Function>,
     pub string_map: StringMap,
     pub global_value_map: GlobalValueMap,
-    pub source_locs: SourceLocs
+    pub source_locs: SourceLocs,
 }
 
 #[derive(Debug, Clone)]
 pub struct StringMap {
-    map: Vec<String>
+    map: Vec<String>,
 }
 
 impl StringMap {
     pub fn new() -> Self {
-        StringMap {
-            map: Vec::new()
-        }
+        StringMap { map: Vec::new() }
     }
 
     pub fn intern(&mut self, s: &str) -> StringRef {
@@ -159,22 +157,25 @@ impl StringMap {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GlobalValue {
     VirtualTable(Vec<String>), // method names in order
-} 
+}
 
 #[derive(Debug, Clone)]
 pub struct GlobalValueMap {
-    map: Vec<GlobalValue>
+    map: Vec<GlobalValue>,
 }
 
 impl GlobalValueMap {
     pub fn new() -> Self {
-        GlobalValueMap {
-            map: Vec::new()
-        }
+        GlobalValueMap { map: Vec::new() }
     }
 
     pub fn intern(&mut self, v: GlobalValue) -> GlobalRef {
-        if let Some((i, _)) = self.map.iter().enumerate().find(|(_, existing)| *existing == &v) {
+        if let Some((i, _)) = self
+            .map
+            .iter()
+            .enumerate()
+            .find(|(_, existing)| *existing == &v)
+        {
             return i;
         }
         self.map.push(v);

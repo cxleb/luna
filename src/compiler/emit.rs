@@ -2,14 +2,15 @@ use std::collections::HashMap;
 
 use crate::compiler::{SourceLoc, ast, mangle};
 use crate::ir::builder::FuncBuilder;
-use crate::ir::{self, BlockRef, GlobalRef, GlobalValueMap, Signature, StringMap, StringRef, Type, VariableRef};
+use crate::ir::{
+    self, BlockRef, GlobalRef, GlobalValueMap, Signature, StringMap, StringRef, Type, VariableRef,
+};
 use crate::types;
 
-
 // This implementation is a copy of cranelift's switch api.
-// Redone to target our IR, which has the same building blocks as CLIR but 
-// we dont want to implement this in the runtime translate, its better here 
-// so its runtime agnostic 
+// Redone to target our IR, which has the same building blocks as CLIR but
+// we dont want to implement this in the runtime translate, its better here
+// so its runtime agnostic
 // https://github.com/bytecodealliance/wasmtime/blob/f6b2700cc89118308faadc08e72092642928f9cf/cranelift/frontend/src/switch.rs#L42
 struct SwitchEmitter {
     cases: HashMap<i64, BlockRef>,
@@ -28,8 +29,6 @@ impl SwitchEmitter {
         let prev = self.cases.insert(index, block);
         assert!(prev.is_none(), "Tried to set the same entry {index} twice");
     }
-
-
 
     /// Turn the `cases` `HashMap` into a list of `ContiguousCaseRange`s.
     ///
@@ -121,11 +120,7 @@ impl SwitchEmitter {
         contiguous_case_ranges: &'a [ContiguousCaseRange],
     ) {
         for (ix, range) in contiguous_case_ranges.iter().enumerate().rev() {
-            let alternate = if ix == 0 {
-                otherwise
-            } else {
-                bx.new_block()
-            };
+            let alternate = if ix == 0 { otherwise } else { bx.new_block() };
 
             if range.first_index == 0 {
                 assert_eq!(alternate, otherwise);
@@ -232,7 +227,7 @@ fn translate_type(ty: &crate::types::Type) -> ir::Type {
         crate::types::TypeKind::Integer => ir::Type::Integer,
         crate::types::TypeKind::Bool => ir::Type::Bool,
         crate::types::TypeKind::Number => ir::Type::Number,
-        _ => ir::Type::Reference
+        _ => ir::Type::Reference,
     }
 }
 
@@ -255,18 +250,22 @@ impl<'a> FuncGen<'a> {
         self.bld.source_loc(crate::ir::SourceLoc {
             file: self.interned_file_name,
             line: source_loc.line,
-            col: source_loc.col
+            col: source_loc.col,
         });
     }
 
     fn generate_interface_vtable(
         &mut self,
         interface: &crate::types::InterfaceType,
-        typ: &types::Type) -> GlobalRef
-    {
-        let v = interface.methods.read().unwrap().iter().map(|(id, _)| {
-            mangle::mangle_method_name(id, typ)
-        }).collect::<Vec<_>>();
+        typ: &types::Type,
+    ) -> GlobalRef {
+        let v = interface
+            .methods
+            .read()
+            .unwrap()
+            .iter()
+            .map(|(id, _)| mangle::mangle_method_name(id, typ))
+            .collect::<Vec<_>>();
         self.global_map.intern(ir::GlobalValue::VirtualTable(v))
     }
 
@@ -288,9 +287,11 @@ impl<'a> FuncGen<'a> {
                     ast::BinaryExprKind::Subtract => self.bld.sub_number(),
                     ast::BinaryExprKind::Multiply => self.bld.mul_number(),
                     ast::BinaryExprKind::Divide => self.bld.div_number(),
-                    _ => { panic!("Invalid condition for type"); }
+                    _ => {
+                        panic!("Invalid condition for type");
+                    }
                 }
-            },
+            }
             crate::types::TypeKind::Integer => {
                 // auto cast to integer is not supported
                 self.expr(&b.lhs);
@@ -300,47 +301,46 @@ impl<'a> FuncGen<'a> {
                     ast::BinaryExprKind::Subtract => self.bld.sub_int(),
                     ast::BinaryExprKind::Multiply => self.bld.mul_int(),
                     ast::BinaryExprKind::Divide => self.bld.div_int(),
-                    _ => { panic!("Invalid condition for type"); }
+                    _ => {
+                        panic!("Invalid condition for type");
+                    }
                 }
-            },
+            }
             crate::types::TypeKind::Bool => {
                 self.expr(&b.lhs);
                 self.expr(&b.rhs);
                 match b.lhs.typ.kind() {
-                    crate::types::TypeKind::Integer => {
-                        match b.kind {
-                            ast::BinaryExprKind::Equal => self.bld.eq_int(),
-                            ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
-                            ast::BinaryExprKind::LessThan => self.bld.lt_int(),
-                            ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
-                            ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
-                            ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
-                            _ => panic!("Invalid binary operation for bool type"),
-                        }
+                    crate::types::TypeKind::Integer => match b.kind {
+                        ast::BinaryExprKind::Equal => self.bld.eq_int(),
+                        ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
+                        ast::BinaryExprKind::LessThan => self.bld.lt_int(),
+                        ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
+                        ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
+                        ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
+                        _ => panic!("Invalid binary operation for bool type"),
                     },
-                    crate::types::TypeKind::Number => {
-                        match b.kind {
-                            ast::BinaryExprKind::Equal => self.bld.eq_number(),
-                            ast::BinaryExprKind::NotEqual => self.bld.neq_number(),
-                            ast::BinaryExprKind::LessThan => self.bld.lt_number(),
-                            ast::BinaryExprKind::GreaterThan => self.bld.gt_number(),
-                            ast::BinaryExprKind::LessThanEqual => self.bld.leq_number(),
-                            ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_number(),
-                            _ => panic!("Invalid binary operation for bool type"),
-                        }
+                    crate::types::TypeKind::Number => match b.kind {
+                        ast::BinaryExprKind::Equal => self.bld.eq_number(),
+                        ast::BinaryExprKind::NotEqual => self.bld.neq_number(),
+                        ast::BinaryExprKind::LessThan => self.bld.lt_number(),
+                        ast::BinaryExprKind::GreaterThan => self.bld.gt_number(),
+                        ast::BinaryExprKind::LessThanEqual => self.bld.leq_number(),
+                        ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_number(),
+                        _ => panic!("Invalid binary operation for bool type"),
                     },
-                    crate::types::TypeKind::Bool => {
-                        match b.kind {
-                            ast::BinaryExprKind::LogicalAnd => self.bld.and(),
-                            ast::BinaryExprKind::LogicalOr => self.bld.or(),
-                            _ => panic!("Invalid binary operation for bool type"),
-                        }
+                    crate::types::TypeKind::Bool => match b.kind {
+                        ast::BinaryExprKind::LogicalAnd => self.bld.and(),
+                        ast::BinaryExprKind::LogicalOr => self.bld.or(),
+                        _ => panic!("Invalid binary operation for bool type"),
                     },
-                    _ => { panic!("Invalid lhs type for bool binary expr"); }
+                    _ => {
+                        panic!("Invalid lhs type for bool binary expr");
+                    }
                 }
-                
-            },
-            _ => { panic!("Cant generate IR for {:?}", e.typ); }
+            }
+            _ => {
+                panic!("Cant generate IR for {:?}", e.typ);
+            }
         }
     }
 
@@ -407,13 +407,13 @@ impl<'a> FuncGen<'a> {
                 // load self
                 self.bld.load(interface_id);
                 self.bld.get_object(0, Type::Reference);
-                // load args    
+                // load args
                 for arg in c.parameters.iter() {
                     self.expr(arg);
                 }
-                let mut signature = Signature { 
-                    parameters: c.parameters.iter().map(|p| p.typ.clone().into()).collect(), 
-                    ret_types: vec![e.typ.clone().into()] 
+                let mut signature = Signature {
+                    parameters: c.parameters.iter().map(|p| p.typ.clone().into()).collect(),
+                    ret_types: vec![e.typ.clone().into()],
                 };
                 signature.parameters.insert(0, ir::Type::Reference);
                 self.bld.indirect_call(signature);
@@ -422,10 +422,10 @@ impl<'a> FuncGen<'a> {
             }
         } else {
             self.expr(&c.function);
-            self.bld.indirect_call(Signature { 
-                parameters: c.parameters.iter().map(|p| p.typ.clone().into()).collect(), 
-                ret_types: vec![e.typ.clone().into()] 
-             });
+            self.bld.indirect_call(Signature {
+                parameters: c.parameters.iter().map(|p| p.typ.clone().into()).collect(),
+                ret_types: vec![e.typ.clone().into()],
+            });
         }
     }
 
@@ -459,7 +459,7 @@ impl<'a> FuncGen<'a> {
         self.expr(&l.value);
         self.bld.load_array(e.typ.clone().into());
     }
-    
+
     fn selector(&mut self, e: &ast::Expr, s: &ast::Selector) {
         if let Some(i) = s.enum_idx {
             self.enum_literal(&e.typ, i, &Vec::new());
@@ -483,10 +483,12 @@ impl<'a> FuncGen<'a> {
         self.bld.new_object(o.fields.len());
         // We need to set all the fields which we got then we need to provide defaults for the rest
         if let crate::types::TypeKind::Struct(struct_fields) = typ.kind() {
-            for (i, (field_name, field_type)) in struct_fields.fields.read().unwrap().iter().enumerate() {
+            for (i, (field_name, field_type)) in
+                struct_fields.fields.read().unwrap().iter().enumerate()
+            {
                 if let Some(value) = o.fields.iter().find(|field| &field.id == field_name) {
                     self.expr(&value.value);
-                } else { 
+                } else {
                     // provide default value
                     match field_type.kind() {
                         crate::types::TypeKind::Integer => self.bld.load_const_int(0),
@@ -495,11 +497,16 @@ impl<'a> FuncGen<'a> {
                         crate::types::TypeKind::String => {
                             let s = self.str_map.intern("");
                             self.bld.load_const_string(s);
-                        },
+                        }
                         crate::types::TypeKind::Array(_) => {
                             self.bld.new_array(0);
-                        },
-                        _ => { panic!("Cannot provide default value for field type {:?}", field_type); }
+                        }
+                        _ => {
+                            panic!(
+                                "Cannot provide default value for field type {:?}",
+                                field_type
+                            );
+                        }
                     }
                 }
                 self.bld.dup(1);
@@ -530,7 +537,7 @@ impl<'a> FuncGen<'a> {
                 self.bld.dup(1);
                 self.bld.set_object(1, Type::Reference);
             }
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 
@@ -727,7 +734,11 @@ impl<'a> FuncGen<'a> {
 
         self.expr(&s.value);
 
-        let default = if let Some(c) = s.cases.iter().find(|c| matches!(c.pattern.kind, ast::PatternKind::CatchAll)) {
+        let default = if let Some(c) = s
+            .cases
+            .iter()
+            .find(|c| matches!(c.pattern.kind, ast::PatternKind::CatchAll))
+        {
             let catch_all = self.bld.new_block();
             self.bld.switch_to_block(catch_all);
             did_return &= self.block_stmt(&c.block);
@@ -748,7 +759,7 @@ impl<'a> FuncGen<'a> {
 
             for case in s.cases.iter() {
                 match &case.pattern.kind {
-                    ast::PatternKind::EnumVariant { id:_, values } => {
+                    ast::PatternKind::EnumVariant { id: _, values } => {
                         let block = self.bld.new_block();
                         self.bld.switch_to_block(block);
                         self.bld.push_scope();
@@ -775,9 +786,9 @@ impl<'a> FuncGen<'a> {
                         did_return &= self.block_stmt(&case.block);
                         self.bld.br(finish_block);
                         self.bld.switch_to_block(prev_block);
-                        
+
                         switch_emitter.set_entry(*i, block);
-                    },
+                    }
                     ast::PatternKind::IntegerRange(_, _) => unimplemented!(),
                     _ => {}
                 }
@@ -806,17 +817,25 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn generate(func: &Box<ast::Func>, ir_module: &'a mut ir::Module, interned_file_name: StringRef) -> Self {
+    fn generate(
+        func: &Box<ast::Func>,
+        ir_module: &'a mut ir::Module,
+        interned_file_name: StringRef,
+    ) -> Self {
         let signature = ir::Signature {
             ret_types: func.typ_.returns.iter().map(|t| t.clone().into()).collect(),
-            parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect()
+            parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect(),
         };
         let mut s = Self {
             str_map: &mut ir_module.string_map,
             global_map: &mut ir_module.global_value_map,
-            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature, &mut ir_module.source_locs),
+            bld: FuncBuilder::new(
+                func.signature.symbol_name.clone(),
+                signature,
+                &mut ir_module.source_locs,
+            ),
             self_var: None,
-            interned_file_name
+            interned_file_name,
         };
         s.bld.push_scope();
         // add params as variables for scope purposes
@@ -830,18 +849,27 @@ impl<'a> FuncGen<'a> {
         s
     }
 
-    fn generate_struct_func(func: &Box<ast::Func>, ir_module: &'a mut ir::Module, struct_type: types::Type, interned_file_name: StringRef) -> Self {
+    fn generate_struct_func(
+        func: &Box<ast::Func>,
+        ir_module: &'a mut ir::Module,
+        struct_type: types::Type,
+        interned_file_name: StringRef,
+    ) -> Self {
         let mut signature = ir::Signature {
             ret_types: func.typ_.returns.iter().map(|t| t.clone().into()).collect(),
-            parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect()
+            parameters: func.typ_.params.iter().map(|t| t.clone().into()).collect(),
         };
         signature.parameters.insert(0, struct_type.clone().into());
         let mut s = Self {
             str_map: &mut ir_module.string_map,
             global_map: &mut ir_module.global_value_map,
-            bld: FuncBuilder::new(func.signature.symbol_name.clone(), signature, &mut ir_module.source_locs),
+            bld: FuncBuilder::new(
+                func.signature.symbol_name.clone(),
+                signature,
+                &mut ir_module.source_locs,
+            ),
             self_var: None,
-            interned_file_name
+            interned_file_name,
         };
         s.bld.push_scope();
         // add params as variables for scope purposes
@@ -862,8 +890,13 @@ impl<'a> FuncGen<'a> {
 }
 
 pub fn emit_program(program: &ast::Program) -> Box<ir::Module> {
-    let mut ir_module = ir::Module { string_map: StringMap::new(), funcs: vec![], source_locs: Default::default(), global_value_map: GlobalValueMap::new() };
-    
+    let mut ir_module = ir::Module {
+        string_map: StringMap::new(),
+        funcs: vec![],
+        source_locs: Default::default(),
+        global_value_map: GlobalValueMap::new(),
+    };
+
     for package in program.packages.iter() {
         for file in package.files.iter() {
             let interned_file_name = ir_module.string_map.intern(&file.id);
@@ -873,7 +906,13 @@ pub fn emit_program(program: &ast::Program) -> Box<ir::Module> {
             }
             for _struct in file.structs.iter() {
                 for func in _struct.functions.iter() {
-                    let ir_func = FuncGen::generate_struct_func(func, &mut ir_module, _struct.typ.clone(), interned_file_name).finish();
+                    let ir_func = FuncGen::generate_struct_func(
+                        func,
+                        &mut ir_module,
+                        _struct.typ.clone(),
+                        interned_file_name,
+                    )
+                    .finish();
                     ir_module.funcs.push(*ir_func);
                 }
             }

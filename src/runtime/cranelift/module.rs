@@ -5,7 +5,6 @@
 // TODO: Factor out `ir::Function`'s `ext_funcs` and `global_values` into a struct
 // shared with `DataDescription`?
 
-use std::collections::{HashMap, hash_map};
 use super::data_context::DataDescription;
 use core::fmt::Display;
 use cranelift_codegen::binemit::{CodeOffset, Reloc};
@@ -19,6 +18,7 @@ use cranelift_codegen::{
 use cranelift_control::ControlPlane;
 use std::borrow::{Cow, ToOwned};
 use std::boxed::Box;
+use std::collections::{HashMap, hash_map};
 use std::string::String;
 
 /// A module relocation.

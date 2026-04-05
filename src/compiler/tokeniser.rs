@@ -92,7 +92,7 @@ impl<'a> Tokeniser<'a> {
 
     pub fn next_inner(&mut self, mode: TokeniserMode) -> Option<Token> {
         self.eat_whitespace()?;
-        
+
         let loc = SourceLoc {
             col: self.col_no(),
             line: self.line_no(),
@@ -103,7 +103,10 @@ impl<'a> Tokeniser<'a> {
         if c.is_alphabetic() || c == '_' {
             let str = self.source.accum(|c, _| c.is_alphanumeric() || c == '_');
             if str == "_" {
-                Some(Token::new(loc, TokenKind::Punctuation(Punctuation::Underscore)))
+                Some(Token::new(
+                    loc,
+                    TokenKind::Punctuation(Punctuation::Underscore),
+                ))
             } else if let Some(token) = keyword(str) {
                 Some(Token::new(loc, TokenKind::Keyword(token)))
             } else {
@@ -161,19 +164,17 @@ impl<'a> Tokeniser<'a> {
                     i64::from_str_radix(str, 10).unwrap(),
                 ))
             }
-        }
-        else if c == '\"' {
+        } else if c == '\"' {
             self.source.next();
             let literal = self
                 .source
                 .accum_string(|c, chars| c == '"' || (c == '$' && chars.next() == Some('{')));
-            let end = self.source.next().expect("Unfinished string or template sequence");
+            let end = self
+                .source
+                .next()
+                .expect("Unfinished string or template sequence");
             if end == '"' {
-                Some(Token::new_string(
-                    loc,
-                    TokenKind::StringLiteral,
-                    literal,
-                ))
+                Some(Token::new_string(loc, TokenKind::StringLiteral, literal))
             } else if end == '$' {
                 // consume '{' which should already checked
                 self.source.next();

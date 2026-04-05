@@ -2,6 +2,11 @@
 
 use crate::runtime::cranelift::compiled_blob::StackMap;
 
+use super::data_context::{DataDescription, Init};
+use super::module::{
+    DataId, FuncId, Linkage, Module, ModuleDeclarations, ModuleError, ModuleReloc,
+    ModuleRelocTarget, ModuleResult,
+};
 use super::{
     compiled_blob::CompiledBlob,
     memory::{BranchProtection, JITMemoryProvider, SystemMemoryProvider},
@@ -12,11 +17,6 @@ use cranelift_codegen::settings::Configurable;
 use cranelift_codegen::{ir, settings};
 use cranelift_control::ControlPlane;
 use cranelift_entity::SecondaryMap;
-use super::data_context::{DataDescription, Init};
-use super::module::{
-    DataId, FuncId, Linkage, Module, ModuleDeclarations, ModuleError,
-    ModuleReloc, ModuleRelocTarget, ModuleResult,
-};
 //use log::info;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -274,7 +274,9 @@ impl JITModule {
             !self.functions_to_finalize.iter().any(|x| *x == func_id),
             "function not yet finalized"
         );
-        let info = info.as_ref().expect("function must be compiled before it can be finalized");
+        let info = info
+            .as_ref()
+            .expect("function must be compiled before it can be finalized");
         info
     }
 
@@ -471,14 +473,16 @@ impl Module for JITModule {
             .buffer
             .user_stack_maps()
             .iter()
-            .map(|(off, _, stack_map)| {
-                StackMap {
-                    offset: *off,
-                    map: stack_map.entries().map(|(_, o)| o).collect(),
-                }
+            .map(|(off, _, stack_map)| StackMap {
+                offset: *off,
+                map: stack_map.entries().map(|(_, o)| o).collect(),
             })
             .collect();
-        let frame_to_fp_offset = compiled_code.buffer.frame_layout().unwrap().frame_to_fp_offset;
+        let frame_to_fp_offset = compiled_code
+            .buffer
+            .frame_layout()
+            .unwrap()
+            .frame_to_fp_offset;
 
         let relocs = compiled_code
             .buffer

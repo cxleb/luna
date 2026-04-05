@@ -64,7 +64,7 @@ pub fn collect_roots(stack_maps: &StackMaps, fp: usize) -> Vec<usize> {
 mod tests {
     use std::collections::HashMap;
 
-    use super::{find_stack_map, StackMap, StackMaps};
+    use super::{StackMap, StackMaps, find_stack_map};
 
     #[test]
     fn finds_stack_map_with_exact_return_address_match() {
