@@ -1,0 +1,25 @@
+{
+  "name": "luna",
+  "displayName": "Luna",
+  "description": "Support for the Luna language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.110.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "luna",
+      "aliases": ["Luna", "luna"],
+      "extensions": [".luna"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "luna",
+      "scopeName": "source.luna",
+      "path": "./syntaxes/luna.tmLanguage.json"
+    }]
+  }
+}

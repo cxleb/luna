@@ -1,6 +1,11 @@
-// This serves an "eventualluy" compilable goal
+// import the io file from the "std" package
+import "std:io"
+// the .luna file extension is optional
+import "otherpackage:file/path.luna"
+// if no package is specified it is assumed to be the package this file belongs to
+import "file/path"
 
-// entry point
+// main is always the entry point
 func main() {
     print("Hello, World!");
 
@@ -38,10 +43,10 @@ func main() {
     // Template strings
     // The normal string also serves as the template String
     // This is the primary method to format strings.
-    print("a + b = {a + b}");
-    print("a - b = {a - b}");
-    print("a / b = {a / b}");
-    print("a * b = {a * b}");
+    print("a + b = ${a + b}");
+    print("a - b = ${a - b}");
+    print("a / b = ${a / b}");
+    print("a * b = ${a * b}");
 }
 
 // parameters/return types
@@ -56,8 +61,36 @@ struct Bingus {
     c: bool,
     d: string,
     e: Bongus,
+
+    // Default constructor of a type
+    init() {
+        // int, number, boolean, and string default to 0
+        // but you must define a reference type, no nulls allowed
+        self.e = Bongus {
+            a: "Hi!"
+        }  
+    }
+
+    // add methods to the method set of the structs
+    func add(a: int) {
+        self.a = self.a +  a;
+    }
 }
 
 struct Bongus {
-    a: int,
+    a: string
 }
+
+// Interfaces are structural, meaning if a types method set contains the 
+// correct methods, then the particular type can be upcast into the interface
+interface Tuna {
+    func cook(a: int, b: number);
+}
+
+// Add more methods to the method set of a type
+extension Bongus {
+    func cook(a: int, b: number) {
+        self.a = "Cooked ${a} pieces, to ${b} degrees"
+    }
+}
+
