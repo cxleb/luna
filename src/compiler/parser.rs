@@ -862,7 +862,7 @@ mod tests {
         assert_eq!(file.imports.len(), 2);
         assert_eq!(file.imports[0].package, "std");
         assert_eq!(file.imports[0].file, "math/core.luna");
-        assert_eq!(file.imports[1].package, "main");
+        assert_eq!(file.imports[1].package, "testing");
         assert_eq!(file.imports[1].file, "utils.luna");
     }
 
