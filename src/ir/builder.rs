@@ -198,6 +198,14 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::GeqNumber);
     }
 
+    pub fn eq_string(&mut self) {
+        self.append_inst(super::Inst::EquString);
+    }
+
+    pub fn neq_string(&mut self) {
+        self.append_inst(super::Inst::NeqString);
+    }
+
     pub fn and(&mut self) {
         self.append_inst(super::Inst::And);
     }

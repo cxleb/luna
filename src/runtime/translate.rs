@@ -125,6 +125,7 @@ pub fn translate_function(
 
     let runtime_ctx = builder.block_params(blocks[0])[0];
     let mut stack = Vec::new();
+    let frontend_config = ctx.isa().frontend_config();
 
     let mut translate_call = |ctx: &mut super::JitContext,
                               builder: &mut cranelift_frontend::FunctionBuilder,
@@ -294,6 +295,34 @@ pub fn translate_function(
                     let lhs = stack.pop().unwrap();
                     let res = builder.ins().fcmp(FloatCC::GreaterThanOrEqual, lhs, rhs);
                     stack.push(res);
+                }
+                ir::Inst::EquString | ir::Inst::NeqString => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+
+                    let mut flags = MemFlags::new();
+                    flags.set_notrap();
+                    flags.set_readonly();
+
+                    let lhs_len = builder.ins().load(I64, flags, lhs, 0);
+                    let rhs_len = builder.ins().load(I64, flags, rhs, 0);
+                    let pointer_equal = builder.ins().icmp(IntCC::Equal, lhs, rhs);
+                    let length_equal = builder.ins().icmp(IntCC::Equal, lhs_len, rhs_len);
+                    let lhs_shorter = builder
+                        .ins()
+                        .icmp(IntCC::UnsignedLessThan, lhs_len, rhs_len);
+                    let compare_length = builder.ins().select(lhs_shorter, lhs_len, rhs_len);
+                    let lhs_data = builder.ins().iadd_imm(lhs, 8);
+                    let rhs_data = builder.ins().iadd_imm(rhs, 8);
+                    let cmp_res =
+                        builder.call_memcmp(frontend_config, lhs_data, rhs_data, compare_length);
+                    let bytes_equal = builder.ins().icmp_imm(IntCC::Equal, cmp_res, 0);
+                    let same_content = builder.ins().band(length_equal, bytes_equal);
+                    let mut result = builder.ins().bor(pointer_equal, same_content);
+                    if matches!(inst, ir::Inst::NeqString) {
+                        result = builder.ins().bnot(result);
+                    }
+                    stack.push(result);
                 }
                 ir::Inst::And => {
                     let rhs = stack.pop().unwrap();

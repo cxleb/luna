@@ -333,6 +333,11 @@ impl<'a> FuncGen<'a> {
                         ast::BinaryExprKind::LogicalOr => self.bld.or(),
                         _ => panic!("Invalid binary operation for bool type"),
                     },
+                    crate::types::TypeKind::String => match b.kind {
+                        ast::BinaryExprKind::Equal => self.bld.eq_string(),
+                        ast::BinaryExprKind::NotEqual => self.bld.neq_string(),
+                        _ => panic!("Invalid binary operation for string type"),
+                    },
                     _ => {
                         panic!("Invalid lhs type for bool binary expr");
                     }

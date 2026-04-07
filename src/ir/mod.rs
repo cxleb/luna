@@ -39,6 +39,8 @@ pub enum Inst {
     GtNumber,
     LeqNumber,
     GeqNumber,
+    EquString,
+    NeqString,
     And,
     Or,
     LoadConstInt(i64),

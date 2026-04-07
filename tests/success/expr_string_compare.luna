@@ -1,0 +1,10 @@
+func main() {
+    let a = "hello";
+    let b = "hello";
+    let c = "world";
+
+    assert(a == b);
+    assert(a != c);
+    assert("same" == "same");
+    assert("left" != "right");
+}
