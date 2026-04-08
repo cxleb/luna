@@ -1089,7 +1089,8 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::Template(t) => t,
             _ => panic!(),
         };
-        // check there is at least one substitution, then check all substitutions are strings, then assign type as string
+        // Check all substitutions are a string-compatible value:
+        // string, integer, number, boolean, or an implementor of the String interface.
         let string_interface = self
             .types
             .get_exact("builtins", "builtins", "String")
@@ -1097,12 +1098,21 @@ impl<'a> FuncTypeInference<'a> {
 
         for expr in t.expressions.iter_mut() {
             self.expr(expr, None)?;
+            if types::is_string(&expr.typ)
+                || types::is_integer(&expr.typ)
+                || types::is_number(&expr.typ)
+                || types::is_bool(&expr.typ)
+            {
+                continue;
+            }
+
             if types::compare(string_interface, &expr.typ) == types::ComparisonResult::Incompatible
             {
                 return self.error_loc(SemaErrorReason::TemplateSubstitutionMustBeString, expr.loc);
             }
 
-            // wrap the expression in a call to the string function on the string interface
+            // For non-primitive String-like values, wrap in a call to .string()
+            // so emit can treat it as a concrete string.
             let original_expr = expr.clone();
             *expr = ast::Expr {
                 kind: ast::ExprKind::Call(Box::new(ast::Call {

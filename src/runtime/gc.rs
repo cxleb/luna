@@ -115,4 +115,16 @@ impl GarbageCollector {
             ptr
         }
     }
+
+    // Allows us to allocate a rust object using the GC, so that it can be automatically freed when no longer used.
+    pub fn create_boxed_value<T: Sized>(&mut self, v: T) -> *const T {
+        // Placeholder implementation
+        unsafe {
+            let ptr = malloc(std::mem::size_of::<T>()) as *mut T;
+            *ptr = v;
+            self.allocations
+                .insert(Allocation::Object(ptr as usize, 0)); // We can treat this as an object with 0 fields, as we will never look for sub-allocations of it.
+            ptr
+        }
+    }
 }

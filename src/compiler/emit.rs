@@ -246,6 +246,14 @@ struct FuncGen<'a> {
 }
 
 impl<'a> FuncGen<'a> {
+    fn builtin_symbol_name(name: &str) -> String {
+        mangle::mangle_name(&types::NameSpecification {
+            package: "builtins".into(),
+            file: "builtins".into(),
+            name: name.into(),
+        })
+    }
+
     fn emit_source_loc(&mut self, source_loc: SourceLoc) {
         self.bld.source_loc(crate::ir::SourceLoc {
             file: self.interned_file_name,
@@ -546,8 +554,40 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn template(&mut self, _t: &ast::Template) {
-        unimplemented!()
+    fn template(&mut self, t: &ast::Template) {
+        self.bld
+            .call(Self::builtin_symbol_name("create_template_builder"));
+        let builder = self.bld.create_temp(Type::Reference);
+        self.bld.store(builder);
+
+        for (i, literal) in t.literals.iter().enumerate() {
+            self.bld.load(builder);
+            self.bld.load_const_string(self.str_map.intern(literal));
+            self.bld.call(Self::builtin_symbol_name("add_string"));
+
+            if let Some(value) = t.expressions.get(i) {
+                self.bld.load(builder);
+                self.expr(value);
+                match value.typ.kind() {
+                    types::TypeKind::String => {
+                        self.bld.call(Self::builtin_symbol_name("add_string"));
+                    }
+                    types::TypeKind::Integer => {
+                        self.bld.call(Self::builtin_symbol_name("add_integer"));
+                    }
+                    types::TypeKind::Number => {
+                        self.bld.call(Self::builtin_symbol_name("add_number"));
+                    }
+                    types::TypeKind::Bool => {
+                        self.bld.call(Self::builtin_symbol_name("add_boolean"));
+                    }
+                    _ => panic!("Invalid template substitution type {:?}", value.typ),
+                }
+            }
+        }
+
+        self.bld.load(builder);
+        self.bld.call(Self::builtin_symbol_name("get_string"));
     }
 
     fn expr(&mut self, e: &ast::Expr) {

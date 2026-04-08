@@ -1,0 +1,25 @@
+struct Person {
+    name: string,
+
+    func string(): string {
+        return self.name;
+    }
+}
+
+func main() {
+    let a = "hello ${10} world";
+    assert(a == "hello 10 world");
+
+    let b = "pi ${3.5} bool ${true}";
+    assert(b == "pi 3.5 bool true");
+
+    let c = "x${"y"}z";
+    assert(c == "xyz");
+
+    let p = Person { name: "Ada" };
+    let d = "Hello ${p}!";
+    assert(d == "Hello Ada!");
+
+    let e = "${1}${2}${3}";
+    assert(e == "123");
+}
