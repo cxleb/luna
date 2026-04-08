@@ -1,0 +1,9 @@
+struct Point {
+    x: int,
+    y: int,
+}
+
+func main() {
+    let point = Point { x: 10, y: 20 };
+    let _msg = "point: ${point}";
+}

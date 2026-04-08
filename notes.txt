@@ -1,6 +1,5 @@
 - Add source length to AST
 - Fix tokeniser(stop copying strings)
-- String templates (blocker: interface, stdlib)
 - Make functions a const value
 - captures functions(closures?)
 - Implement a concept of "api" so we can have std library
@@ -20,6 +19,7 @@
 - export syntax 
 
 done:
+- String templates (blocker: interface, stdlib)
 - Const variables are const
 - Implement multiple modules (import and export syntax?, how does the extension syntax work?)
 - Assert should become a compiler construct, test condition and jump to panic block (blocker: debug info)

@@ -1,0 +1,4 @@
+func main() {
+    let values: []int = [1, 2, 3];
+    let _msg = "values: ${values}";
+}

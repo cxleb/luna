@@ -1,0 +1,17 @@
+interface Counter {
+    func next(): int;
+}
+
+struct Sequence {
+    value: int,
+
+    func next(): int {
+        return self.value + 1;
+    }
+}
+
+func main() {
+    let sequence = Sequence { value: 10 };
+    let c: Counter = sequence;
+    let _msg = "counter: ${c}";
+}

@@ -1,0 +1,29 @@
+interface Named {
+    func string(): string;
+}
+
+struct User {
+    first: string,
+    last: string,
+
+    func string(): string {
+        return "${self.first} ${self.last}";
+    }
+}
+
+func render_name(value: Named): string {
+    return "User: ${value}";
+}
+
+func main() {
+    let user = User {
+        first: "Ada",
+        last: "Lovelace"
+    };
+
+    let message = render_name(user);
+    assert(message == "User: Ada Lovelace");
+
+    let inline = "Hello ${user}";
+    assert(inline == "Hello Ada Lovelace");
+}
