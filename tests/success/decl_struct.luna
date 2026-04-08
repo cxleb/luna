@@ -14,5 +14,5 @@ func main() {
     assert(a.a == 10);
     assert(a.b > 10.0);
     assert(a.b < 11.0);
-    //assert(a.c == "This is a string");
+    assert(a.c == "This is a string");
 }

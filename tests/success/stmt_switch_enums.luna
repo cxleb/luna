@@ -16,6 +16,7 @@ func main() {
         }
         .three(a, b): {
             assert(a == 67);
+            assert(b == "Six Seven");
         }
         _: {
             assert(false);
