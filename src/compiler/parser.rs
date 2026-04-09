@@ -776,7 +776,14 @@ impl<'a> Parser<'a> {
         } else if self.test(TokenKind::IntegerLiteral) {
             let token = self.next()?;
             let value = token.get_int();
-            PatternKind::Integer(value)
+            if self.test(TokenKind::Punctuation(Punctuation::DotDot)) {
+                self.next()?;
+                let end_token = self.expect(TokenKind::IntegerLiteral)?;
+                let end_value = end_token.get_int();
+                PatternKind::IntegerRange(value, end_value)
+            } else {
+                PatternKind::Integer(value)
+            }
         } else if self.test(TokenKind::StringLiteral) {
             let token = self.next()?;
             let value = token.get_string();

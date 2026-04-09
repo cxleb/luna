@@ -115,6 +115,7 @@ pub enum Punctuation {
     Colon,                                // :
     Comma,                                // ,
     Dot,                                  // .
+    DotDot,                               // ..
     DotDotDot,                            // ...
     Equals,                               // =
     EqualsEquals,                         // ==
