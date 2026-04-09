@@ -14,6 +14,7 @@ use crate::types;
 // https://github.com/bytecodealliance/wasmtime/blob/f6b2700cc89118308faadc08e72092642928f9cf/cranelift/frontend/src/switch.rs#L42
 struct SwitchEmitter {
     cases: HashMap<i64, BlockRef>,
+    range_cases: Vec<(i64, i64, BlockRef)>,
 }
 
 impl SwitchEmitter {
@@ -21,13 +22,19 @@ impl SwitchEmitter {
     pub fn new() -> Self {
         Self {
             cases: HashMap::new(),
+            range_cases: Vec::new(),
         }
     }
 
-    /// Set a switch entry
+    /// Set a switch entry for an exact integer value
     pub fn set_entry(&mut self, index: i64, block: BlockRef) {
         let prev = self.cases.insert(index, block);
         assert!(prev.is_none(), "Tried to set the same entry {index} twice");
+    }
+
+    /// Set a switch entry for an inclusive integer range [lo, hi]
+    pub fn set_range_entry(&mut self, lo: i64, hi: i64, block: BlockRef) {
+        self.range_cases.push((lo, hi, block));
     }
 
     /// Turn the `cases` `HashMap` into a list of `ContiguousCaseRange`s.
@@ -38,8 +45,8 @@ impl SwitchEmitter {
     /// * The `ContiguousCaseRange`s will not overlap.
     /// * Between two `ContiguousCaseRange`s there will be at least one entry index.
     /// * No `ContiguousCaseRange`s will be empty.
-    fn collect_contiguous_case_ranges(self) -> Vec<ContiguousCaseRange> {
-        let mut cases = self.cases.into_iter().collect::<Vec<(_, _)>>();
+    fn collect_contiguous_case_ranges(cases: HashMap<i64, BlockRef>) -> Vec<ContiguousCaseRange> {
+        let mut cases = cases.into_iter().collect::<Vec<(_, _)>>();
         cases.sort_by_key(|&(index, _)| index);
 
         let mut contiguous_case_ranges: Vec<ContiguousCaseRange> = vec![];
@@ -178,9 +185,25 @@ impl SwitchEmitter {
     /// * The function builder to emit to
     /// * The default block
     pub fn emit(self, bx: &mut FuncBuilder, default: BlockRef) {
-        let contiguous_case_ranges = self.collect_contiguous_case_ranges();
+        let SwitchEmitter { cases, range_cases } = self;
+        let contiguous_case_ranges = Self::collect_contiguous_case_ranges(cases);
         let temp = bx.create_temp(Type::Integer);
         bx.store(temp);
+
+        // Emit inclusive range checks as a linear chain before the exact-match dispatch
+        for (lo, hi, case_block) in range_cases {
+            let next_block = bx.new_block();
+            bx.load(temp);
+            bx.load_const_int(lo);
+            bx.geq_int();
+            bx.load(temp);
+            bx.load_const_int(hi);
+            bx.leq_int();
+            bx.and();
+            bx.condbr(case_block, next_block);
+            bx.switch_to_block(next_block);
+        }
+
         Self::build_search_tree(bx, temp, default, &contiguous_case_ranges);
     }
 }
@@ -830,11 +853,15 @@ impl<'a> FuncGen<'a> {
                         self.bld.switch_to_block(block);
                         did_return &= self.block_stmt(&case.block);
                         self.bld.br(finish_block);
-                        self.bld.switch_to_block(prev_block);
-
                         switch_emitter.set_entry(*i, block);
                     }
-                    ast::PatternKind::IntegerRange(_, _) => unimplemented!(),
+                    ast::PatternKind::IntegerRange(lo, hi) => {
+                        let block = self.bld.new_block();
+                        self.bld.switch_to_block(block);
+                        did_return &= self.block_stmt(&case.block);
+                        self.bld.br(finish_block);
+                        switch_emitter.set_range_entry(*lo, *hi, block);
+                    }
                     _ => {}
                 }
             }

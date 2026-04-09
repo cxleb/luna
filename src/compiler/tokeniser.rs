@@ -134,34 +134,40 @@ impl<'a> Tokeniser<'a> {
                     i64::from_str_radix(str, 8).unwrap(),
                 ))
             } else {
-                let str = self.source.accum(|c, _| c.is_numeric() || c == '.');
-                if str.contains('.') {
+                let int_str = self.source.accum(|c, _| c.is_numeric());
+                if self.source.peek_char() == Some('.') && !self.source.peek_str("..") {
+                    self.source.next();
+                    let dec_str = self.source.accum(|c, _| c.is_numeric());
+                    let float_str = format!("{}.{}", int_str, dec_str);
                     Some(Token::new_float(
                         loc,
                         TokenKind::NumberLiteral,
-                        str.parse().unwrap(),
+                        float_str.parse().unwrap(),
                     ))
                 } else {
                     Some(Token::new_int(
                         loc,
                         TokenKind::IntegerLiteral,
-                        i64::from_str_radix(str, 10).unwrap(),
+                        i64::from_str_radix(int_str, 10).unwrap(),
                     ))
                 }
             }
         } else if c.is_numeric() {
-            let str = self.source.accum(|c, _| c.is_numeric() || c == '.');
-            if str.contains('.') {
+            let int_str = self.source.accum(|c, _| c.is_numeric());
+            if self.source.peek_char() == Some('.') && !self.source.peek_str("..") {
+                self.source.next();
+                let dec_str = self.source.accum(|c, _| c.is_numeric());
+                let float_str = format!("{}.{}", int_str, dec_str);
                 Some(Token::new_float(
                     loc,
                     TokenKind::NumberLiteral,
-                    str.parse().unwrap(),
+                    float_str.parse().unwrap(),
                 ))
             } else {
                 Some(Token::new_int(
                     loc,
                     TokenKind::IntegerLiteral,
-                    i64::from_str_radix(str, 10).unwrap(),
+                    i64::from_str_radix(int_str, 10).unwrap(),
                 ))
             }
         } else if c == '\"' {
@@ -297,6 +303,9 @@ impl<'a> Tokeniser<'a> {
                     if self.source.peek_str("...") {
                         self.source.advance(3).unwrap();
                         Punctuation::DotDotDot
+                    } else if self.source.peek_str("..") {
+                        self.source.advance(2).unwrap();
+                        Punctuation::DotDot
                     } else {
                         self.source.next();
                         Punctuation::Dot
@@ -652,7 +661,7 @@ mod test {
 
     #[test]
     fn punctuation_tokens() {
-        let js = "& && &&= &= | || ||= |= ^ ^= : , . ...  = == === => ! != !== \
+        let js = "& && &&= &= | || ||= |= ^ ^= : , . .. ...  = == === => ! != !== \
         / /= < <= << <<= { [ ( - -= -- * *= ** **= % %= + += ++ ? ?? ??= > >= \
         >> >>= >>> >>>= } ] ) ; ~";
         let punctuation = &[
@@ -669,6 +678,7 @@ mod test {
             Punctuation::Colon,
             Punctuation::Comma,
             Punctuation::Dot,
+            Punctuation::DotDot,
             Punctuation::DotDotDot,
             Punctuation::Equals,
             Punctuation::EqualsEquals,

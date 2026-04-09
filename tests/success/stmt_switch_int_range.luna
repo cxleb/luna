@@ -1,0 +1,44 @@
+func main() {
+    let a = 5;
+    switch a {
+        1..10: {
+            assert(a >= 1 && a <= 10);
+        }
+        _: {
+            assert(false);
+        }
+    }
+    let b = 0;
+    switch b {
+        1..10: {
+            assert(false);
+        }
+        _: {
+            assert(b == 0);
+        }
+    }
+    let c = 3;
+    switch c {
+        1..2: {
+            assert(false);
+        }
+        3..5: {
+            assert(c >= 3 && c <= 5);
+        }
+        _: {
+            assert(false);
+        }
+    }
+    let d = 7;
+    switch d {
+        1..5: {
+            assert(false);
+        }
+        6: {
+            assert(false);
+        }
+        7..10: {
+            assert(d >= 7 && d <= 10);
+        }
+    }
+}
