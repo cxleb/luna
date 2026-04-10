@@ -85,7 +85,17 @@ impl Drop for PtrLen {
     }
 }
 
-// TODO: add a `Drop` impl for `cfg(target_os = "windows")`
+#[cfg(target_os = "windows")]
+impl Drop for PtrLen {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() {
+            use windows_sys::Win32::System::Memory::{MEM_RELEASE, VirtualFree};
+            unsafe {
+                VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
+            }
+        }
+    }
+}
 
 /// JIT memory manager. This manages pages of suitably aligned and
 /// accessible memory. Memory will be leaked by default to have
