@@ -1,0 +1,16 @@
+struct Request {
+
+}
+
+struct Response {
+
+}
+
+interface Acceptor {
+    fn accept(req: Request, res: Response);
+}
+
+// eventually this should go onto a different task and return a server object so it can be stopped.
+func serve(addr: string, acceptor: Acceptor) {
+
+} 

@@ -11,6 +11,7 @@ fn main() {
     let builtins = builtins::default_builtins();
 
     let compiler = compiler::new_compiler();
+    compiler::add_std_package(Arc::clone(&compiler));
     let main_file_name = compiler::add_root_file(Arc::clone(&compiler), &name);
     let module = compiler::run_compiler(Arc::clone(&compiler), &builtins);
 

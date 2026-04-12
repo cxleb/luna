@@ -82,6 +82,13 @@ pub fn add_file(compiler: Arc<Mutex<Compiler>>, package_id: &str, filename: &str
         }
     };
 
+    let full_path = if !full_path.ends_with(".luna") {
+        // append .luna if not present
+        format!("{}.luna", full_path)
+    } else {
+        full_path
+    };
+
     let compiler_clone = Arc::clone(&compiler);
     let parse_task = Box::new(move || match std::fs::read_to_string(&full_path) {
         Ok(src) => {
@@ -110,8 +117,8 @@ pub fn add_file(compiler: Arc<Mutex<Compiler>>, package_id: &str, filename: &str
         }
         Err(e) => {
             compiler_clone.lock().unwrap().errors.push(format!(
-                "Could not read file {} in package {}: {}",
-                filename, package_id, e
+                "Could not read file {} in package {}: {} - {}",
+                filename, package_id, e, full_path
             ));
         }
     });
@@ -137,6 +144,17 @@ pub fn add_root_file(compiler: Arc<Mutex<Compiler>>, filename: &str) -> String {
     add_file(compiler, "main", filename);
     filename.into()
 }
+
+pub fn add_std_package(compiler: Arc<Mutex<Compiler>>) {
+    let base_path = std::env::current_dir()
+        .unwrap()
+        .join("lib/std");
+    {
+        let mut compiler_guard = compiler.lock().unwrap();
+        let package = ensure_package(&mut compiler_guard.program, "std");
+        package.base_path = Some(base_path);
+    }
+}    
 
 pub fn run_compiler(compiler: Arc<Mutex<Compiler>>, builtins: &Builtins) -> Box<ir::Module> {
     let compiler = Arc::clone(&compiler);

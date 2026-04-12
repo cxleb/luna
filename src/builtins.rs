@@ -1,4 +1,7 @@
+use std::net::Ipv4Addr;
+
 use crate::types;
+use libc::{self};
 
 pub struct BuiltinFunction {
     pub id: String,
@@ -151,6 +154,124 @@ pub fn builtin_get_string(_: *mut crate::runtime::RuntimeContext, builder: *cons
     Box::into_raw(internal) as *const u8
 }
 
+pub fn builtin_input(_: *mut crate::runtime::RuntimeContext) -> *const u8 {
+    use std::io::{self, Write};
+    print!("> ");
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    let internal = crate::runtime::string::convert_to_interal_string(&input.trim_end());
+    Box::into_raw(internal) as *const u8
+}
+
+pub fn builtin_tcp_connect(_: *mut crate::runtime::RuntimeContext, address: *const u8) -> i64 {
+    let address = crate::runtime::string::convert_from_internal_string(address);
+
+    let parts: Vec<&str> = address.split(':').collect();
+    if parts.len() != 2 {
+        return -5;
+    }
+
+    let host = parts[0];
+    let port = match parts[1].parse::<u16>() {
+        Ok(p) => p,
+        Err(_) => return -4,
+    };
+
+    let host = match host.parse::<Ipv4Addr>() {
+        Ok(h) => h,
+        Err(_) => return -3,
+    };
+
+    let socket = unsafe { libc::socket(libc::PF_INET, libc::SOCK_STREAM, libc::IPPROTO_TCP) };
+    if socket == -1 {
+        return -1;
+    }
+
+    unsafe {
+        let sa = libc::sockaddr_in {
+            sin_len: std::mem::size_of::<libc::sockaddr_in>() as u8,
+            sin_family: libc::AF_INET as u8,
+            sin_port: port,
+            sin_addr: libc::in_addr {
+                s_addr: host.to_bits()
+            },
+            sin_zero: [0; 8],
+        };
+
+        if libc::bind(socket, &sa as *const libc::sockaddr_in as *const libc::sockaddr, std::mem::size_of::<libc::sockaddr_in>() as u32) == -1 {
+            libc::close(socket);
+            return -2;
+        }
+    }
+
+    socket as i64
+}
+
+pub fn builtin_tcp_accept(_: *mut crate::runtime::RuntimeContext, socket: i64) -> i64 {
+    let client_socket = unsafe { libc::accept(socket as libc::c_int, std::ptr::null_mut(), std::ptr::null_mut()) };
+    if client_socket == -1 {
+        return -1;
+    }
+    client_socket as i64
+}
+
+pub fn builtin_tcp_disconnect(_: *mut crate::runtime::RuntimeContext, socket: i64) -> i64 {
+    if unsafe { libc::close(socket as libc::c_int) } == -1 {
+        return -1;
+    }
+    0
+}
+
+pub fn builtin_stdin(_: *mut crate::runtime::RuntimeContext) -> i64 {
+    libc::STDIN_FILENO as i64
+}
+
+pub fn builtin_stdout(_: *mut crate::runtime::RuntimeContext) -> i64 {
+    libc::STDOUT_FILENO as i64
+}
+
+pub fn builtin_stderr(_: *mut crate::runtime::RuntimeContext) -> i64 {
+    libc::STDERR_FILENO as i64
+}
+
+pub fn builtin_read(ctx: *mut crate::runtime::RuntimeContext, fd: i64) -> *const i64 {
+    let mut buffer = [0u8; 1024];
+    let mut copy_buffer = Vec::new();
+
+    loop {
+        let bytes_read = unsafe { libc::read(fd as libc::c_int, buffer.as_mut_ptr() as *mut libc::c_void, buffer.len()) };
+        if bytes_read == -1 {
+            return unsafe {
+                (*ctx).gc.create_array(0)
+            };
+        }
+        for i in 0..bytes_read {
+            copy_buffer.push(buffer[i as usize] as i64);
+        }
+        if (bytes_read as usize) < buffer.len() {
+            break;
+        }
+    }
+
+    let array = unsafe {
+        (*ctx).gc.create_array(buffer.len())
+    };
+    for (i, &b) in copy_buffer.iter().enumerate() {
+        unsafe {
+            let ptr = (array as usize + 8 + (i * 8)) as *mut usize;
+            *ptr = b as usize;
+        }
+    }
+    array
+}
+//
+//pub fn builtin_write(ctx: *mut crate::runtime::RuntimeContext, fd: i64, array: *mut i64) {
+//    loop {
+//        let bytes_read = unsafe { libc::write(fd, array as *const libc::c_void, 8) };
+//    }
+//}
+
 pub fn default_builtins() -> Builtins {
     let mut builtins = Builtins::new();
     builtins.push_function("print", vec![types::string()], None, builtin_print);
@@ -199,6 +320,14 @@ pub fn default_builtins() -> Builtins {
         Some(types::string()),
         builtin_get_string,
     );
+    builtins.push_function_0("stdin", vec![], Some(types::integer()), builtin_stdin);
+    builtins.push_function_0("stdout", vec![], Some(types::integer()), builtin_stdout);
+    builtins.push_function_0("stderr", vec![], Some(types::integer()), builtin_stderr);
+    builtins.push_function("tcp_connect", vec![types::string()], Some(types::integer()), builtin_tcp_connect);
+    builtins.push_function("tcp_accept", vec![types::integer()], Some(types::integer()), builtin_tcp_accept);
+    builtins.push_function("tcp_disconnect", vec![types::integer()], None, builtin_tcp_disconnect);
+    builtins.push_function("read", vec![types::integer()], Some(types::array(types::integer())), builtin_read);
+
 
     builtins
 }
