@@ -340,6 +340,10 @@ pub fn translate_function(
                     let val = builder.ins().iconst(I64, *value);
                     stack.push(val);
                 }
+                ir::Inst::LoadConstByte(value) => {
+                    let val = builder.ins().iconst(I8, *value as i64);
+                    stack.push(val);
+                }
                 ir::Inst::LoadConstNumber(value) => {
                     let val = builder.ins().f64const(*value);
                     stack.push(val);

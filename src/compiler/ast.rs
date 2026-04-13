@@ -7,6 +7,7 @@ pub enum Type {
     #[default]
     Unknown,
     Integer,
+    Byte,
     Number,
     String,
     Bool,

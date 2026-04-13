@@ -46,6 +46,7 @@ pub struct InterfaceType {
 pub enum TypeKind {
     Bad,
     Integer,
+    Byte,
     Number,
     String,
     Bool,
@@ -187,7 +188,11 @@ pub fn compare(a: &Type, b: &Type) -> ComparisonResult {
 
 /// Is type numeric (integer or number)
 pub fn is_numeric(ty: &Type) -> bool {
-    matches!(ty.inner.kind, TypeKind::Integer | TypeKind::Number)
+    matches!(ty.inner.kind, TypeKind::Integer | TypeKind::Byte | TypeKind::Number)
+}
+
+pub fn is_byte(ty: &Type) -> bool {
+    matches!(ty.inner.kind, TypeKind::Byte)
 }
 
 pub fn is_bad(ty: &Type) -> bool {
@@ -298,6 +303,7 @@ pub fn name(typ: &Type) -> String {
     match &typ.inner.kind {
         TypeKind::Bad => "bad".into(),
         TypeKind::Integer => "integer".into(),
+        TypeKind::Byte => "byte".into(),
         TypeKind::Number => "number".into(),
         TypeKind::String => "string".into(),
         TypeKind::Bool => "bool".into(),
@@ -344,6 +350,13 @@ pub fn integer() -> Type {
     static INTEGER_TYPE: OnceLock<Type> = OnceLock::new();
     INTEGER_TYPE
         .get_or_init(|| create_type(TypeKind::Integer))
+        .clone()
+}
+
+pub fn byte() -> Type {
+    static BYTE_TYPE: OnceLock<Type> = OnceLock::new();
+    BYTE_TYPE
+        .get_or_init(|| create_type(TypeKind::Byte))
         .clone()
 }
 

@@ -130,6 +130,15 @@ pub fn builtin_add_integer(_: *mut crate::runtime::RuntimeContext, builder: *con
     builder.push_str(&value.to_string());
 }
 
+pub fn builtin_add_byte(
+    _: *mut crate::runtime::RuntimeContext,
+    builder: *const u8,
+    value: u8,
+) {
+    let builder = unsafe { &mut *(builder as *mut String) };
+    builder.push_str(&value.to_string());
+}
+
 pub fn builtin_add_boolean(
     _: *mut crate::runtime::RuntimeContext,
     builder: *const u8,
@@ -301,6 +310,12 @@ pub fn default_builtins() -> Builtins {
         vec![types::unknown_reference(), types::integer()],
         None,
         builtin_add_integer,
+    );
+    builtins.push_function_2(
+        "add_byte",
+        vec![types::unknown_reference(), types::byte()],
+        None,
+        builtin_add_byte,
     );
     builtins.push_function_2(
         "add_boolean",

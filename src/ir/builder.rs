@@ -218,6 +218,10 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::LoadConstInt(i));
     }
 
+    pub fn load_const_byte(&mut self, b: u8) {
+        self.append_inst(super::Inst::LoadConstByte(b));
+    }
+
     pub fn load_const_number(&mut self, n: f64) {
         self.append_inst(super::Inst::LoadConstNumber(n));
     }

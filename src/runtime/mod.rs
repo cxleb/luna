@@ -194,6 +194,7 @@ impl JitContext {
     fn translate_type(&self, ty: &crate::ir::Type) -> cranelift_codegen::ir::Type {
         match ty {
             crate::ir::Type::Integer => I64,
+            crate::ir::Type::Byte => I8,
             crate::ir::Type::Bool => I8,
             crate::ir::Type::Number => F64,
             _ => cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple()), // pointer?

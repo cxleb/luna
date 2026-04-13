@@ -248,6 +248,7 @@ impl ContiguousCaseRange {
 fn translate_type(ty: &crate::types::Type) -> ir::Type {
     match ty.kind() {
         crate::types::TypeKind::Integer => ir::Type::Integer,
+        crate::types::TypeKind::Byte => ir::Type::Byte,
         crate::types::TypeKind::Bool => ir::Type::Bool,
         crate::types::TypeKind::Number => ir::Type::Number,
         _ => ir::Type::Reference,
@@ -528,6 +529,7 @@ impl<'a> FuncGen<'a> {
                     // provide default value
                     match field_type.kind() {
                         crate::types::TypeKind::Integer => self.bld.load_const_int(0),
+                        crate::types::TypeKind::Byte => self.bld.load_const_byte(0),
                         crate::types::TypeKind::Number => self.bld.load_const_number(0.0),
                         crate::types::TypeKind::Bool => self.bld.load_const_bool(false),
                         crate::types::TypeKind::String => {
@@ -597,6 +599,9 @@ impl<'a> FuncGen<'a> {
                     }
                     types::TypeKind::Integer => {
                         self.bld.call(Self::builtin_symbol_name("add_integer"));
+                    }
+                    types::TypeKind::Byte => {
+                        self.bld.call(Self::builtin_symbol_name("add_byte"));
                     }
                     types::TypeKind::Number => {
                         self.bld.call(Self::builtin_symbol_name("add_number"));

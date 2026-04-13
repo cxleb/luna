@@ -9,6 +9,7 @@ pub type GlobalRef = usize;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
     Integer,
+    Byte,
     Number,
     Bool,
     Reference,
@@ -44,6 +45,7 @@ pub enum Inst {
     And,
     Or,
     LoadConstInt(i64),
+    LoadConstByte(u8),
     LoadConstNumber(f64),
     LoadConstBool(bool),
     LoadConstString(StringRef),

@@ -282,6 +282,7 @@ fn type_lookup(
 ) -> SemaResult<Type> {
     match ast_type {
         ast::Type::Integer => Ok(types::integer()),
+        ast::Type::Byte => Ok(types::byte()),
         ast::Type::Number => Ok(types::number()),
         ast::Type::String => Ok(types::string()),
         ast::Type::Bool => Ok(types::bool()),

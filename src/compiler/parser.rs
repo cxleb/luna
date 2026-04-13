@@ -836,6 +836,8 @@ impl<'a> Parser<'a> {
             return Ok(Box::new(Type::Bool));
         } else if string == "int" {
             return Ok(Box::new(Type::Integer));
+        } else if string == "byte" {
+            return Ok(Box::new(Type::Byte));
         } else if string == "number" {
             return Ok(Box::new(Type::Number));
         } else {
