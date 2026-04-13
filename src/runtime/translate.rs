@@ -471,9 +471,14 @@ pub fn translate_function(
                         stack.push(*r);
                     }
                 }
-                ir::Inst::NewArray(size) => {
+                ir::Inst::NewArray(size, typ) => {
+                    let clir_typ = ctx.translate_type(&typ);
                     let val = builder.ins().iconst(I64, *size as i64);
                     stack.push(val);
+                    let val = builder.ins().iconst(I64, clir_typ.bytes() as i64);
+                    stack.push(val);
+                    let scan_elements = matches!(typ, ir::Type::Reference);
+                    stack.push(builder.ins().iconst(I8, if scan_elements { 1 } else { 0 }));
                     translate_call(ctx, &mut builder, &mut stack, "__create_array");
                 }
                 ir::Inst::LoadArray(typ) => {
@@ -510,16 +515,17 @@ pub fn translate_function(
 
                     builder.switch_to_block(continue_block);
                     // load the value now we know the array index is ok
-                    let offset = builder.ins().imul_imm(index, 8);
+                    let clir_typ = ctx.translate_type(&typ);
+                    let offset = builder.ins().imul_imm(index, clir_typ.bytes() as i64);
                     let array_begin = builder.ins().iadd_imm(array, 8);
                     let pointer = builder.ins().iadd(array_begin, offset);
                     let value =
                         builder
                             .ins()
-                            .load(ctx.translate_type(&typ), MemFlags::new(), pointer, 0);
+                            .load(clir_typ, MemFlags::new(), pointer, 0);
                     stack.push(value);
                 }
-                ir::Inst::StoreArray(_) => {
+                ir::Inst::StoreArray(typ) => {
                     let array = stack.pop().unwrap();
                     let index = stack.pop().unwrap();
                     let value = stack.pop().unwrap();
@@ -554,7 +560,8 @@ pub fn translate_function(
 
                     builder.switch_to_block(continue_block);
                     // store the value now we know the array index is ok
-                    let offset = builder.ins().imul_imm(index, 8);
+                    let clir_typ = ctx.translate_type(&typ);
+                    let offset = builder.ins().imul_imm(index, clir_typ.bytes() as i64);
                     let array_begin = builder.ins().iadd_imm(array, 8);
                     let pointer = builder.ins().iadd(array_begin, offset);
                     builder

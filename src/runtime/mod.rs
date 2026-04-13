@@ -70,9 +70,9 @@ pub extern "C" fn panic(_: *mut RuntimeContext, message: *const u8) {
     std::process::exit(1);
 }
 
-pub extern "C" fn create_array(ctx: *mut RuntimeContext, size: i64) -> *const i64 {
+pub extern "C" fn create_array(ctx: *mut RuntimeContext, size: i64, elem_size: i64, scan_elements: bool) -> *const i64 {
     let gc = unsafe { &mut (*ctx).gc };
-    let array = gc.create_array(size as usize);
+    let array = gc.create_array(size as usize, elem_size as usize, scan_elements);
     array
 }
 
@@ -243,7 +243,7 @@ impl JitContext {
         signatures.push(TranslateSignature {
             id: "__create_array".into(),
             signature: Signature {
-                parameters: vec![ir::Type::Integer],
+                parameters: vec![ir::Type::Integer, ir::Type::Integer, ir::Type::Bool],
                 ret_types: vec![ir::Type::Reference],
             },
         });

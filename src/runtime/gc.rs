@@ -4,14 +4,19 @@ use libc::{free, malloc};
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 enum Allocation {
-    Array(usize, usize),
+    Array{
+        ptr: usize, 
+        size: usize,
+        elem_size: usize,
+        scan_elements : bool, // whether we should scan the elements of this array for pointers to other allocations. This is false for arrays of primitive types.
+    },
     Object(usize, usize),
 }
 
 impl Allocation {
     pub fn get_address(&self) -> usize {
         match self {
-            &Allocation::Array(p, _) => p,
+            &Allocation::Array{ptr, size: _, elem_size: _, scan_elements:_} => ptr,
             &Allocation::Object(p, _) => p,
         }
     }
@@ -45,9 +50,12 @@ impl GarbageCollector {
 
         // find all sub allocations and mark them
         match allocation {
-            &Allocation::Array(p, s) => {
-                for i in 0..s {
-                    let v = (p + 8 + (i * 8)) as *mut usize;
+            &Allocation::Array{ptr: p, size: s, elem_size: e, scan_elements} => {
+                if !scan_elements {
+                    return;
+                }
+                for i in 0..(s/e) {
+                    let v = (p + 8 + (i * e)) as *mut usize;
                     let v = unsafe { *v };
                     if let Some(a) = self.find_allocation(v) {
                         self.mark_allocation(a, marks);
@@ -93,14 +101,14 @@ impl GarbageCollector {
         }
     }
 
-    pub fn create_array(&mut self, size: usize) -> *const i64 {
+    pub fn create_array(&mut self, size: usize, elem_size: usize, scan_elements: bool) -> *const i64 {
         // Placeholder implementation
         // +8 for the size
         unsafe {
-            let ptr = malloc((8 * size) + 8) as *mut i64;
-            *ptr = size as i64;
+            let ptr = malloc(size * elem_size + 8) as *mut i64;
+            *ptr = (size * elem_size) as i64;
             self.allocations
-                .insert(Allocation::Array(ptr as usize, size));
+                .insert(Allocation::Array{ptr: ptr as usize, size, elem_size, scan_elements});
             ptr
         }
     }

@@ -252,7 +252,7 @@ pub fn builtin_read(ctx: *mut crate::runtime::RuntimeContext, fd: i64) -> *const
         let bytes_read = unsafe { libc::read(fd as libc::c_int, buffer.as_mut_ptr() as *mut libc::c_void, buffer.len()) };
         if bytes_read == -1 {
             return unsafe {
-                (*ctx).gc.create_array(0)
+                (*ctx).gc.create_array(0, 1, false)
             };
         }
         for i in 0..bytes_read {
@@ -264,7 +264,7 @@ pub fn builtin_read(ctx: *mut crate::runtime::RuntimeContext, fd: i64) -> *const
     }
 
     let array = unsafe {
-        (*ctx).gc.create_array(buffer.len())
+        (*ctx).gc.create_array(buffer.len(), 1, false)
     };
     for (i, &b) in copy_buffer.iter().enumerate() {
         unsafe {

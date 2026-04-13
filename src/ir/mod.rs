@@ -65,7 +65,7 @@ pub enum Inst {
     Call(String),
     IndirectCall(Signature), // top of the stack is the function to call, arity is the number of arguments (not including the function pointer)
 
-    NewArray(usize),
+    NewArray(usize, Type),
     LoadArray(Type),  // Pops the index and array
     StoreArray(Type), // Pops the value, index, and array
 

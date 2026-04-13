@@ -286,8 +286,8 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::IndirectCall(signature));
     }
 
-    pub fn new_array(&mut self, size: usize) {
-        self.append_inst(super::Inst::NewArray(size));
+    pub fn new_array(&mut self, size: usize, typ: Type) {
+        self.append_inst(super::Inst::NewArray(size, typ));
     }
 
     pub fn load_array(&mut self, typ: Type) {

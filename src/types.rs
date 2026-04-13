@@ -289,6 +289,14 @@ pub fn get_interface_func_index(ty: &Type, id: &str) -> usize {
     }
 }
 
+pub fn get_inner_array_type(ty: &Type) -> Type {
+    if let TypeKind::Array(element_type) = &ty.inner.kind {
+        element_type.clone()
+    } else {
+        panic!("Type is not an array");
+    }
+}
+
 pub fn create_type(kind: TypeKind) -> Type {
     Type {
         inner: Arc::new(Inner {

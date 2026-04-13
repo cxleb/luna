@@ -22,4 +22,17 @@ func main() {
     assert(g[10] == 12);
     assert(h == 12);
     assert(g[10] == h);
+
+    // bytes
+    let bz: []int = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    bz[10] = 10;
+    let b = bz[10];
+    assert(bz[10] == 10);
+    assert(b == 10);
+    assert(bz[10] == b);
+    bz[10] = 12;
+    b = bz[10];
+    assert(bz[10] == 12);
+    assert(b == 12);
+    assert(bz[10] == b);
 }

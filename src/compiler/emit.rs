@@ -506,8 +506,8 @@ impl<'a> FuncGen<'a> {
         self.bld.get_object(s.idx, e.typ.clone().into());
     }
 
-    fn array_literal(&mut self, a: &Box<ast::ArrayLiteral>) {
-        self.bld.new_array(a.literals.len());
+    fn array_literal(&mut self, e: &ast::Expr, a: &Box<ast::ArrayLiteral>) {
+        self.bld.new_array(a.literals.len(), translate_type(&types::get_inner_array_type(&e.typ)));
         for (i, literal) in a.literals.iter().enumerate() {
             self.expr(literal);
             self.bld.load_const_int(i as i64);
@@ -536,8 +536,8 @@ impl<'a> FuncGen<'a> {
                             let s = self.str_map.intern("");
                             self.bld.load_const_string(s);
                         }
-                        crate::types::TypeKind::Array(_) => {
-                            self.bld.new_array(0);
+                        crate::types::TypeKind::Array(typ) => {
+                            self.bld.new_array(0, translate_type(typ));
                         }
                         _ => {
                             panic!(
@@ -633,7 +633,7 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::Identifier(i) => self.identifier(i),
             ast::ExprKind::Subscript(l) => self.subscript(e, l),
             ast::ExprKind::Selector(l) => self.selector(e, l),
-            ast::ExprKind::ArrayLiteral(a) => self.array_literal(a),
+            ast::ExprKind::ArrayLiteral(a) => self.array_literal(e, a),
             ast::ExprKind::ObjectLiteral(o) => self.object_literal(&e.typ, o),
             ast::ExprKind::_Self => self._self(),
             ast::ExprKind::Template(t) => self.template(t),
