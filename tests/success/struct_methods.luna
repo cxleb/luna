@@ -1,7 +1,7 @@
 struct Func {
     a: int,
 
-    func a(i: int) {
+    func c(i: int) {
         assert(self.a == i);
     }
 }
@@ -11,8 +11,8 @@ func main() {
     let g = Func { a: 2 };
     let h = Func { a: 3 };
     let i = Func { a: 4 };
-    g.a(2);
-    h.a(3);
-    f.a(1);
-    i.a(4);
+    g.c(2);
+    h.c(3);
+    f.c(1);
+    i.c(4);
 }

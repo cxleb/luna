@@ -8,7 +8,7 @@ use crate::types::{self, NameSpecification, Type, clone_struct_fields};
 #[derive(Debug)]
 pub enum SemaErrorReason {
     GenericError, // todo(caleb): Remove me!
-    VariableNotFound,
+    IdentifierNotFound,
     NonNumericTypeInBinaryExpression,
     IncompatibleTypesInBinaryExpression,
     IncompatibleTypesInVariableDefinition,
@@ -28,8 +28,8 @@ pub enum SemaErrorReason {
     NonBoolInLogicalExpression,
     TypeNotFound,
     StructFieldNotFound,
-    InvalidUsageOfSelector,
     CannotFindSelectorInStruct,
+    InvalidUsageOfSelector,
     CannotFindVariantInEnum,
     CannotUseSelfOutsideOfMethod,
     EnumVariantValueTypesIncompatible,
@@ -39,6 +39,12 @@ pub enum SemaErrorReason {
     InvalidPatternKind,
     ExpressionCannotBeCasted,
     TemplateSubstitutionMustBeString,
+    ArrayLiteralElementTypesIncompatible,
+    GotTypeButExpectedExpression,
+    GotPackageButExpectedExpression,
+    CannotUseFunctionAsSelector,
+    CannotUseMethodAsSelector,
+    CannotUseEnumVariantAsSelector
 }
 
 #[derive(Debug)]
@@ -141,15 +147,6 @@ fn collect_types(program: &ast::Program) -> TypeCollection {
                     name: struct_.id.clone(),
                 };
                 let typ = types::struct_type(name_spec.clone(), Vec::new());
-                collection.types.insert(name_spec, typ);
-            }
-            for enum_ in file.enums.iter() {
-                let name_spec = NameSpecification {
-                    package: package.id.clone(),
-                    file: file.id.clone(),
-                    name: enum_.id.clone(),
-                };
-                let typ = types::enum_type(name_spec.clone(), Vec::new());
                 collection.types.insert(name_spec, typ);
             }
             for enum_ in file.enums.iter() {
@@ -313,7 +310,6 @@ fn type_lookup(
 
 struct FunctionCollection {
     functions: HashMap<NameSpecification, types::FunctionType>,
-    //methods: HashMap<MethodSpecification, types::FunctionType>,
 }
 
 impl FunctionCollection {
@@ -475,6 +471,15 @@ fn collect_functions(
     Ok(function_collection)
 }
 
+enum ExprResult {
+    Value(Type),
+    Type(Type),
+    Package(String),
+    Function(types::FunctionType, NameSpecification),
+    Method(Type, types::FunctionType, String),
+    EnumVariant(Type, usize),
+}
+
 struct FuncTypeInference<'a> {
     ///structs: &'a Vec<Box<ast::Struct>>,
     imports: &'a Vec<ast::Import>,
@@ -487,6 +492,7 @@ struct FuncTypeInference<'a> {
     package_id: &'a str,
     file_id: &'a str,
     variable_scopes: Vec<HashMap<String, VariableBinding>>,
+    loc: SourceLoc,
 }
 
 struct VariableBinding {
@@ -512,6 +518,7 @@ impl<'a> FuncTypeInference<'a> {
             file_id,
             variable_scopes: Vec::new(),
             self_type: None,
+            loc: SourceLoc::default(),
         }
     }
 
@@ -533,6 +540,7 @@ impl<'a> FuncTypeInference<'a> {
             file_id,
             variable_scopes: Vec::new(),
             self_type: Some(self_type),
+            loc: SourceLoc::default(),
         }
     }
 
@@ -567,6 +575,10 @@ impl<'a> FuncTypeInference<'a> {
         Ok(())
     }
 
+    pub fn error<T>(&self, reason: SemaErrorReason) -> SemaResult<T> {
+        self.error_loc(reason, self.loc)
+    }
+
     pub fn error_loc<T>(&self, reason: SemaErrorReason, loc: SourceLoc) -> SemaResult<T> {
         Err(SemaError {
             reason,
@@ -587,12 +599,7 @@ impl<'a> FuncTypeInference<'a> {
             .cloned()
     }
 
-    fn binary_expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
-        let b = match &mut e.kind {
-            ast::ExprKind::BinaryExpr(b) => b,
-            _ => panic!(),
-        };
-
+    fn binary_expr(&mut self, b: &mut ast::BinaryExpr, type_hint: Option<types::Type>) -> SemaResult<Type> {
         match b.kind {
             ast::BinaryExprKind::Add
             | ast::BinaryExprKind::Subtract
@@ -612,22 +619,21 @@ impl<'a> FuncTypeInference<'a> {
                             typ = types::integer();
                         }
                     } else {
-                        return self.error_loc(
-                            SemaErrorReason::IncompatibleTypesInBinaryExpression,
-                            e.loc,
+                        return self.error(
+                            SemaErrorReason::IncompatibleTypesInBinaryExpression
                         );
                     }
                 }
 
                 if !types::is_numeric(&b.rhs.typ) {
                     return self
-                        .error_loc(SemaErrorReason::NonNumericTypeInBinaryExpression, e.loc);
+                        .error(SemaErrorReason::NonNumericTypeInBinaryExpression);
                 }
                 if !types::is_numeric(&b.lhs.typ) {
                     return self
-                        .error_loc(SemaErrorReason::NonNumericTypeInBinaryExpression, e.loc);
+                        .error(SemaErrorReason::NonNumericTypeInBinaryExpression);
                 }
-                e.typ = typ;
+                Ok(typ)
             }
             ast::BinaryExprKind::Equal
             | ast::BinaryExprKind::NotEqual
@@ -640,10 +646,10 @@ impl<'a> FuncTypeInference<'a> {
 
                 if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
                     return self
-                        .error_loc(SemaErrorReason::IncompatibleTypesInBinaryExpression, e.loc);
+                        .error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
                 }
 
-                e.typ = types::bool();
+                Ok(types::bool())
             }
             ast::BinaryExprKind::LogicalAnd | ast::BinaryExprKind::LogicalOr => {
                 self.expr(&mut b.lhs, None)?;
@@ -656,67 +662,55 @@ impl<'a> FuncTypeInference<'a> {
                     return self.error_loc(SemaErrorReason::NonBoolInLogicalExpression, b.rhs.loc);
                 }
 
-                e.typ = types::bool();
+                Ok(types::bool())
             }
         }
-        self.ok()
     }
 
     fn unary_expr(
         &mut self,
         _u: &mut Box<ast::UnaryExpr>,
         _type_hint: Option<types::Type>,
-    ) -> SemaResult<()> {
-        self.ok()
+    ) -> SemaResult<Type> {
+        unimplemented!()
     }
 
-    fn assign(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
-        let a = match &mut e.kind {
-            ast::ExprKind::Assign(a) => a,
-            _ => panic!(),
-        };
-
+    fn assign(&mut self, a: &mut ast::Assign, type_hint: Option<types::Type>) -> SemaResult<Type> {
         self.expr(&mut a.value, type_hint)?;
         self.store_expr(&mut a.destination)?;
         if types::compare(&a.destination.typ, &a.value.typ) == types::ComparisonResult::Incompatible
         {
-            return self.error_loc(SemaErrorReason::AssignmentTypesIncompatible, e.loc);
+            return self.error(SemaErrorReason::AssignmentTypesIncompatible);
         }
-        e.typ = a.destination.typ.clone();
-        self.ok()
+
+        Ok(a.value.typ.clone())
     }
 
-    fn call(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
-        let c = match &mut e.kind {
-            ast::ExprKind::Call(c) => c,
-            _ => panic!(),
-        };
-
-        match &mut c.function.kind {
-            ast::ExprKind::Identifier(i) => {
-                if i.id == "assert" {
-                    if c.parameters.len() != 1 {
-                        return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
-                    }
-                    self.expr(&mut c.parameters[0], None)?;
-                    return self.ok();
+    fn call(&mut self, c: &mut ast::Call, _type_hint: Option<types::Type>) -> SemaResult<Type> {
+        // assert special case
+        if let ast::ExprKind::Identifier(i) = &c.function.kind {
+            if i.id == "assert" {
+                if c.parameters.len() != 1 {
+                    return self.error(SemaErrorReason::CallTooManyArguments);
                 }
+                self.expr(&mut c.parameters[0], None)?;
+                return Ok(types::bad());
+            }
+        }
 
-                let (func_signature, name_spec) =
-                    match self
-                        .functions
-                        .get(self.imports, self.package_id, self.file_id, &i.id)
-                    {
-                        Some(s) => s,
-                        None => return self.error_loc(SemaErrorReason::FunctionNotFound, e.loc),
-                    };
+        let function = self.expr_or_name(&mut c.function)?;
 
+        match function {
+            ExprResult::Package(_) => self.error(SemaErrorReason::GotPackageButExpectedExpression),
+            ExprResult::Value(_) => unimplemented!("Calling by value is not supported yet"),
+            ExprResult::Type(_) => unimplemented!("Initialisers arent implemented for now"),
+            ExprResult::Function(func_signature, name_spec) => {
                 // Do some basic argument count checking
                 if func_signature.params.len() < c.parameters.len() {
-                    return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
+                    return self.error(SemaErrorReason::CallTooManyArguments);
                 }
                 if func_signature.params.len() > c.parameters.len() {
-                    return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
+                    return self.error(SemaErrorReason::CallNotEnoughArguments);
                 }
 
                 // Sema check arguements, then check argument types
@@ -731,268 +725,360 @@ impl<'a> FuncTypeInference<'a> {
 
                 // Assign this expr the return type of the function
                 if let Some(typ) = func_signature.returns.first() {
-                    e.typ = typ.clone();
+                    Ok(typ.clone())
                 } else {
-                    e.typ = types::bad();
+                    Ok(types::bad())
+                }
+            }
+            ExprResult::Method(typ, func_signature, name) => {
+                // Do some basic argument count checking
+                if func_signature.params.len() < c.parameters.len() {
+                    return self.error(SemaErrorReason::CallTooManyArguments);
+                }
+                if func_signature.params.len() > c.parameters.len() {
+                    return self.error(SemaErrorReason::CallNotEnoughArguments);
                 }
 
-                self.ok()
+                // Sema check arguements, then check argument types
+                for (arg, param) in
+                    c.parameters.iter_mut().zip(func_signature.params.iter())
+                {
+                    self.expr(arg, Some(param.clone()))?;
+                    if types::compare(&param, &arg.typ)
+                        == types::ComparisonResult::Incompatible
+                    {
+                        return self
+                            .error_loc(SemaErrorReason::CallArgumentTypeMismatch, arg.loc);
+                    }
+                }
+
+                c.symbol_name = if types::is_struct(&typ) {
+                    Some(mangle::mangle_method_name(&name, &typ))
+                } else {
+                    None
+                };
+
+                c.function.typ = typ.clone();
+
+                // Assign this expr the return type of the function
+                if let Some(typ) = func_signature.returns.first() { 
+                    Ok(typ.clone())
+                } else {
+                    Ok(types::bad())
+                }
             }
-            ast::ExprKind::Selector(s) => {
-                self.expr(&mut s.value, None)?;
-
-                if types::is_struct(&s.value.typ) {
-                    if let Some(func_signature) = s.value.typ.get_method(&s.selector.id) {
-                        //let func_signature = &f;
-
-                        // Do some basic argument count checking
-                        if func_signature.params.len() < c.parameters.len() {
-                            return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
-                        }
-                        if func_signature.params.len() > c.parameters.len() {
-                            return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
-                        }
-
-                        // Sema check arguements, then check argument types
-                        for (arg, param) in
-                            c.parameters.iter_mut().zip(func_signature.params.iter())
-                        {
-                            self.expr(arg, Some(param.clone()))?;
-                            if types::compare(&param, &arg.typ)
-                                == types::ComparisonResult::Incompatible
-                            {
-                                return self
-                                    .error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
-                            }
-                        }
-
-                        // Assign this expr the return type of the function
-                        if let Some(typ) = func_signature.returns.first() {
-                            e.typ = typ.clone();
-                        } else {
-                            e.typ = types::bad();
-                        }
-
-                        c.symbol_name =
-                            Some(mangle::mangle_method_name(&s.selector.id, &s.value.typ));
-
-                        return self.ok();
-                    } else {
-                        return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc);
-                    }
-                } else if types::is_interface(&s.value.typ) {
-                    if let Some(func_signature) = s.value.typ.get_method(&s.selector.id) {
-                        //let func_signature = &f;
-
-                        // Do some basic argument count checking
-                        if func_signature.params.len() < c.parameters.len() {
-                            return self.error_loc(SemaErrorReason::CallTooManyArguments, e.loc);
-                        }
-                        if func_signature.params.len() > c.parameters.len() {
-                            return self.error_loc(SemaErrorReason::CallNotEnoughArguments, e.loc);
-                        }
-
-                        // Sema check arguements, then check argument types
-                        for (arg, param) in
-                            c.parameters.iter_mut().zip(func_signature.params.iter())
-                        {
-                            self.expr(arg, Some(param.clone()))?;
-                            if types::compare(&arg.typ, &param)
-                                == types::ComparisonResult::Incompatible
-                            {
-                                return self
-                                    .error_loc(SemaErrorReason::CallArgumentTypeMismatch, e.loc);
-                            }
-                        }
-
-                        // Assign this expr the return type of the function
-                        if let Some(typ) = func_signature.returns.first() {
-                            e.typ = typ.clone();
-                        } else {
-                            e.typ = types::bad();
-                        }
-                        c.function.typ = s.value.typ.clone();
-
-                        return self.ok();
-                    } else {
-                        return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc);
-                    }
-                } else if let types::TypeKind::Enum(enum_type) = s.value.typ.kind() {
-                    match enum_type
+            ExprResult::EnumVariant(typ, i) => {
+                if let types::TypeKind::Enum(enum_type) = typ.kind() {
+                    let values = &enum_type
                         .variants
                         .read()
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                        .find(|v| v.1.0 == s.selector.id)
-                    {
-                        Some((i, values)) => {
-                            // Assign this expr the type of the enum
-                            e.typ = s.value.typ.clone();
+                        .unwrap()[i];
 
-                            for (arg, param) in c.parameters.iter_mut().zip(values.1.iter()) {
-                                self.expr(arg, Some(param.clone()))?;
-                                if types::compare(&arg.typ, &param)
-                                    == types::ComparisonResult::Incompatible
-                                {
-                                    return self.error_loc(
-                                        SemaErrorReason::EnumVariantValueTypesIncompatible,
-                                        e.loc,
-                                    );
-                                }
-                            }
-
-                            c.enum_idx = Some(i);
-                            self.ok()
-                        }
-                        None => {
-                            return self.error_loc(SemaErrorReason::CannotFindVariantInEnum, e.loc);
+                    for (arg, param) in c.parameters.iter_mut().zip(values.1.iter()) {
+                        self.expr(arg, Some(param.clone()))?;
+                        if types::compare(&arg.typ, &param)
+                            == types::ComparisonResult::Incompatible
+                        {
+                            return self.error_loc(
+                                SemaErrorReason::EnumVariantValueTypesIncompatible,
+                                arg.loc,
+                            );
                         }
                     }
+
+                    c.enum_idx = Some(i);
+                    Ok(typ.clone())
                 } else {
-                    return self.error_loc(SemaErrorReason::InvalidUsageOfSelector, s.value.loc);
+                    unreachable!();
                 }
             }
-            _ => unimplemented!("Function calls must be direct(by name) for now"),
         }
+
+        // match &mut c.function.kind {
+        //     ast::ExprKind::Identifier(i) => {
+        //         if i.id == "assert" {
+        //             if c.parameters.len() != 1 {
+        //                 return self.error(SemaErrorReason::CallTooManyArguments);
+        //             }
+        //             self.expr(&mut c.parameters[0], None)?;
+        //             return Ok(types::bad());
+        //         }
+
+        //         let (func_signature, name_spec) =
+        //             match self
+        //                 .functions
+        //                 .get(self.imports, self.package_id, self.file_id, &i.id)
+        //             {
+        //                 Some(s) => s,
+        //                 None => return self.error(SemaErrorReason::FunctionNotFound),
+        //             };
+
+        //         // Do some basic argument count checking
+        //         if func_signature.params.len() < c.parameters.len() {
+        //             return self.error(SemaErrorReason::CallTooManyArguments);
+        //         }
+        //         if func_signature.params.len() > c.parameters.len() {
+        //             return self.error(SemaErrorReason::CallNotEnoughArguments);
+        //         }
+
+        //         // Sema check arguements, then check argument types
+        //         for (arg, param) in c.parameters.iter_mut().zip(func_signature.params.iter()) {
+        //             self.expr(arg, Some(param.clone()))?;
+        //             if types::compare(&param, &arg.typ) == types::ComparisonResult::Incompatible {
+        //                 return self.error_loc(SemaErrorReason::CallArgumentTypeMismatch, arg.loc);
+        //             }
+        //         }
+
+        //         c.symbol_name = Some(mangle::mangle_name(&name_spec));
+
+        //         // Assign this expr the return type of the function
+        //         if let Some(typ) = func_signature.returns.first() {
+        //             Ok(typ.clone())
+        //         } else {
+        //             Ok(types::bad())
+        //         }
+        //     }
+        //     ast::ExprKind::Selector(s) => {
+        //         self.expr(&mut s.value, None)?;
+
+        //         if types::is_struct(&s.value.typ) {
+        //             if let Some(func_signature) = s.value.typ.get_method(&s.selector.id) {
+        //                 //let func_signature = &f;
+
+        //                 // Do some basic argument count checking
+        //                 if func_signature.params.len() < c.parameters.len() {
+        //                     return self.error(SemaErrorReason::CallTooManyArguments);
+        //                 }
+        //                 if func_signature.params.len() > c.parameters.len() {
+        //                     return self.error(SemaErrorReason::CallNotEnoughArguments);
+        //                 }
+
+        //                 // Sema check arguements, then check argument types
+        //                 for (arg, param) in
+        //                     c.parameters.iter_mut().zip(func_signature.params.iter())
+        //                 {
+        //                     self.expr(arg, Some(param.clone()))?;
+        //                     if types::compare(&param, &arg.typ)
+        //                         == types::ComparisonResult::Incompatible
+        //                     {
+        //                         return self
+        //                             .error_loc(SemaErrorReason::CallArgumentTypeMismatch, arg.loc);
+        //                     }
+        //                 }
+
+        //                 c.symbol_name =
+        //                     Some(mangle::mangle_method_name(&s.selector.id, &s.value.typ));
+
+        //                 // Assign this expr the return type of the function
+        //                 if let Some(typ) = func_signature.returns.first() { 
+        //                     Ok(typ.clone())
+        //                 } else {
+        //                     Ok(types::bad())
+        //                 }
+        //             } else {
+        //                 self.error(SemaErrorReason::CannotFindSelectorInStruct)
+        //             }
+        //         } else if types::is_interface(&s.value.typ) {
+        //             if let Some(func_signature) = s.value.typ.get_method(&s.selector.id) {
+        //                 //let func_signature = &f;
+
+        //                 // Do some basic argument count checking
+        //                 if func_signature.params.len() < c.parameters.len() {
+        //                     return self.error(SemaErrorReason::CallTooManyArguments);
+        //                 }
+        //                 if func_signature.params.len() > c.parameters.len() {
+        //                     return self.error(SemaErrorReason::CallNotEnoughArguments);
+        //                 }
+
+        //                 // Sema check arguements, then check argument types
+        //                 for (arg, param) in
+        //                     c.parameters.iter_mut().zip(func_signature.params.iter())
+        //                 {
+        //                     self.expr(arg, Some(param.clone()))?;
+        //                     if types::compare(&arg.typ, &param)
+        //                         == types::ComparisonResult::Incompatible
+        //                     {
+        //                         return self
+        //                             .error_loc(SemaErrorReason::CallArgumentTypeMismatch, arg.loc);
+        //                     }
+        //                 }
+
+        //                 // Assign this expr the return type of the function
+        //                 c.function.typ = s.value.typ.clone();
+                        
+        //                 if let Some(typ) = func_signature.returns.first() {
+        //                     Ok(typ.clone())
+        //                 } else {
+        //                     Ok(types::bad())
+        //                 }
+        //             } else {
+        //                 return self.error(SemaErrorReason::CannotFindSelectorInStruct);
+        //             }
+        //         } else if let types::TypeKind::Enum(enum_type) = s.value.typ.kind() {
+        //             match enum_type
+        //                 .variants
+        //                 .read()
+        //                 .unwrap()
+        //                 .iter()
+        //                 .enumerate()
+        //                 .find(|v| v.1.0 == s.selector.id)
+        //             {
+        //                 Some((i, values)) => {
+
+        //                     for (arg, param) in c.parameters.iter_mut().zip(values.1.iter()) {
+        //                         self.expr(arg, Some(param.clone()))?;
+        //                         if types::compare(&arg.typ, &param)
+        //                             == types::ComparisonResult::Incompatible
+        //                         {
+        //                             return self.error_loc(
+        //                                 SemaErrorReason::EnumVariantValueTypesIncompatible,
+        //                                 arg.loc,
+        //                             );
+        //                         }
+        //                     }
+
+        //                     c.enum_idx = Some(i);
+        //                     Ok(s.value.typ.clone())
+        //                 }
+        //                 None => {
+        //                     return self.error(SemaErrorReason::CannotFindVariantInEnum);
+        //                 }
+        //             }
+        //         } else {
+        //             return self.error_loc(SemaErrorReason::InvalidUsageOfSelector, s.value.loc);
+        //         }
+        //     }
+        //     _ => unimplemented!("Function calls must be direct(by name) for now"),
+        // }
     }
 
     fn integer(
         &mut self,
         _i: &mut Box<ast::Integer>,
         _type_hint: Option<types::Type>,
-    ) -> SemaResult<()> {
-        self.ok()
+    ) -> SemaResult<Type> {
+        Ok(types::integer())
     }
 
     fn number(
         &mut self,
         _f: &mut Box<ast::Number>,
         _type_hint: Option<types::Type>,
-    ) -> SemaResult<()> {
-        self.ok()
+    ) -> SemaResult<Type> {
+        Ok(types::number())
     }
 
     fn boolean(
         &mut self,
         _b: &mut Box<ast::Bool>,
         _type_hint: Option<types::Type>,
-    ) -> SemaResult<()> {
-        self.ok()
+    ) -> SemaResult<Type> {
+        Ok(types::bool())
     }
 
     fn string_literal(
         &mut self,
         _s: &mut Box<ast::StringLiteral>,
         _type_hint: Option<types::Type>,
-    ) -> SemaResult<()> {
-        self.ok()
+    ) -> SemaResult<Type> {
+        Ok(types::string())
     }
 
-    fn identifier(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
-        let i = match &e.kind {
-            ast::ExprKind::Identifier(i) => i,
-            _ => panic!(),
-        };
-        if let Some(binding) = self.find_var(&i.id) {
-            e.typ = binding.typ.clone();
-            self.ok()
+    fn identifier(&mut self, i: &mut ast::Identifier, _type_hint: Option<types::Type>) -> SemaResult<ExprResult> {
+        if let Some(function) = self.functions.get(self.imports, self.package_id, self.file_id, &i.id) {
+            Ok(ExprResult::Function(function.0.clone(), function.1.clone()))
+        } else if let Some(binding) = self.find_var(&i.id) {
+            Ok(ExprResult::Value(binding.typ.clone()))
         } else if let Some(typ) = self.find_type(&i.id) {
-            e.typ = typ;
-            self.ok()
+            Ok(ExprResult::Type(typ))
         } else {
-            self.error_loc(SemaErrorReason::VariableNotFound, e.loc)
+            self.error(SemaErrorReason::IdentifierNotFound)
         }
     }
 
-    fn subscript(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
-        // check the array is an array, then check the index is an integer
-        // then set the type to the array element type
-        let s = match &mut e.kind {
-            ast::ExprKind::Subscript(s) => s,
-            _ => panic!(),
-        };
+    fn selector(&mut self, s: &mut ast::Selector, _type_hint: Option<types::Type>) -> SemaResult<ExprResult> {
+        let value = self.expr_or_name(&mut s.value)?;
 
+        match value {
+            ExprResult::Package(_) => unimplemented!(),
+            ExprResult::Value(typ) => {
+                if let Some(a) = typ.get_method(&s.selector.id) {
+                    Ok(ExprResult::Method(typ.clone(), a, s.selector.id.clone()))
+                } else if let types::TypeKind::Struct(struct_type) = typ.kind() {
+                    if let Some((i, (_, ty))) = struct_type
+                        .fields
+                        .read()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
+                        .find(|a| a.1.0 == s.selector.id)
+                    {
+                        s.idx = i;
+                        Ok(ExprResult::Value(ty.clone()))
+                    } else {
+                        self.error(SemaErrorReason::CannotFindSelectorInStruct)
+                    }
+                } else {
+                    self.error(SemaErrorReason::InvalidUsageOfSelector)
+                }
+            },
+            ExprResult::Type(typ) => {
+                if let types::TypeKind::Enum(enum_type) = typ.kind() {
+                    if let Some((i, (_, v))) = enum_type
+                        .variants
+                        .read()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
+                        .find(|a| a.1.0 == s.selector.id)
+                    {
+                        if v.len() != 0 {
+                            Ok(ExprResult::EnumVariant(typ.clone(), i))
+                        } else {
+                            s.enum_idx = Some(i);
+                            Ok(ExprResult::Value(typ.clone()))
+                        }
+                    } else {
+                        self.error(SemaErrorReason::CannotFindVariantInEnum)
+                    }
+                } else {
+                    self.error(SemaErrorReason::InvalidUsageOfSelector)
+                }
+            },
+            ExprResult::Function(_, _) => self.error(SemaErrorReason::CannotUseFunctionAsSelector),
+            ExprResult::Method(_, _, _) => self.error(SemaErrorReason::CannotUseMethodAsSelector),
+            ExprResult::EnumVariant(_, _) => self.error(SemaErrorReason::CannotUseEnumVariantAsSelector),
+        }
+    }
+
+    fn subscript(&mut self, s: &mut ast::Subscript, _type_hint: Option<types::Type>) -> SemaResult<Type> {
         self.expr(&mut s.value, None)?;
         self.expr(&mut s.index, None)?;
 
         if !types::is_array(&s.value.typ) {
-            return self.error_loc(SemaErrorReason::ValueIsNotIndexable, e.loc);
+            return self.error_loc(SemaErrorReason::ValueIsNotIndexable, s.value.loc);
         }
 
         if !types::is_integer(&s.index.typ) {
-            return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, e.loc);
+            return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, s.index.loc);
         }
 
-        e.typ = match &s.value.typ.kind() {
-            types::TypeKind::Array(element_type) => element_type.clone(),
-            _ => panic!(), // already checked above
-        };
-        self.ok()
-    }
-
-    fn selector(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
-        let s = match &mut e.kind {
-            ast::ExprKind::Selector(s) => s,
-            _ => panic!(),
-        };
-
-        self.expr(&mut s.value, None)?;
-
-        if let types::TypeKind::Struct(struct_type) = s.value.typ.kind() {
-            if let Some((i, (_, ty))) = struct_type
-                .fields
-                .read()
-                .unwrap()
-                .iter()
-                .enumerate()
-                .find(|a| a.1.0 == s.selector.id)
-            {
-                e.typ = ty.clone();
-                s.idx = i;
-            } else {
-                return self.error_loc(SemaErrorReason::CannotFindSelectorInStruct, e.loc);
-            }
-        } else if let types::TypeKind::Enum(enum_type) = s.value.typ.kind() {
-            if let Some((i, _)) = enum_type
-                .variants
-                .read()
-                .unwrap()
-                .iter()
-                .enumerate()
-                .find(|a| a.1.0 == s.selector.id)
-            {
-                e.typ = s.value.typ.clone();
-                s.enum_idx = Some(i);
-            } else {
-                return self.error_loc(SemaErrorReason::CannotFindVariantInEnum, e.loc);
-            }
-        } else {
-            return self.error_loc(SemaErrorReason::InvalidUsageOfSelector, e.loc);
-        }
-
-        self.ok()
+        Ok(types::get_inner_array_type(&s.value.typ))
     }
 
     fn array_literal(
         &mut self,
-        e: &mut ast::Expr,
+        l: &mut ast::ArrayLiteral,
         type_hint: Option<types::Type>,
-    ) -> SemaResult<()> {
-        // get type from first element, check all are the same, then assign type as array of that type
-        let l = match &mut e.kind {
-            ast::ExprKind::ArrayLiteral(l) => l,
-            _ => panic!(),
-        };
-
+    ) -> SemaResult<Type> {
         if l.literals.is_empty() {
             // empty array literal, assign type as array of unknown
             match type_hint {
                 Some(typ) => {
-                    e.typ = typ.clone();
+                    Ok(typ.clone())
                 }
                 _ => {
-                    e.typ = types::array(types::bad());
+                    Ok(types::array(types::bad()))
                 }
             }
         } else {
@@ -1015,25 +1101,19 @@ impl<'a> FuncTypeInference<'a> {
                     == types::ComparisonResult::Incompatible
                 {
                     return self
-                        .error_loc(SemaErrorReason::IncompatibleTypesInBinaryExpression, e.loc);
+                        .error(SemaErrorReason::ArrayLiteralElementTypesIncompatible);
                 }
             }
-            e.typ = types::array(element_type);
-        }
 
-        self.ok()
+            Ok(types::array(element_type))
+        }
     }
 
     fn object_literal(
         &mut self,
-        e: &mut ast::Expr,
+        l: &mut ast::ObjectLiteral,
         _type_hint: Option<types::Type>,
-    ) -> SemaResult<()> {
-        let l = match &mut e.kind {
-            ast::ExprKind::ObjectLiteral(l) => l,
-            _ => panic!(),
-        };
-
+    ) -> SemaResult<Type> {
         let id = match &l.id {
             Some(id) => id,
             None => unimplemented!("Anonymous object literals not supported yet"),
@@ -1043,12 +1123,12 @@ impl<'a> FuncTypeInference<'a> {
         // does the struct exist?
         let struct_def = match self.find_type(&id.id) {
             Some(s) => s.clone(),
-            None => return self.error_loc(SemaErrorReason::TypeNotFound, e.loc),
+            None => return self.error(SemaErrorReason::TypeNotFound),
         };
 
         // check the type is actually a struct
         if !types::is_struct(&struct_def) {
-            return self.error_loc(SemaErrorReason::TypeNotFound, e.loc);
+            return self.error(SemaErrorReason::TypeNotFound);
         }
 
         let struct_fields = clone_struct_fields(&struct_def);
@@ -1071,25 +1151,18 @@ impl<'a> FuncTypeInference<'a> {
             }
         }
 
-        e.typ = struct_def;
-
-        self.ok()
+        Ok(struct_def)
     }
 
-    fn _self(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
+    fn _self(&mut self, e: &mut ast::Expr) -> SemaResult<Type> {
         let self_type = match &self.self_type {
             Some(t) => t.clone(),
             None => return self.error_loc(SemaErrorReason::CannotUseSelfOutsideOfMethod, e.loc),
         };
-        e.typ = self_type;
-        self.ok()
+        Ok(self_type)
     }
 
-    fn template(&mut self, e: &mut ast::Expr, _type_hint: Option<types::Type>) -> SemaResult<()> {
-        let t = match &mut e.kind {
-            ast::ExprKind::Template(t) => t,
-            _ => panic!(),
-        };
+    fn template(&mut self, t: &mut ast::Template, _type_hint: Option<types::Type>) -> SemaResult<Type> {
         // Check all substitutions are a string-compatible value:
         // string, integer, number, boolean, or an implementor of the String interface.
         let string_interface = self
@@ -1140,32 +1213,55 @@ impl<'a> FuncTypeInference<'a> {
             self.expr(expr, None)?;
         }
 
-        e.typ = types::string();
-        self.ok()
+        Ok(types::string())
     }
 
-    fn expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<()> {
+    fn expr(&mut self, e: &mut ast::Expr, type_hint: Option<types::Type>) -> SemaResult<Type> {
+        let old_loc = self.loc;
+        self.loc = e.loc;
+
         let checked_e = match &mut e.kind {
-            ast::ExprKind::BinaryExpr(_) => self.binary_expr(e, type_hint.clone()),
+            ast::ExprKind::BinaryExpr(b) => self.binary_expr(b, type_hint.clone()),
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u, type_hint.clone()),
-            ast::ExprKind::Assign(_) => self.assign(e, type_hint.clone()),
-            ast::ExprKind::Call(_) => self.call(e, type_hint.clone()),
+            ast::ExprKind::Assign(a) => self.assign(a, type_hint.clone()),
+            ast::ExprKind::Call(c) => self.call(c, type_hint.clone()),
             ast::ExprKind::Integer(i) => self.integer(i, type_hint.clone()),
             ast::ExprKind::Number(f) => self.number(f, type_hint.clone()),
             ast::ExprKind::Boolean(b) => self.boolean(b, type_hint.clone()),
             ast::ExprKind::StringLiteral(s) => self.string_literal(s, type_hint.clone()),
-            ast::ExprKind::Identifier(_) => self.identifier(e, type_hint.clone()),
-            ast::ExprKind::Subscript(_) => self.subscript(e, type_hint.clone()),
-            ast::ExprKind::Selector(_) => self.selector(e, type_hint.clone()),
-            ast::ExprKind::ArrayLiteral(_) => self.array_literal(e, type_hint.clone()),
-            ast::ExprKind::ObjectLiteral(_) => self.object_literal(e, type_hint.clone()),
+            ast::ExprKind::Identifier(i) => {
+                match self.identifier(i, type_hint.clone()) {
+                    Ok(ExprResult::Value(typ)) => Ok(typ),
+                    Ok(ExprResult::Type(_)) => self.error(SemaErrorReason::GotTypeButExpectedExpression),
+                    Ok(ExprResult::Package(_)) => self.error(SemaErrorReason::GotPackageButExpectedExpression),
+                    Err(e) => Err(e),
+                    _ => unimplemented!("Calling functions by value or using types as values is not supported yet"),
+                }
+            },
+            ast::ExprKind::Selector(s) => {
+                match self.selector(s, type_hint.clone()) {
+                    Ok(ExprResult::Value(typ)) => Ok(typ),
+                    Ok(ExprResult::Type(_)) => self.error(SemaErrorReason::GotTypeButExpectedExpression),
+                    Ok(ExprResult::Package(_)) => self.error(SemaErrorReason::GotPackageButExpectedExpression),
+                    Err(e) => Err(e),
+                    _ => unimplemented!("Calling functions by value or using types as values is not supported yet"),
+                }
+            },
+            ast::ExprKind::Subscript(s) => self.subscript(s, type_hint.clone()),
+            ast::ExprKind::ArrayLiteral(a) => self.array_literal(a, type_hint.clone()),
+            ast::ExprKind::ObjectLiteral(o) => self.object_literal(o, type_hint.clone()),
             ast::ExprKind::_Self => self._self(e),
-            ast::ExprKind::Template(_) => self.template(e, type_hint.clone()),
+            ast::ExprKind::Template(t) => self.template(t, type_hint.clone()),
             ast::ExprKind::Cast(_) => unimplemented!("Cast expressions not implemented yet"),
         };
 
-        if checked_e.is_err() {
-            return checked_e;
+        self.loc = old_loc;
+
+        match &checked_e {
+            Ok(typ) => {
+                e.typ = typ.clone();
+            }
+            Err(_) => return checked_e,
         }
 
         // Wraps implicit casts
@@ -1187,7 +1283,30 @@ impl<'a> FuncTypeInference<'a> {
             }
         }
 
-        self.ok()
+        checked_e
+    }
+
+    fn expr_or_name(&mut self, e: &mut ast::Expr) -> SemaResult<ExprResult> {
+        let old_loc = self.loc;
+        self.loc = e.loc;
+        
+        let r = match &mut e.kind {
+            ast::ExprKind::Identifier(i) => self.identifier(i, None),
+            ast::ExprKind::Selector(s) => self.selector(s, None),
+            _ => Ok(ExprResult::Value(self.expr(e, None)?.clone())),
+        };
+
+        match &r {
+            Ok(ExprResult::Value(typ)) => {
+                e.typ = typ.clone();
+            }
+            Err(_) => return r,
+            _ => {}
+        }
+
+        self.loc = old_loc;
+
+        r
     }
 
     fn store_subscript(&mut self, e: &mut ast::Expr) -> SemaResult<()> {
@@ -1259,7 +1378,7 @@ impl<'a> FuncTypeInference<'a> {
             e.typ = binding.typ.clone();
             self.ok()
         } else {
-            self.error_loc(SemaErrorReason::VariableNotFound, e.loc)
+            self.error_loc(SemaErrorReason::IdentifierNotFound, e.loc)
         }
     }
 
@@ -1287,7 +1406,10 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     fn expr_stmt(&mut self, e: &mut Box<ast::ExprStmt>) -> SemaResult<()> {
-        self.expr(&mut e.expr, None)
+        match self.expr(&mut e.expr, None) {
+            Ok(_) => self.ok(),
+            Err(e) => Err(e),
+        }
     }
 
     fn for_stmt(&mut self, _f: &mut Box<ast::ForStmt>) -> SemaResult<()> {

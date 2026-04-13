@@ -13,12 +13,13 @@
 - Dont run GC on every check yield
 - GC api?
 - Fix panic to only kill the process, not the entire program
-- Int ranges in switches 
 - Refactor out string map in place of global map
-- Refactor checker to return what kind of thing an expression evaluated to
 - export syntax 
+- dont allow methods and struct members to have the same name
 
 done:
+- Int ranges in switches 
+- Refactor checker to return what kind of thing an expression evaluated to
 - String templates (blocker: interface, stdlib)
 - Const variables are const
 - Implement multiple modules (import and export syntax?, how does the extension syntax work?)
