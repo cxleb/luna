@@ -13,6 +13,7 @@ pub enum Type {
     Number,
     Bool,
     Reference,
+    Array
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -68,6 +69,8 @@ pub enum Inst {
     NewArray(usize, Type),
     LoadArray(Type),  // Pops the index and array
     StoreArray(Type), // Pops the value, index, and array
+    CreateSlice(Type),
+    ArrayLen,
 
     NewObject(usize),
     GetObject(usize, Type),

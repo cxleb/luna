@@ -1,6 +1,10 @@
 func main() {
     // arrays
     let a: []int = [0, 1, 2, 3];
+    assert(a[0] == 0);
+    assert(a[1] == 1);
+    assert(a[2] == 2);
+    assert(a[3] == 3);
     a[0] = 0;
     a[1] = 10;
     a[2] = 20;

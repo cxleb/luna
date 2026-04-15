@@ -251,6 +251,7 @@ fn translate_type(ty: &crate::types::Type) -> ir::Type {
         crate::types::TypeKind::Byte => ir::Type::Byte,
         crate::types::TypeKind::Bool => ir::Type::Bool,
         crate::types::TypeKind::Number => ir::Type::Number,
+        crate::types::TypeKind::Array(_) => ir::Type::Array, 
         _ => ir::Type::Reference,
     }
 }
@@ -492,9 +493,16 @@ impl<'a> FuncGen<'a> {
     }
 
     fn subscript(&mut self, e: &ast::Expr, l: &Box<ast::Subscript>) {
-        self.expr(&l.index);
-        self.expr(&l.value);
-        self.bld.load_array(e.typ.clone().into());
+        if let Some(slice_end) = &l.slice_end { 
+            self.expr(&l.index);
+            self.expr(slice_end);
+            self.expr(&l.value);
+            self.bld.create_slice(types::get_inner_array_type(&e.typ).into());
+        } else {
+            self.expr(&l.index);
+            self.expr(&l.value);
+            self.bld.load_array(e.typ.clone().into());
+        }
     }
 
     fn selector(&mut self, e: &ast::Expr, s: &ast::Selector) {

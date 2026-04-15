@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use cranelift_codegen::{
-    ir::types::{F64, I8, I64},
-    isa::{OwnedTargetIsa, TargetIsa},
-    settings::Configurable,
+    ir::types::{F64, I8, I64}, isa::{OwnedTargetIsa, TargetIsa}, settings::Configurable
 };
 //use cranelift_jit::{JITBuilder, JITModule};
 //use cranelift_module::{FuncId, Module};
@@ -135,6 +133,58 @@ pub extern "C" fn fiber_entry(t: context::Transfer) -> ! {
     }
 }
 
+struct AbiType {
+    pub root: cranelift_codegen::ir::Type, 
+    pub fat_ptr_typ: Option<cranelift_codegen::ir::Type>
+} 
+
+impl AbiType {
+    pub fn new(
+        root: cranelift_codegen::ir::Type, 
+        fat_ptr_typ: Option<cranelift_codegen::ir::Type>) -> Self {
+        Self {
+            root,
+            fat_ptr_typ,
+        }
+    }
+
+    pub fn bytes(&self) -> u32 {
+        self.root.bytes() + self.fat_ptr_typ.map(|t| t.bytes()).unwrap_or(0)
+    }
+}
+
+impl IntoIterator for AbiType {
+    type Item = cranelift_codegen::ir::Type;
+    type IntoIter = AbiTypeIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        AbiTypeIter { abi_type: self, i: 0 }
+    }
+}
+
+struct AbiTypeIter {
+    abi_type: AbiType,
+    i: i8,
+} 
+
+impl Iterator for AbiTypeIter {
+    type Item = cranelift_codegen::ir::Type;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i == 0 {
+            self.i = 1;
+            Some(self.abi_type.root)
+        } else if let Some(fat_ptr_typ) = self.abi_type.fat_ptr_typ && self.i == 1 {
+            self.i = 2;
+            Some(fat_ptr_typ)
+        } else {
+            None
+        }
+    }
+}
+
+//impl IntoItera
+
 pub struct JitContext {
     isa: OwnedTargetIsa,
     module: JITModule,
@@ -191,13 +241,15 @@ impl JitContext {
         &*self.isa
     }
 
-    fn translate_type(&self, ty: &crate::ir::Type) -> cranelift_codegen::ir::Type {
+    fn translate_type(&self, ty: &crate::ir::Type) -> AbiType {
+        let ptr = cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple());
         match ty {
-            crate::ir::Type::Integer => I64,
-            crate::ir::Type::Byte => I8,
-            crate::ir::Type::Bool => I8,
-            crate::ir::Type::Number => F64,
-            _ => cranelift_codegen::ir::Type::triple_pointer_type(self.isa().triple()), // pointer?
+            crate::ir::Type::Integer => AbiType::new(I64, None),
+            crate::ir::Type::Byte => AbiType::new(I8, None),
+            crate::ir::Type::Bool => AbiType::new(I8, None),
+            crate::ir::Type::Number => AbiType::new(F64, None),
+            crate::ir::Type::Reference => AbiType::new(ptr, None),
+            crate::ir::Type::Array => AbiType::new(ptr, Some(I64)),
         }
     }
 

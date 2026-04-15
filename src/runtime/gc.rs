@@ -20,6 +20,17 @@ impl Allocation {
             &Allocation::Object(p, _) => p,
         }
     }
+
+    pub fn address_in_range(&self, ptr: usize) -> bool {
+        match self {
+            &Allocation::Array{ptr: p, size, elem_size, scan_elements:_} => {
+                ptr >= p && ptr < (p + (size * elem_size))
+            }
+            &Allocation::Object(p, _) => {
+                ptr == p
+            }
+        }
+    }
 }
 
 pub struct GarbageCollector {
@@ -40,7 +51,7 @@ impl GarbageCollector {
     fn find_allocation(&self, ptr: usize) -> Option<&Allocation> {
         self.allocations
             .iter()
-            .filter(|&alloc| alloc.get_address() == ptr)
+            .filter(|&alloc| alloc.address_in_range(ptr))
             .next()
     }
 
@@ -103,10 +114,8 @@ impl GarbageCollector {
 
     pub fn create_array(&mut self, size: usize, elem_size: usize, scan_elements: bool) -> *const i64 {
         // Placeholder implementation
-        // +8 for the size
         unsafe {
-            let ptr = malloc(size * elem_size + 8) as *mut i64;
-            *ptr = (size * elem_size) as i64;
+            let ptr = malloc(size * elem_size) as *mut i64;
             self.allocations
                 .insert(Allocation::Array{ptr: ptr as usize, size, elem_size, scan_elements});
             ptr

@@ -522,8 +522,13 @@ impl<'a> Parser<'a> {
             if self.test(TokenKind::Punctuation(Punctuation::LeftBracket)) {
                 self.next()?;
                 let index = self.parse_expression()?;
+                let mut slice_end = None;
+                if self.test(TokenKind::Punctuation(Punctuation::Colon)) {
+                    self.next()?;
+                    slice_end = Some(self.parse_expression()?);
+                }
                 expr = self.expr(
-                    ExprKind::Subscript(Box::new(Subscript { value: expr, index })),
+                    ExprKind::Subscript(Box::new(Subscript { value: expr, index, slice_end })),
                     loc,
                 );
                 self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;

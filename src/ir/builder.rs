@@ -298,6 +298,14 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::StoreArray(typ));
     }
 
+    pub fn create_slice(&mut self, typ: Type) {
+        self.append_inst(super::Inst::CreateSlice(typ));
+    }
+
+    pub fn array_len(&mut self) {
+        self.append_inst(super::Inst::ArrayLen);
+    }
+
     pub fn new_object(&mut self, size: usize) {
         self.append_inst(super::Inst::NewObject(size));
     }

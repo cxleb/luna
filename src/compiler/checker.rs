@@ -906,7 +906,15 @@ impl<'a> FuncTypeInference<'a> {
             return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, s.index.loc);
         }
 
-        Ok(types::get_inner_array_type(&s.value.typ))
+        if let Some(slice_end) = s.slice_end.as_mut() {
+            self.expr(slice_end, None)?;
+            if !types::is_integer(&slice_end.typ) {
+                return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, slice_end.loc);
+            }
+            Ok(s.value.typ.clone())
+        } else {
+            Ok(types::get_inner_array_type(&s.value.typ))
+        }
     }
 
     fn array_literal(
