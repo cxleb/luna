@@ -3,4 +3,5 @@ func main() {
     let b = a[2:4];
     assert(b[0] == 12);
     assert(b[1] == 13);
+    let c = a[1:1];
 }

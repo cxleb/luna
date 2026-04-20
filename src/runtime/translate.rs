@@ -83,7 +83,7 @@ fn construct_panic_message(
 }
 
 struct ValueStack {
-    stack: Vec<(cranelift_codegen::ir::Value, Option<cranelift_codegen::ir::Value>)>,
+    stack: Vec<cranelift_codegen::ir::Value>,
 }
 
 impl ValueStack {
@@ -91,23 +91,11 @@ impl ValueStack {
         Self { stack: Vec::new() }
     }
 
-    pub fn s_push(&mut self, value: cranelift_codegen::ir::Value) {
-        self.push(value, None);
+    pub fn push(&mut self, value: cranelift_codegen::ir::Value) {
+        self.stack.push(value);
     }
-
-    pub fn s_pop(&mut self) -> cranelift_codegen::ir::Value {
-        let (value, second) = self.pop();
-        if second.is_some() {
-            panic!("Expected a single value on the stack, but got a fat pointer");
-        }
-        value
-    }
-
-    pub fn push(&mut self, value: cranelift_codegen::ir::Value, fat_ptr: Option<cranelift_codegen::ir::Value>) {
-        self.stack.push((value, fat_ptr));
-    }
-
-    pub fn pop(&mut self) -> (cranelift_codegen::ir::Value, Option<cranelift_codegen::ir::Value>) {
+    
+    pub fn pop(&mut self) -> cranelift_codegen::ir::Value {
         self.stack.pop().expect("Stack underflow")
     }
 
@@ -116,16 +104,13 @@ impl ValueStack {
         self.stack.push(val);
     }
 
-    pub fn take_and_flatten(&mut self, n: usize) -> Vec<cranelift_codegen::ir::Value> {
+    pub fn take(&mut self, n: usize) -> Vec<cranelift_codegen::ir::Value> {
         let len = self.stack.len();
         if n > len {
             panic!("Stack underflow");
         }
         let mut taken = Vec::new();
-        for (v, fat_ptr) in self.stack.iter().rev().take(n) {
-            if let Some(fat_ptr) = fat_ptr {
-                taken.push(*fat_ptr);
-            }
+        for v in self.stack.iter().rev().take(n) {
             taken.push(*v);
         }
         self.stack.truncate(len - n);
@@ -153,14 +138,13 @@ pub fn translate_function(
 
     let blocks: Vec<Block> = func.blocks.iter().map(|_| builder.create_block()).collect();
 
-    let variables: Vec<(Variable, Option<Variable>)> = func
+    let variables: Vec<Variable> = func
         .variables
         .iter()
         .map(|var| {
             let abi_type = ctx.translate_type(&var.typ);
             let var = builder.declare_var(abi_type.root);
-            let fat_ptr_var = abi_type.fat_ptr_typ.map(|t| builder.declare_var(t));
-            (var, fat_ptr_var)
+            var
         })
         .collect();
     let mut data_desc = DataDescription::new();
@@ -172,12 +156,12 @@ pub fn translate_function(
 
     builder.switch_to_block(blocks[0]);
     for i in 0..func.signature.parameters.len() {
-        builder.def_var(variables[i].0, builder.block_params(blocks[0])[1 + i]);
+        builder.def_var(variables[i], builder.block_params(blocks[0])[1 + i]);
     }
 
     for (var, func_var) in variables.iter().zip(func.variables.iter()) {
         if matches!(func_var.typ, crate::ir::Type::Reference | crate::ir::Type::Array) {
-            builder.declare_var_needs_stack_map(var.0);
+            builder.declare_var_needs_stack_map(*var);
         }
     }
 
@@ -203,18 +187,14 @@ pub fn translate_function(
             declared_signatures.insert(id.to_string(), func_ref);
         }
 
-        let mut args = stack.take_and_flatten(sig.signature.parameters.len());
+        let mut args = stack.take(sig.signature.parameters.len());
         args.reverse();
         args.insert(0, runtime_ctx);
 
         let call = builder.ins().call(declared_signatures[id], &args);
         let mut results = builder.inst_results(call).iter();
-        for typ in sig.signature.ret_types.iter() {
-            if matches!(typ, crate::ir::Type::Array) {
-                stack.push(*results.next().unwrap(), Some(*results.next().unwrap()));
-            } else {
-                stack.s_push(*results.next().unwrap());
-            }
+        for _ in sig.signature.ret_types.iter() {
+            stack.push(*results.next().unwrap());
         }
     };
 
@@ -230,131 +210,131 @@ pub fn translate_function(
                     stack.duplicate(*i);
                 }
                 ir::Inst::AddInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().iadd(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::SubInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().isub(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::MulInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().imul(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::DivInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().sdiv(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::ModInt => todo!(),
                 ir::Inst::EquInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().icmp(IntCC::Equal, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::NeqInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().icmp(IntCC::NotEqual, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::LtInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().icmp(IntCC::SignedLessThan, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::GtInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().icmp(IntCC::SignedGreaterThan, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::LeqInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().icmp(IntCC::SignedLessThanOrEqual, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::GeqInt => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder
                         .ins()
                         .icmp(IntCC::SignedGreaterThanOrEqual, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::AddNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fadd(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::SubNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fsub(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::MulNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fmul(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::DivNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fdiv(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::EquNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fcmp(FloatCC::Equal, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::NeqNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fcmp(FloatCC::NotEqual, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::LtNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fcmp(FloatCC::LessThan, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::GtNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fcmp(FloatCC::GreaterThan, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::LeqNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fcmp(FloatCC::LessThanOrEqual, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::GeqNumber => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().fcmp(FloatCC::GreaterThanOrEqual, lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::EquString | ir::Inst::NeqString => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
 
                     let mut flags = MemFlags::new();
                     flags.set_notrap();
@@ -378,35 +358,35 @@ pub fn translate_function(
                     if matches!(inst, ir::Inst::NeqString) {
                         result = builder.ins().bnot(result);
                     }
-                    stack.s_push(result);
+                    stack.push(result);
                 }
                 ir::Inst::And => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().band(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::Or => {
-                    let rhs = stack.s_pop();
-                    let lhs = stack.s_pop();
+                    let rhs = stack.pop();
+                    let lhs = stack.pop();
                     let res = builder.ins().bor(lhs, rhs);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::LoadConstInt(value) => {
                     let val = builder.ins().iconst(I64, *value);
-                    stack.s_push(val);
+                    stack.push(val);
                 }
                 ir::Inst::LoadConstByte(value) => {
                     let val = builder.ins().iconst(I8, *value as i64);
-                    stack.s_push(val);
+                    stack.push(val);
                 }
                 ir::Inst::LoadConstNumber(value) => {
                     let val = builder.ins().f64const(*value);
-                    stack.s_push(val);
+                    stack.push(val);
                 }
                 ir::Inst::LoadConstBool(value) => {
                     let val = builder.ins().iconst(I8, if *value { 1 } else { 0 });
-                    stack.s_push(val);
+                    stack.push(val);
                 }
                 ir::Inst::LoadConstString(value) => {
                     let data_id = ctx
@@ -420,7 +400,7 @@ pub fn translate_function(
                         .expect("Could not define data");
                     let local_data_id = ctx.module.declare_data_in_func(data_id, builder.func);
                     let addr = builder.ins().symbol_value(I64, local_data_id);
-                    stack.s_push(addr);
+                    stack.push(addr);
                 }
                 ir::Inst::LoadGlobal(value) => {
                     let data_id = ctx
@@ -451,60 +431,44 @@ pub fn translate_function(
                         .expect("Could not define data");
                     let local_data_id = ctx.module.declare_data_in_func(data_id, builder.func);
                     let addr = builder.ins().symbol_value(I64, local_data_id);
-                    stack.s_push(addr);
+                    stack.push(addr);
                 }
                 ir::Inst::Truncate => {
-                    let val = stack.s_pop();
+                    let val = stack.pop();
                     let res = builder.ins().fcvt_to_sint(I64, val);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::Promote => {
-                    let val = stack.s_pop();
+                    let val = stack.pop();
                     let res = builder
                         .ins()
                         .fcvt_from_sint(cranelift_codegen::ir::types::F64, val);
-                    stack.s_push(res);
+                    stack.push(res);
                 }
                 ir::Inst::Load(var) => {
-                    let var = &variables[*var];
-                    if let Some(fat_ptr_var) = var.1 {
-                        let fat_ptr = builder.use_var(fat_ptr_var);
-                        stack.push(builder.use_var(var.0), Some(fat_ptr));
-                    } else {
-                        stack.s_push(builder.use_var(var.0));
-                    }
+                    let var = variables[*var];
+                    stack.push(builder.use_var(var));
                 }
                 ir::Inst::Store(var) => {
-                    let var = &variables[*var];
+                    let var = variables[*var];
                     let val = stack.pop();
-                    assert!((var.1.is_none() && val.1.is_none()) || (var.1.is_some() && val.1.is_some()), "Mistake in value size");
-                    builder.def_var(var.0, val.0);
-                    if let Some(fat_ptr_var) = var.1 {
-                        builder.def_var(fat_ptr_var, val.1.expect("Expected a fat pointer"))
-                    }
+                    builder.def_var(var, val);
                 }
                 ir::Inst::Tee(var) => {
-                    let var = &variables[*var];
+                    let var = variables[*var];
                     let val = stack.pop();
-                    assert!((var.1.is_none() && val.1.is_none()) || (var.1.is_some() && val.1.is_some()), "Mistake in value size");
-                    if let Some(fat_ptr_var) = var.1 {
-                        builder.def_var(var.0, val.0);
-                        builder.def_var(fat_ptr_var, val.1.expect("Expected a fat pointer"));
-                        stack.push(val.0, val.1);
-                    } else {
-                        builder.def_var(var.0, val.0);
-                        stack.s_push(val.0);
-                    }
+                    builder.def_var(var, val);
+                    stack.push(val);
                 }
                 ir::Inst::CondBr(c, a) => {
-                    let cond = stack.s_pop();
+                    let cond = stack.pop();
                     builder.ins().brif(cond, blocks[*c], &[], blocks[*a], &[]);
                 }
                 ir::Inst::Br(target) => {
                     builder.ins().jump(blocks[*target], &[]);
                 }
                 ir::Inst::BrTable(def, a) => {
-                    let val = stack.s_pop();
+                    let val = stack.pop();
                     let val = builder.ins().ireduce(I32, val);
                     let table = a
                         .iter()
@@ -516,58 +480,48 @@ pub fn translate_function(
                     builder.ins().br_table(val, jt);
                 }
                 ir::Inst::Ret => {
-                    let ret_vals = stack.take_and_flatten(func.signature.ret_types.len());
+                    let ret_vals = stack.take(func.signature.ret_types.len());
                     builder.ins().return_(&ret_vals);
                 }
                 ir::Inst::Call(id) => {
                     translate_call(ctx, &mut builder, &mut stack, &id);
                 }
                 ir::Inst::IndirectCall(signature) => {
-                    let mut args = stack.take_and_flatten(signature.parameters.len());
+                    let mut args = stack.take(signature.parameters.len());
                     args.reverse();
                     args.insert(0, runtime_ctx);
-                    let func = stack.s_pop();
+                    let func = stack.pop();
                     let sig = translate_signature(ctx, signature, call_conv);
                     let sig_ref = builder.import_signature(sig);
                     let call = builder.ins().call_indirect(sig_ref, func, &args);
                     let mut results = builder.inst_results(call).iter();
-                    for typ in signature.ret_types.iter() {
-                        if matches!(typ, crate::ir::Type::Array) {
-                            stack.push(*results.next().unwrap(), Some(*results.next().unwrap()));
-                        } else {
-                            stack.s_push(*results.next().unwrap());
-                        }
+                    for _ in signature.ret_types.iter() {
+                        stack.push(*results.next().unwrap());
                     }
                 }
                 ir::Inst::NewArray(size, typ) => {
                     // allocate
                     let clir_typ = ctx.translate_type(&typ);
                     let val = builder.ins().iconst(I64, *size as i64);
-                    stack.s_push(val);
+                    stack.push(val);
                     let val = builder.ins().iconst(I64, clir_typ.bytes() as i64);
-                    stack.s_push(val);
+                    stack.push(val);
                     let scan_elements = matches!(typ, ir::Type::Reference);
-                    stack.s_push(builder.ins().iconst(I8, if scan_elements { 1 } else { 0 }));
+                    stack.push(builder.ins().iconst(I8, if scan_elements { 1 } else { 0 }));
                     translate_call(ctx, &mut builder, &mut stack, "__create_array");
-                    
-                    let array_ptr = stack.s_pop();
-                    let size = builder.ins().iconst(I64, *size as i64);
-                    stack.push(array_ptr, Some(size));
                 }
                 ir::Inst::LoadArray(typ) => {
-                    let (array_ptr, array_size) = stack.pop();
-                    let array_size = array_size.expect("Expected a fat pointer for the array size");
-
-                    let index = stack.s_pop();
+                    let array = stack.pop();
+                    let index = stack.pop();
                     // create a new block that everything after this load goes into
                     let continue_block = builder.create_block();
                     // load the array size, which is directly at the array pointer
-                    // let array_size = builder.ins().load(I64, MemFlags::new(), array, 0);
+                    let array_size = builder.ins().load(I64, MemFlags::new(), array, 0);
                     // check the index is allg
                     let index_ok_zero =
                         builder
                             .ins()
-                            .icmp_imm(IntCC::SignedGreaterThanOrEqual, index, 0);
+                            .icmp_imm(IntCC::SignedGreaterThanOrEqual, array_size, 0);
                     let index_ok_size =
                         builder.ins().icmp(IntCC::SignedLessThan, index, array_size);
                     let index_ok = builder.ins().band(index_ok_size, index_ok_zero);
@@ -590,37 +544,29 @@ pub fn translate_function(
 
                     builder.switch_to_block(continue_block);
                     // load the value now we know the array index is ok
-                    let abi_typ = ctx.translate_type(&typ);
-                    let offset = builder.ins().imul_imm(index, abi_typ.bytes() as i64);
-                    //let array_begin = builder.ins().iadd_imm(array, 8);
-                    let pointer = builder.ins().iadd(array_ptr, offset);
+                    let clir_typ = ctx.translate_type(&typ);
+                    let offset = builder.ins().imul_imm(index, clir_typ.bytes() as i64);
+                    let array_begin = builder.ins().iadd_imm(array, 8);
+                    let pointer = builder.ins().iadd(array_begin, offset);
                     let value =
                         builder
                             .ins()
-                            .load(abi_typ.root, MemFlags::new(), pointer, 0);
-                    stack.s_push(value);
-
-                    if let Some(fat_ptr_typ) = abi_typ.fat_ptr_typ {
-                        let pointer = builder.ins().iadd_imm(pointer, abi_typ.root.bytes() as i64);
-                        let fat_ptr = builder
-                            .ins()
-                            .load(fat_ptr_typ, MemFlags::new(), pointer, 0);
-                        stack.s_push(fat_ptr);
-                    }
+                            .load(clir_typ.root, MemFlags::new(), pointer, 0);
+                    stack.push(value);
                 }
                 ir::Inst::StoreArray(typ) => {
-                    let (array_ptr, array_size) = stack.pop();
-                    let array_size = array_size.expect("Expected a fat pointer for the array size");
-
-                    let index = stack.s_pop();
-                    let value = stack.s_pop();
+                    let array = stack.pop();
+                    let index = stack.pop();
+                    let value = stack.pop();
                     // create a new block that everything after this load goes into
                     let continue_block = builder.create_block();
+                    // load the array size, which is directly at the array pointer
+                    let array_size = builder.ins().load(I64, MemFlags::new(), array, 0);
                     // check the index is allg
                     let index_ok_zero =
                         builder
                             .ins()
-                            .icmp_imm(IntCC::SignedGreaterThanOrEqual, index, 0);
+                            .icmp_imm(IntCC::SignedGreaterThanOrEqual, array_size, 0);
                     let index_ok_size =
                         builder.ins().icmp(IntCC::SignedLessThan, index, array_size);
                     let index_ok = builder.ins().band(index_ok_size, index_ok_zero);
@@ -643,26 +589,21 @@ pub fn translate_function(
 
                     builder.switch_to_block(continue_block);
                     // store the value now we know the array index is ok
-                    let abi_typ = ctx.translate_type(&typ);
-                    let offset = builder.ins().imul_imm(index, abi_typ.bytes() as i64);
-                    //let array_begin = builder.ins().iadd_imm(array, 8);
-                    let pointer = builder.ins().iadd(array_ptr, offset);
+                    let clir_typ = ctx.translate_type(&typ);
+                    let offset = builder.ins().imul_imm(index, clir_typ.bytes() as i64);
+                    let array_begin = builder.ins().iadd_imm(array, 8);
+                    let pointer = builder.ins().iadd(array_begin, offset);
                     builder
                         .ins()
                         .store(MemFlags::new().with_aligned(), value, pointer, 0);
-                    if abi_typ.fat_ptr_typ.is_some() {
-                        let fat_ptr = stack.s_pop();
-                        let pointer = builder.ins().iadd_imm(pointer, abi_typ.root.bytes() as i64);
-                        builder
-                            .ins()
-                            .store(MemFlags::new().with_aligned(), fat_ptr, pointer, 0);
-                    }
                 }
                 ir::Inst::CreateSlice(typ) => {
-                    let (array_ptr, array_size) = stack.pop();
-                    let array_size = array_size.expect("Expected a fat pointer for the array size");
-                    let end = stack.s_pop();
-                    let start = stack.s_pop();
+                    let array = stack.pop();
+                    let end = stack.pop();
+                    let start = stack.pop();
+                    
+                    // load the array size, which is directly at the array pointer
+                    let array_size = builder.ins().load(I64, MemFlags::new(), array, 0);
                     
                     // create a new block that everything after this load goes into
                     let continue_block = builder.create_block();
@@ -709,25 +650,40 @@ pub fn translate_function(
                     );
 
                     builder.switch_to_block(continue_block);
-                    // array_ptr + (start * element_size), end - start
-                    let abi_typ = ctx.translate_type(&typ);
-                    let offset = builder.ins().imul_imm(start, abi_typ.bytes() as i64);
-                    let pointer = builder.ins().iadd(array_ptr, offset);
-                    let len = builder.ins().isub(end, start);
-                    stack.push(pointer, Some(len));
+
+                    // create the new array
+                    let clir_typ = ctx.translate_type(&typ);
+                    let slice_size = builder.ins().isub(end, start);
+                    stack.push(slice_size);
+                    let val = builder.ins().iconst(I64, clir_typ.bytes() as i64);
+                    stack.push(val);
+                    let scan_elements = matches!(typ, ir::Type::Reference);
+                    stack.push(builder.ins().iconst(I8, if scan_elements { 1 } else { 0 }));
+                    translate_call(ctx, &mut builder, &mut stack, "__create_array");
+
+                    // copy the contents
+                    let slice = stack.pop();
+                    let byte_size = builder.ins().imul_imm(slice_size, clir_typ.bytes() as i64);
+                    let offset = builder.ins().imul_imm(start, clir_typ.bytes() as i64);
+                    let src_pointer = builder.ins().iadd_imm(array, 8);
+                    let src_pointer = builder.ins().iadd(src_pointer, offset);
+                    let dest_pointer = builder.ins().iadd_imm(slice, 8);
+                    builder.call_memcpy(frontend_config, dest_pointer, src_pointer, byte_size);
+
+                    stack.push(slice);
                 }
                 ir::Inst::ArrayLen => {
-                    let (_, slice_len) = stack.pop();
-                    let slice_len = slice_len.expect("Expected a fat pointer for the slice length");
-                    stack.s_push(slice_len);
+                    let array = stack.pop();
+                    let array_size = builder.ins().load(I64, MemFlags::new(), array, 0);
+                    stack.push(array_size);
                 }   
                 ir::Inst::NewObject(size) => {
                     let val = builder.ins().iconst(I64, *size as i64);
-                    stack.s_push(val);
+                    stack.push(val);
                     translate_call(ctx, &mut builder, &mut stack, "__create_object");
                 }
                 ir::Inst::GetObject(i, typ) => {
-                    let object = stack.s_pop();
+                    let object = stack.pop();
                     let offset = *i as i64 * 8;
                     let pointer = builder.ins().iadd_imm(object, offset);
                     let abi_type = ctx.translate_type(&typ);
@@ -735,17 +691,17 @@ pub fn translate_function(
                         builder
                             .ins()
                             .load(abi_type.root, MemFlags::new(), pointer, 0);
-                    stack.s_push(value);
+                    stack.push(value);
                     if let Some(fat_ptr_typ) = abi_type.fat_ptr_typ {let value =
                         builder
                             .ins()
                             .load(fat_ptr_typ, MemFlags::new(), pointer, 0);
-                        stack.s_push(value);
+                        stack.push(value);
                     }
                 }
                 ir::Inst::SetObject(i, _) => {
-                    let object = stack.s_pop();
-                    let value = stack.s_pop();
+                    let object = stack.pop();
+                    let value = stack.pop();
                     let offset = *i as i64 * 8;
                     let pointer = builder.ins().iadd_imm(object, offset);
                     builder
@@ -756,7 +712,7 @@ pub fn translate_function(
                     translate_call(ctx, &mut builder, &mut stack, "__check_yield");
                 }
                 ir::Inst::Assert => {
-                    let condition = stack.s_pop();
+                    let condition = stack.pop();
                     let continue_block = builder.create_block();
                     let panic_message = construct_panic_message(
                         ctx,
@@ -782,7 +738,7 @@ pub fn translate_function(
     // This is the panic block
     builder.switch_to_block(panic_block);
     let message = builder.append_block_param(panic_block, ctx.translate_type(&ir::Type::Reference).root);
-    stack.s_push(message);
+    stack.push(message);
     translate_call(ctx, &mut builder, &mut stack, "__panic");
     builder
         .ins()

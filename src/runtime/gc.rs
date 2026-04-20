@@ -114,8 +114,10 @@ impl GarbageCollector {
 
     pub fn create_array(&mut self, size: usize, elem_size: usize, scan_elements: bool) -> *const i64 {
         // Placeholder implementation
+        // +8 for the size
         unsafe {
-            let ptr = malloc(size * elem_size) as *mut i64;
+            let ptr = malloc(size * elem_size + 8) as *mut i64;
+            *ptr = (size * elem_size) as i64;
             self.allocations
                 .insert(Allocation::Array{ptr: ptr as usize, size, elem_size, scan_elements});
             ptr
