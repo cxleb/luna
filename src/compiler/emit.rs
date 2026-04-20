@@ -352,6 +352,15 @@ impl<'a> FuncGen<'a> {
                         ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
                         _ => panic!("Invalid binary operation for bool type"),
                     },
+                    crate::types::TypeKind::Byte => match b.kind {
+                        ast::BinaryExprKind::Equal => self.bld.eq_int(),
+                        ast::BinaryExprKind::NotEqual => self.bld.neq_int(),
+                        ast::BinaryExprKind::LessThan => self.bld.lt_int(),
+                        ast::BinaryExprKind::GreaterThan => self.bld.gt_int(),
+                        ast::BinaryExprKind::LessThanEqual => self.bld.leq_int(),
+                        ast::BinaryExprKind::GreaterThanEqual => self.bld.geq_int(),
+                        _ => panic!("Invalid binary operation for bool type"),
+                    },
                     crate::types::TypeKind::Number => match b.kind {
                         ast::BinaryExprKind::Equal => self.bld.eq_number(),
                         ast::BinaryExprKind::NotEqual => self.bld.neq_number(),
@@ -467,8 +476,12 @@ impl<'a> FuncGen<'a> {
         }
     }
 
-    fn integer(&mut self, i: &Box<ast::Integer>) {
-        self.bld.load_const_int(i.value);
+    fn integer(&mut self, e: &ast::Expr, i: &Box<ast::Integer>) {
+        if types::is_byte(&e.typ) {
+            self.bld.load_const_byte(i.value as u8);
+        } else {
+            self.bld.load_const_int(i.value);
+        }
     }
 
     fn number(&mut self, f: &Box<ast::Number>) {
@@ -633,7 +646,7 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u),
             ast::ExprKind::Assign(a) => self.assign(a),
             ast::ExprKind::Call(c) => self.call(c, e),
-            ast::ExprKind::Integer(i) => self.integer(i),
+            ast::ExprKind::Integer(i) => self.integer(e, i),
             ast::ExprKind::Number(f) => self.number(f),
             ast::ExprKind::Boolean(b) => self.boolean(b),
             ast::ExprKind::StringLiteral(s) => self.string_literal(s),

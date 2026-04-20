@@ -798,9 +798,19 @@ impl<'a> FuncTypeInference<'a> {
     fn integer(
         &mut self,
         _i: &mut Box<ast::Integer>,
-        _type_hint: Option<types::Type>,
+        type_hint: Option<types::Type>,
     ) -> SemaResult<Type> {
-        Ok(types::integer())
+        if let Some(typ) = type_hint {
+            if types::is_integer(&typ) {
+                Ok(typ)
+            } else if types::is_byte(&typ) {
+                Ok(typ)
+            } else {
+                self.error(SemaErrorReason::ExpressionCannotBeCasted)
+            }
+        } else {
+            Ok(types::integer())
+        }
     }
 
     fn number(
