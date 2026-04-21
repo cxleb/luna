@@ -589,7 +589,18 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     pub fn find_type(&self, name: &str) -> Option<Type> {
-        self.types
+        if name == "string" {
+             Some(types::string())
+        } else if name == "int" {
+            Some(types::integer())
+        } else if name == "byte" {
+            Some(types::byte())
+        } else if name == "number" {
+            Some(types::number())
+        } else if name == "bool" {
+            Some(types::bool())
+        } else {
+            self.types
             .get(
                 &self.imports,
                 self.package_id,
@@ -597,6 +608,7 @@ impl<'a> FuncTypeInference<'a> {
                 &name.to_string(),
             )
             .cloned()
+        }
     }
 
     fn binary_expr(&mut self, b: &mut ast::BinaryExpr, type_hint: Option<types::Type>) -> SemaResult<Type> {
