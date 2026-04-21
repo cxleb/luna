@@ -24,7 +24,7 @@ impl Allocation {
     pub fn address_in_range(&self, ptr: usize) -> bool {
         match self {
             &Allocation::Array{ptr: p, size, elem_size, scan_elements:_} => {
-                ptr >= p && ptr < (p + (size * elem_size))
+                ptr ==p || ptr >= p && ptr < (p + (size * elem_size))
             }
             &Allocation::Object(p, _) => {
                 ptr == p
@@ -90,7 +90,7 @@ impl GarbageCollector {
         for &root in stack_roots.iter() {
             let alloc = self
                 .find_allocation(root)
-                .expect("Stack root was not an allocation!");
+                .unwrap_or_else(|| panic!("Stack root was not an allocation! {root} allocations: {:?}", self.allocations));
             self.mark_allocation(alloc, &mut marks);
         }
         let to_remove = self

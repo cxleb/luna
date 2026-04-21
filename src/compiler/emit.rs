@@ -251,6 +251,7 @@ fn translate_type(ty: &crate::types::Type) -> ir::Type {
         crate::types::TypeKind::Byte => ir::Type::Byte,
         crate::types::TypeKind::Bool => ir::Type::Bool,
         crate::types::TypeKind::Number => ir::Type::Number,
+        crate::types::TypeKind::String => ir::Type::String,
         crate::types::TypeKind::Array(_) => ir::Type::Array, 
         _ => ir::Type::Reference,
     }

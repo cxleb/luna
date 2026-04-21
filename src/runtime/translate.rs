@@ -33,8 +33,7 @@ fn translate_signature(
     let mut params: Vec<AbiParam> = signature
         .parameters
         .iter()
-        .flat_map(|a| ctx.translate_type(a))
-        .map(|a| AbiParam::new(a))
+        .map(|a| AbiParam::new(ctx.translate_type(a).root))
         .collect();
     params.insert(0, AbiParam::new(ctx.context_type()));
     Signature {
@@ -42,8 +41,7 @@ fn translate_signature(
         returns: signature
             .ret_types
             .iter()
-            .flat_map(|a| ctx.translate_type(a))
-            .map(|a| AbiParam::new(a))
+            .map(|a| AbiParam::new(ctx.translate_type(a).root))
             .collect(),
         call_conv,
     }
@@ -692,12 +690,6 @@ pub fn translate_function(
                             .ins()
                             .load(abi_type.root, MemFlags::new(), pointer, 0);
                     stack.push(value);
-                    if let Some(fat_ptr_typ) = abi_type.fat_ptr_typ {let value =
-                        builder
-                            .ins()
-                            .load(fat_ptr_typ, MemFlags::new(), pointer, 0);
-                        stack.push(value);
-                    }
                 }
                 ir::Inst::SetObject(i, _) => {
                     let object = stack.pop();
@@ -751,6 +743,7 @@ pub fn translate_function(
     //println!("{}", translated.display());
     let res = verify_function(&translated, ctx.isa());
     if let Err(errors) = res {
-        panic!("{}", errors);
+        println!("Error verifying function {}: {}", func.id, errors);
+        println!("{}", translated.display());
     }
 }

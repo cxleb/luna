@@ -12,6 +12,7 @@ pub enum Type {
     Byte,
     Number,
     Bool,
+    String,
     Reference,
     Array
 }

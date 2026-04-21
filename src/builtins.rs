@@ -178,18 +178,24 @@ pub fn builtin_tcp_connect(_: *mut crate::runtime::RuntimeContext, address: *con
 
     let parts: Vec<&str> = address.split(':').collect();
     if parts.len() != 2 {
-        return -5;
+        return -6;
     }
 
     let host = parts[0];
     let port = match parts[1].parse::<u16>() {
         Ok(p) => p,
-        Err(_) => return -4,
+        Err(_) => return -5,
     };
 
-    let host = match host.parse::<Ipv4Addr>() {
-        Ok(h) => h,
-        Err(_) => return -3,
+    let host = if host.is_empty() {
+        libc::INADDR_ANY
+    } else if host == "localhost" {
+        libc::INADDR_LOOPBACK
+    } else {
+        match host.parse::<Ipv4Addr>() {
+            Ok(h) => h.to_bits(),
+            Err(_) => return -4,
+        }
     };
 
     let socket = unsafe { libc::socket(libc::PF_INET, libc::SOCK_STREAM, libc::IPPROTO_TCP) };
@@ -201,9 +207,9 @@ pub fn builtin_tcp_connect(_: *mut crate::runtime::RuntimeContext, address: *con
         let sa = libc::sockaddr_in {
             sin_len: std::mem::size_of::<libc::sockaddr_in>() as u8,
             sin_family: libc::AF_INET as u8,
-            sin_port: port,
+            sin_port: libc::htons(port),
             sin_addr: libc::in_addr {
-                s_addr: host.to_bits()
+                s_addr: libc::htonl(host)
             },
             sin_zero: [0; 8],
         };
@@ -211,6 +217,10 @@ pub fn builtin_tcp_connect(_: *mut crate::runtime::RuntimeContext, address: *con
         if libc::bind(socket, &sa as *const libc::sockaddr_in as *const libc::sockaddr, std::mem::size_of::<libc::sockaddr_in>() as u32) == -1 {
             libc::close(socket);
             return -2;
+        }
+
+        if libc::listen(socket, 128) == -1 {
+            return -3;
         }
     }
 
@@ -225,7 +235,7 @@ pub fn builtin_tcp_accept(_: *mut crate::runtime::RuntimeContext, socket: i64) -
     client_socket as i64
 }
 
-pub fn builtin_tcp_disconnect(_: *mut crate::runtime::RuntimeContext, socket: i64) -> i64 {
+pub fn builtin_tcp_close(_: *mut crate::runtime::RuntimeContext, socket: i64) -> i64 {
     if unsafe { libc::close(socket as libc::c_int) } == -1 {
         return -1;
     }
@@ -244,19 +254,19 @@ pub fn builtin_stderr(_: *mut crate::runtime::RuntimeContext) -> i64 {
     libc::STDERR_FILENO as i64
 }
 
-pub fn builtin_read(ctx: *mut crate::runtime::RuntimeContext, fd: i64) -> *const i64 {
+pub fn builtin_tcp_recv(ctx: *mut crate::runtime::RuntimeContext, fd: i64) -> *const i64 {
     let mut buffer = [0u8; 1024];
     let mut copy_buffer = Vec::new();
 
     loop {
-        let bytes_read = unsafe { libc::read(fd as libc::c_int, buffer.as_mut_ptr() as *mut libc::c_void, buffer.len()) };
+        let bytes_read = unsafe { libc::recv(fd as libc::c_int, buffer.as_mut_ptr() as *mut libc::c_void, buffer.len(), 0) };
         if bytes_read == -1 {
             return unsafe {
                 (*ctx).gc.create_array(0, 1, false)
             };
         }
         for i in 0..bytes_read {
-            copy_buffer.push(buffer[i as usize] as i64);
+            copy_buffer.push(buffer[i as usize]);
         }
         if (bytes_read as usize) < buffer.len() {
             break;
@@ -266,20 +276,28 @@ pub fn builtin_read(ctx: *mut crate::runtime::RuntimeContext, fd: i64) -> *const
     let array = unsafe {
         (*ctx).gc.create_array(buffer.len(), 1, false)
     };
-    for (i, &b) in copy_buffer.iter().enumerate() {
-        unsafe {
-            let ptr = (array as usize + 8 + (i * 8)) as *mut usize;
-            *ptr = b as usize;
-        }
+    unsafe {
+        std::ptr::copy_nonoverlapping(copy_buffer.as_ptr(), (array as i64 + 8) as *mut u8, copy_buffer.len());
     }
     array
 }
-//
-//pub fn builtin_write(ctx: *mut crate::runtime::RuntimeContext, fd: i64, array: *mut i64) {
-//    loop {
-//        let bytes_read = unsafe { libc::write(fd, array as *const libc::c_void, 8) };
-//    }
-//}
+
+pub fn builtin_tcp_send(_: *mut crate::runtime::RuntimeContext, fd: i64, array: *mut i64) {
+    // Get the size of the array
+    let mut array_size = unsafe { *array } as usize;
+    let mut offset = 0;
+    loop {
+        let bytes_send = unsafe { libc::send(fd as libc::c_int, (array as i64 + 8 + offset) as *const libc::c_void, array_size, 0) };
+        if bytes_send == -1 {
+            break;
+        }
+        if bytes_send as usize >= array_size {
+            break;
+        }
+        offset += bytes_send as i64;
+        array_size -= bytes_send as usize;
+    }
+}
 
 pub fn default_builtins() -> Builtins {
     let mut builtins = Builtins::new();
@@ -340,8 +358,9 @@ pub fn default_builtins() -> Builtins {
     builtins.push_function_0("stderr", vec![], Some(types::integer()), builtin_stderr);
     builtins.push_function("tcp_connect", vec![types::string()], Some(types::integer()), builtin_tcp_connect);
     builtins.push_function("tcp_accept", vec![types::integer()], Some(types::integer()), builtin_tcp_accept);
-    builtins.push_function("tcp_disconnect", vec![types::integer()], None, builtin_tcp_disconnect);
-    builtins.push_function("read", vec![types::integer()], Some(types::array(types::integer())), builtin_read);
+    builtins.push_function("tcp_close", vec![types::integer()], None, builtin_tcp_close);
+    builtins.push_function("tcp_recv", vec![types::integer()], Some(types::array(types::byte())), builtin_tcp_recv);
+    builtins.push_function_2("tcp_send", vec![types::integer(), types::array(types::byte())], None, builtin_tcp_send);
 
 
     builtins

@@ -1,0 +1,34 @@
+struct Listener {
+    fd: int,
+
+    func accept(): Socket {
+        let socket_fd = tcp_accept(self.fd);
+        return Socket {
+            fd: socket_fd
+        };
+    }
+}
+
+struct Socket {
+    fd: int,
+
+    func read(): []byte {
+        return tcp_recv(self.fd);
+    }
+
+    func write(b: []byte) {
+        tcp_send(self.fd, b);
+    }
+
+    func close() {
+        tcp_close(self.fd);
+    }
+}
+
+func connect(addr: string): Listener {
+    let listener_fd = tcp_connect(addr);
+
+    return Listener {
+        fd: listener_fd
+    };
+} 
