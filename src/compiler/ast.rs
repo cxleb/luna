@@ -85,8 +85,9 @@ pub struct Identifier {
 #[derive(Debug, Clone)]
 pub struct Subscript {
     pub value: Expr,
-    pub index: Expr,
-    pub slice_end: Option<Expr>,
+    pub is_slice: bool,
+    pub index: Option<Expr>,
+    pub index_end: Option<Expr>,
 }
 
 #[derive(Debug, Clone)]

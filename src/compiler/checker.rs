@@ -44,7 +44,9 @@ pub enum SemaErrorReason {
     GotPackageButExpectedExpression,
     CannotUseFunctionAsSelector,
     CannotUseMethodAsSelector,
-    CannotUseEnumVariantAsSelector
+    CannotUseEnumVariantAsSelector,
+    CannotStoreIntoSliceExpression,
+    ExpectedAnIndex
 }
 
 #[derive(Debug)]
@@ -918,21 +920,32 @@ impl<'a> FuncTypeInference<'a> {
 
     fn subscript(&mut self, s: &mut ast::Subscript, _type_hint: Option<types::Type>) -> SemaResult<Type> {
         self.expr(&mut s.value, None)?;
-        self.expr(&mut s.index, None)?;
 
         if !types::is_array(&s.value.typ) {
             return self.error_loc(SemaErrorReason::ValueIsNotIndexable, s.value.loc);
         }
 
-        if !types::is_integer(&s.index.typ) {
-            return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, s.index.loc);
+        if !s.is_slice && s.index.is_none() {
+            return self.error(SemaErrorReason::ExpectedAnIndex);
         }
 
-        if let Some(slice_end) = s.slice_end.as_mut() {
-            self.expr(slice_end, None)?;
-            if !types::is_integer(&slice_end.typ) {
-                return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, slice_end.loc);
+        if let Some(index) = s.index.as_mut() {
+            self.expr(index, None)?;
+
+            if !types::is_integer(&index.typ) {
+               return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, s.index.as_ref().unwrap().loc);
             }
+        }
+
+        if let Some(index) = s.index_end.as_mut() {
+            self.expr(index, None)?;
+
+            if !types::is_integer(&index.typ) {
+               return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, s.index.as_ref().unwrap().loc);
+            }
+        }
+
+        if s.is_slice {
             Ok(s.value.typ.clone())
         } else {
             Ok(types::get_inner_array_type(&s.value.typ))
@@ -1190,14 +1203,24 @@ impl<'a> FuncTypeInference<'a> {
             _ => panic!(),
         };
 
-        self.expr(&mut s.value, None)?;
-        self.expr(&mut s.index, None)?;
+        if s.is_slice {
+            return self.error_loc(SemaErrorReason::CannotStoreIntoSliceExpression, e.loc);
+        }
 
+        if s.index.is_none() {
+            return self.error_loc(SemaErrorReason::ExpectedAnIndex, e.loc);
+        }
+
+        self.expr(&mut s.value, None)?;
+        if let Some(index) = &mut s.index {
+            self.expr(index, None)?;
+        }
+        
         if !types::is_array(&s.value.typ) {
             return self.error_loc(SemaErrorReason::ValueIsNotIndexable, e.loc);
         }
 
-        if !types::is_integer(&s.index.typ) {
+        if !types::is_integer(&s.index.as_ref().unwrap().typ) {
             return self.error_loc(SemaErrorReason::ValueCannotBeUsedAsIndex, e.loc);
         }
 

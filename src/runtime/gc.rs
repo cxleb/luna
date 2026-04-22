@@ -117,7 +117,7 @@ impl GarbageCollector {
         // +8 for the size
         unsafe {
             let ptr = malloc(size * elem_size + 8) as *mut i64;
-            *ptr = (size * elem_size) as i64;
+            *ptr = (size) as i64;
             self.allocations
                 .insert(Allocation::Array{ptr: ptr as usize, size, elem_size, scan_elements});
             ptr

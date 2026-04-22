@@ -507,15 +507,24 @@ impl<'a> FuncGen<'a> {
     }
 
     fn subscript(&mut self, e: &ast::Expr, l: &Box<ast::Subscript>) {
-        if let Some(slice_end) = &l.slice_end { 
-            self.expr(&l.index);
-            self.expr(slice_end);
+        if l.is_slice {
+            if let Some(index) = &l.index {
+                self.expr(index);
+            } else {
+                self.bld.load_const_int(0);
+            }
+            if let Some(index) = &l.index_end {
+                self.expr(index);
+            } else {
+                self.expr(&l.value);
+                self.bld.array_len();
+            }
             self.expr(&l.value);
             self.bld.create_slice(types::get_inner_array_type(&e.typ).into());
         } else {
-            self.expr(&l.index);
+            self.expr(l.index.as_ref().expect("Expected an index"));
             self.expr(&l.value);
-            self.bld.load_array(e.typ.clone().into());
+            self.bld.load_array(e.typ.clone().into());    
         }
     }
 
@@ -663,7 +672,7 @@ impl<'a> FuncGen<'a> {
     }
 
     fn store_subscript(&mut self, e: &ast::Expr, l: &Box<ast::Subscript>) {
-        self.expr(&l.index);
+        self.expr(&l.index.as_ref().expect("Expected an index"));
         self.expr(&l.value);
         self.bld.store_array(e.typ.clone().into());
     }

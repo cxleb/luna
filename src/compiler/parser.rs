@@ -521,16 +521,37 @@ impl<'a> Parser<'a> {
         loop {
             if self.test(TokenKind::Punctuation(Punctuation::LeftBracket)) {
                 self.next()?;
-                let index = self.parse_expression()?;
-                let mut slice_end = None;
                 if self.test(TokenKind::Punctuation(Punctuation::Colon)) {
                     self.next()?;
-                    slice_end = Some(self.parse_expression()?);
+                    let index_end = if self.test(TokenKind::Punctuation(Punctuation::RightBracket)) {
+                        None
+                    } else {
+                        Some(self.parse_expression()?)
+                    };
+                    expr = self.expr(
+                        ExprKind::Subscript(Box::new(Subscript { value: expr, index: None, is_slice: true, index_end })),
+                        loc,
+                    );
+                    self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;
+                    continue;
+                } else {
+                    let index = self.parse_expression()?;
+                    let mut index_end = None;
+                    let mut is_slice = false;
+                    if self.test(TokenKind::Punctuation(Punctuation::Colon)) {
+                        self.next()?;
+                        is_slice = true;
+                        index_end = if self.test(TokenKind::Punctuation(Punctuation::RightBracket)) {
+                            None
+                        } else {
+                            Some(self.parse_expression()?)
+                        };
+                    }
+                    expr = self.expr(
+                        ExprKind::Subscript(Box::new(Subscript { value: expr, index: Some(index), is_slice, index_end })),
+                        loc,
+                    );
                 }
-                expr = self.expr(
-                    ExprKind::Subscript(Box::new(Subscript { value: expr, index, slice_end })),
-                    loc,
-                );
                 self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;
             } else if self.test(TokenKind::Punctuation(Punctuation::Equals)) {
                 self.next()?;

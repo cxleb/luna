@@ -4,4 +4,12 @@ func main() {
     assert(b[0] == 12);
     assert(b[1] == 13);
     let c = a[1:1];
+
+    let d = a[:2];
+    assert(d[0] == 10);
+    assert(d[1] == 11);
+
+    let e = a[4:];
+    assert(e[0] == 14);
+    assert(e[1] == 15);
 }
