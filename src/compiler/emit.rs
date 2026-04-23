@@ -531,10 +531,13 @@ impl<'a> FuncGen<'a> {
     fn selector(&mut self, e: &ast::Expr, s: &ast::Selector) {
         if let Some(i) = s.enum_idx {
             self.enum_literal(&e.typ, i, &Vec::new());
-            return;
+        } else if types::is_array(&s.value.typ) && s.selector.id == "length" {
+            self.expr(&s.value);
+            self.bld.array_len();
+        } else {
+            self.expr(&s.value);
+            self.bld.get_object(s.idx, e.typ.clone().into());
         }
-        self.expr(&s.value);
-        self.bld.get_object(s.idx, e.typ.clone().into());
     }
 
     fn array_literal(&mut self, e: &ast::Expr, a: &Box<ast::ArrayLiteral>) {

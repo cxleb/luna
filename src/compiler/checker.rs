@@ -655,8 +655,8 @@ impl<'a> FuncTypeInference<'a> {
             | ast::BinaryExprKind::GreaterThan
             | ast::BinaryExprKind::LessThanEqual
             | ast::BinaryExprKind::GreaterThanEqual => {
-                self.expr(&mut b.lhs, None)?;
-                self.expr(&mut b.rhs, None)?;
+                let typ = self.expr(&mut b.lhs, None)?;
+                self.expr(&mut b.rhs, Some(typ))?;
 
                 if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
                     return self
@@ -885,6 +885,8 @@ impl<'a> FuncTypeInference<'a> {
                     } else {
                         self.error(SemaErrorReason::CannotFindSelectorInStruct)
                     }
+                } else if types::is_array(&typ) && s.selector.id == "length" {
+                    Ok(ExprResult::Value(types::integer()))
                 } else {
                     self.error(SemaErrorReason::InvalidUsageOfSelector)
                 }

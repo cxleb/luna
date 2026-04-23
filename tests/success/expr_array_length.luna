@@ -1,0 +1,12 @@
+func main() {
+    let a: []int = [10, 11, 12, 13, 14, 15];
+    assert(a.length == 6);
+    let b = a[2:4];
+    assert(b.length == 2);
+    let c = a[1:1];
+    assert(c.length == 0);
+    let d = a[:2];
+    assert(d.length == 2);
+    let e = a[4:];
+    assert(e.length == 2);
+}

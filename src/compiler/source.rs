@@ -113,7 +113,7 @@ impl<'a> Source<'a> {
             't' => '\t',
             'v' => 'v',
             'u' => todo!("Unicode escape sequences havent been implemented yet"),
-            _ => panic!("Invalid escape sequence!"),
+            _ => panic!("Invalid escape sequence! line: {}, col: {}", self.line_no, self.col_no),
         }
     }
 
