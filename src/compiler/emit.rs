@@ -782,9 +782,11 @@ impl<'a> FuncGen<'a> {
                 self.bld.condbr(consequent_block, finish_block);
             }
             self.bld.switch_to_block(consequent_block);
-            self.stmt(&f.consequent);
+            let returned = self.stmt(&f.consequent);
             // In this situation, we always need to branch to finish
-            self.bld.br(finish_block);
+            if !returned {
+                self.bld.br(finish_block);
+            }
             self.bld.switch_to_block(finish_block);
             false
         }

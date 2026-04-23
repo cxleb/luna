@@ -1,0 +1,17 @@
+func find_item(bytes: []byte, item: byte): int {
+    let idx = 0;
+    while idx < bytes.length {
+        if bytes[idx] == item {
+            return idx;
+        }
+        idx = idx + 1;
+    }
+    return idx;
+}
+
+func main() {
+    let a: []byte = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    
+    let b = find_item(a, 3);
+    assert(b == 2);
+}
