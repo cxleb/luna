@@ -1,16 +1,81 @@
+import "std:net";
+
 struct Request {
+    method: string,
+    path: string,
 
 }
 
 struct Response {
+    status: int,
+    content: string,
 
+    func ok(content: string) {
+        self.status = 200;
+        self.content = content;
+    }
 }
 
 interface Acceptor {
-    fn accept(req: Request, res: Response);
+    func accept(req: Request, res: Response);
 }
 
 // eventually this should go onto a different task and return a server object so it can be stopped.
 func serve(addr: string, acceptor: Acceptor) {
+    let listener = connect(addr);
 
-} 
+    while true {
+        let socket = listener.accept();
+        let request_bytes = socket.read();
+
+        if request_bytes.length != 0 {
+            let index = find_new_line(request_bytes);
+            
+            let addr_line = request_bytes[0:index];
+            request_bytes = request_bytes[index+1:];
+
+            let method_idx = find_space(addr_line);
+            let method = addr_line[:method_idx];
+            index = find_space(addr_line[method_idx+1:]);
+            let path = addr_line[method_idx+1:method_idx+1+index];
+
+            let req = Request {
+                method: byte_array_to_string(method),
+                path: byte_array_to_string(path)
+            };
+
+            let res = Response {
+                status: 100,
+                content: ""
+            };
+
+            println("Request: method = \"${req.method}\", path = \"${req.path}\"");
+            acceptor.accept(req, res);
+            
+            let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n${res.content}";
+
+            socket.write(string_to_byte_array(response));
+            socket.close();
+        }
+
+    }
+}
+
+func find_space(bytes: []byte): int {
+    return find_item(bytes, 32);
+}
+
+func find_new_line(bytes: []byte): int {
+    return find_item(bytes, 10);
+}
+
+func find_item(bytes: []byte, item: byte): int {
+    let idx = 0;
+    while idx < bytes.length {
+        if bytes[idx] == item {
+            return idx;
+        }
+        idx = idx + 1;
+    }
+    return idx;
+}

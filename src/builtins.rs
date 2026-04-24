@@ -299,6 +299,25 @@ pub fn builtin_tcp_send(_: *mut crate::runtime::RuntimeContext, fd: i64, array: 
     }
 }
 
+pub fn builtin_byte_array_to_string(_: *mut crate::runtime::RuntimeContext, array: *const i64) -> *const u8 {
+    let slice = unsafe { std::slice::from_raw_parts((array as i64 + 8) as *const u8, *array as usize) };
+    let string = String::from_utf8_lossy(slice).to_string();
+    let internal = crate::runtime::string::convert_to_interal_string(&string);
+    Box::into_raw(internal) as *const u8
+}
+
+pub fn builtin_string_to_byte_array(ctx: *mut crate::runtime::RuntimeContext, string: *const u8) -> *const i64 {
+    let string = crate::runtime::string::convert_from_internal_string(string);
+    let bytes = string.as_bytes();
+    let array = unsafe {
+        (*ctx).gc.create_array(bytes.len(), 1, false)
+    };
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), (array as i64 + 8) as *mut u8, bytes.len());
+    }
+    array
+}
+
 pub fn default_builtins() -> Builtins {
     let mut builtins = Builtins::new();
     builtins.push_function("print", vec![types::string()], None, builtin_print);
@@ -361,7 +380,8 @@ pub fn default_builtins() -> Builtins {
     builtins.push_function("tcp_close", vec![types::integer()], None, builtin_tcp_close);
     builtins.push_function("tcp_recv", vec![types::integer()], Some(types::array(types::byte())), builtin_tcp_recv);
     builtins.push_function_2("tcp_send", vec![types::integer(), types::array(types::byte())], None, builtin_tcp_send);
-
+    builtins.push_function("byte_array_to_string", vec![types::array(types::byte())], Some(types::string()), builtin_byte_array_to_string);
+    builtins.push_function("string_to_byte_array", vec![types::string()], Some(types::array(types::byte())), builtin_string_to_byte_array);
 
     builtins
 }
