@@ -1,12 +1,14 @@
-import "std:http"
+import "std:http";
 
 struct HttpServer {
     a: int,
 
-    func accept(c: http.Context) {
-        if c.path == "/hello" {
-            c.ok("<p>Hello! ${a}</p>");
-            a += 1;
+    func accept(req: Request, res: Response) {
+        if req.path == "/hello" {
+            res.ok("<p>Hello! ${self.a}</p>");
+            self.a = self.a + 1;
+        } else {
+            res.ok("<p>Hello!</p>");
         }
     }
 }
@@ -15,5 +17,7 @@ func main() {
     let server = HttpServer{
         a: 0
     };
-    http.serve("127.0.0.1:80", server);
+    let addr = "localhost:7111";
+    println("Serving on ${addr}");
+    serve(addr, server);
 }
