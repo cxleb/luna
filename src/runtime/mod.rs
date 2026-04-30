@@ -286,15 +286,15 @@ impl JitContext {
             .funcs
             .iter()
             .map(|func| {
-                translate::translate_function(
+                let mut translation_ctx = translate::TranslationContext::new(
                     self,
                     &func,
-                    &mut context,
                     &signatures,
                     &module.string_map,
                     &module.source_locs,
                     &module.global_value_map,
                 );
+                translation_ctx.translate_function(&mut context);
                 let id = self
                     .module
                     .declare_function(

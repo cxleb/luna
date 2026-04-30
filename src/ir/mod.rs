@@ -66,6 +66,7 @@ pub enum Inst {
     // Pops the necessary arguments off the stack, e.g a(10, 10) will pop 2
     Call(String),
     IndirectCall(Signature), // top of the stack is the function to call, arity is the number of arguments (not including the function pointer)
+    FuncAddr(String), // loads the address of the function onto the stack
 
     NewArray(usize, Type),
     LoadArray(Type),  // Pops the index and array

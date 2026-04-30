@@ -286,6 +286,10 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::IndirectCall(signature));
     }
 
+    pub fn func_addr(&mut self, id: String) {
+        self.append_inst(super::Inst::FuncAddr(id));
+    }
+
     pub fn new_array(&mut self, size: usize, typ: Type) {
         self.append_inst(super::Inst::NewArray(size, typ));
     }
