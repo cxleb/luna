@@ -16,15 +16,13 @@ fn main() {
     let module = compiler::run_compiler(Arc::clone(&compiler), &builtins);
 
     let mut jit = runtime::JitContext::new(builtins);
-    //print!("compiling... ");  std::io::stdout().flush().unwrap();
+    
     jit.compile_ir_module(&module);
-    //println!("done.");
-    //println!("running...\n");
+
     let main_symbol = compiler::mangle::mangle_name(&NameSpecification {
         package: "main".into(),
         file: main_file_name,
         name: "main".into(),
     });
-    jit.call_function_no_params_no_return(&main_symbol);
-    //println!("Returned {}", returned);
+    jit.call_function_no_params_no_return(&main_symbol).expect("Could not find main in file");
 }

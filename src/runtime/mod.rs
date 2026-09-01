@@ -333,8 +333,8 @@ impl JitContext {
         }
     }
 
-    pub fn call_function_no_params_no_return(&self, name: &str) {
-        let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name).unwrap();
+    pub fn call_function_no_params_no_return(&self, name: &str) -> Option<()> {
+        let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name)?;
         let fiber = Box::new(Fiber {
             ctx: self.runtime_ctx,
             entry_point: compiled_func.code,
@@ -347,18 +347,6 @@ impl JitContext {
             t.context.resume(fiber as usize);
         }
 
-        //unsafe {
-        //    let code_fn = core::mem::transmute::<_, fn(*mut RuntimeContext)>(compiled_func.code);
-        //    code_fn(self.runtime_ctx);
-        //}
-    }
-
-    pub fn call_function_no_params<Returns>(&self, name: &str) -> Returns {
-        let compiled_func = self.compiled_funcs.iter().find(|c| c.name == name).unwrap();
-        unsafe {
-            let code_fn =
-                core::mem::transmute::<_, fn(*mut RuntimeContext) -> Returns>(compiled_func.code);
-            code_fn(self.runtime_ctx)
-        }
+        Some(())
     }
 }
