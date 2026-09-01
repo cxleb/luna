@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet};
 
 use libc::{free, malloc};
 
@@ -65,7 +65,7 @@ impl GarbageCollector {
                 if !scan_elements {
                     return;
                 }
-                for i in 0..(s/e) {
+                for i in 0..s {
                     let v = (p + 8 + (i * e)) as *mut usize;
                     let v = unsafe { *v };
                     if let Some(a) = self.find_allocation(v) {

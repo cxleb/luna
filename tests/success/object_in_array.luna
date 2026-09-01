@@ -1,0 +1,22 @@
+interface Shape {
+    func name(): string;
+}
+
+func print_shapes(shapes: []Shape) {
+    let shape = shapes[0];
+    println("${shape.name()}");
+}
+
+struct Circle {
+    func name(): string {
+        return "Circle";
+    }
+}
+
+func main() {
+    let shapes: []Shape = [
+        Circle {}
+    ];
+
+    print_shapes(shapes);
+}
