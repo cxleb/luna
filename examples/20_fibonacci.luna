@@ -1,4 +1,4 @@
-func fibonacci(n: int) int {
+func fibonacci(n: int): int {
     if n <= 1 {
         return n;
     } else {
@@ -9,7 +9,7 @@ func fibonacci(n: int) int {
 func main() {
     let a = 0;
     while a < 20 {
-        print(fibonacci(a));
+        println("${fibonacci(a)}");
         a = a + 1;
     }
 }

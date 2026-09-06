@@ -5,6 +5,6 @@
 //
 // the cli embedding will call the main function first.
 func main() {
-    // the cli embedding also implements "print" to output to stdout
-    print_string("Hello, World!");
+    // the cli embedding also implements "println" to output to stdout
+    println("Hello, World!");
 }

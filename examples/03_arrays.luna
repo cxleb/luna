@@ -1,11 +1,14 @@
 func main() {
     let a = [0];
     a[0] = 0;
+    println("${a[0]}");
+
+    a = [0, 0, 0, 0];
     a[1] = 10;
     a[2] = 20;
     a[3] = 30;
-    print_int(a[0]);
-    print_int(a[1]);
-    print_int(a[2]);
-    print_int(a[3]);
+    println("${a[0]}");
+    println("${a[1]}");
+    println("${a[2]}");
+    println("${a[3]}");
 }
