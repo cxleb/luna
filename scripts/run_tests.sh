@@ -2,7 +2,7 @@
 
 cargo test
 
-cargo build
+cargo build --release
 
 # Test success cases - these should pass
 echo "=== Testing Success Cases ==="
@@ -12,7 +12,7 @@ for filename in tests/success/*; do
     if [ -f "$filename" ]; then
         total_success=$((total_success + 1))
         echo "Running success test: $filename";
-        if ./target/debug/luna-rs "$filename" >/dev/null 2>&1; then
+        if ./target/release/luna-rs "$filename" >/dev/null 2>&1; then
             echo "✓ PASSED: $filename"
             success_count=$((success_count + 1))
         else
@@ -33,7 +33,7 @@ for filename in tests/failure/*; do
     if [ -f "$filename" ]; then
         total_failure=$((total_failure + 1))
         echo "Running failure test: $filename";
-        if ! ./target/debug/luna-rs "$filename" >/dev/null 2>&1; then
+        if ! ./target/release/luna-rs "$filename" >/dev/null 2>&1; then
             echo "✓ PASSED: $filename (correctly failed)"
             failure_count=$((failure_count + 1))
         else

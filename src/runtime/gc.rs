@@ -11,6 +11,7 @@ enum Allocation {
         scan_elements : bool, // whether we should scan the elements of this array for pointers to other allocations. This is false for arrays of primitive types.
     },
     Object(usize, usize),
+    BoxedRustValue(usize)
 }
 
 impl Allocation {
@@ -18,6 +19,7 @@ impl Allocation {
         match self {
             &Allocation::Array{ptr, size: _, elem_size: _, scan_elements:_} => ptr,
             &Allocation::Object(p, _) => p,
+            &Allocation::BoxedRustValue(p) => p,
         }
     }
 
@@ -27,6 +29,9 @@ impl Allocation {
                 ptr ==p || ptr >= p && ptr < (p + (size * elem_size))
             }
             &Allocation::Object(p, _) => {
+                ptr == p
+            }
+            &Allocation::BoxedRustValue(p) => {
                 ptr == p
             }
         }
@@ -81,6 +86,9 @@ impl GarbageCollector {
                         self.mark_allocation(a, marks);
                     }
                 }
+            }
+            &Allocation::BoxedRustValue(_) => {
+                return;
             }
         }
     }
@@ -140,9 +148,9 @@ impl GarbageCollector {
         // Placeholder implementation
         unsafe {
             let ptr = malloc(std::mem::size_of::<T>()) as *mut T;
-            *ptr = v;
+            ptr.write(v);
             self.allocations
-                .insert(Allocation::Object(ptr as usize, 0)); // We can treat this as an object with 0 fields, as we will never look for sub-allocations of it.
+                .insert(Allocation::BoxedRustValue(ptr as usize)); // We can treat this as an object with 0 fields, as we will never look for sub-allocations of it.
             ptr
         }
     }
