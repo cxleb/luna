@@ -290,6 +290,22 @@ impl<'a> FuncBuilder<'a> {
         self.append_inst(super::Inst::FuncAddr(id));
     }
 
+    pub fn load_pointer(&mut self, typ: Type) {
+        self.append_inst(super::Inst::LoadPointer(typ));
+    }
+
+    pub fn store_pointer(&mut self) {
+        self.append_inst(super::Inst::StorePointer);
+    }
+
+    pub fn offset_pointer(&mut self, typ: Type) {
+        self.append_inst(super::Inst::OffsetPointer(typ));
+    }
+
+    pub fn is_null_pointer(&mut self) {
+        self.append_inst(super::Inst::IsNullPointer);
+    }
+
     pub fn new_array(&mut self, size: usize, typ: Type) {
         self.append_inst(super::Inst::NewArray(size, typ));
     }

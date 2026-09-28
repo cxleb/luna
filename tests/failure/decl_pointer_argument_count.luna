@@ -1,0 +1,5 @@
+func invalid(p: ptr<int, byte>) {
+}
+
+func main() {
+}

@@ -605,6 +605,29 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary_expr(&mut self) -> ParserResult<Expr> {
+        if self.test(TokenKind::Punctuation(Punctuation::At)) {
+            let token = self.next()?;
+            let name = self.expect(TokenKind::Identifier)?.get_string();
+            self.expect(TokenKind::Punctuation(Punctuation::LeftParenthesis))?;
+            let mut parameters = Vec::new();
+            while !self.test(TokenKind::Punctuation(Punctuation::RightParenthesis)) {
+                parameters.push(self.parse_expression()?);
+                if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                    self.next()?;
+                } else {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Punctuation(Punctuation::RightParenthesis))?;
+            return Ok(self.expr(
+                ExprKind::Intrinsic(Box::new(Intrinsic {
+                    name,
+                    parameters,
+                })),
+                token.loc,
+            ));
+        }
+
         if self.test(TokenKind::Punctuation(Punctuation::LeftParenthesis)) {
             self.next()?;
             self.nest_level += 1;
@@ -847,6 +870,14 @@ impl<'a> Parser<'a> {
     /////////////////////////////
 
     fn parse_type(&mut self) -> ParserResult<Box<Type>> {
+        let old_mode = self.mode;
+        self.mode = TokeniserMode::Type;
+        let result = self.parse_type_inner();
+        self.mode = old_mode;
+        result
+    }
+
+    fn parse_type_inner(&mut self) -> ParserResult<Box<Type>> {
         if self.test(TokenKind::Punctuation(Punctuation::LeftBracket)) {
             self.tokeniser.next(self.mode);
             self.expect(TokenKind::Punctuation(Punctuation::RightBracket))?;
@@ -855,6 +886,21 @@ impl<'a> Parser<'a> {
         }
 
         let string = self.expect(TokenKind::Identifier)?.get_string();
+
+        if self.test(TokenKind::Punctuation(Punctuation::LeftAngle)) {
+            self.next()?;
+            let mut arguments = Vec::new();
+            while !self.test(TokenKind::Punctuation(Punctuation::RightAngle)) {
+                arguments.push(self.parse_type()?);
+                if self.test(TokenKind::Punctuation(Punctuation::Comma)) {
+                    self.next()?;
+                } else {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Punctuation(Punctuation::RightAngle))?;
+            return Ok(Box::new(Type::Application(string, arguments)));
+        }
 
         if string == "string" {
             return Ok(Box::new(Type::String));

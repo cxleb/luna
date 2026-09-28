@@ -1,0 +1,6 @@
+func invalid(p: ptr<int>) {
+    @offset(p, 1.5);
+}
+
+func main() {
+}

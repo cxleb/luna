@@ -1,0 +1,6 @@
+func invalid(p: ptr<int>) {
+    let value = @store(p, 1);
+}
+
+func main() {
+}

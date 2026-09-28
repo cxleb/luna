@@ -1,0 +1,6 @@
+func invalid(p: ptr<int>) {
+    @store(p, true);
+}
+
+func main() {
+}

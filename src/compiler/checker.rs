@@ -27,6 +27,12 @@ pub enum SemaErrorReason {
     CannotAssignToConst,
     NonBoolInLogicalExpression,
     TypeNotFound,
+    UnsupportedTypeArguments,
+    InvalidPointerTypeArguments,
+    InvalidPointerElementType,
+    UnknownIntrinsic,
+    ExpectedPointer,
+    ExpressionHasNoValue,
     StructFieldNotFound,
     CannotFindSelectorInStruct,
     InvalidUsageOfSelector,
@@ -285,6 +291,46 @@ fn type_lookup(
         ast::Type::Number => Ok(types::number()),
         ast::Type::String => Ok(types::string()),
         ast::Type::Bool => Ok(types::bool()),
+        ast::Type::Application(name, arguments) => {
+            let reason = if name != "ptr" {
+                Some(SemaErrorReason::UnsupportedTypeArguments)
+            } else if arguments.len() != 1 {
+                Some(SemaErrorReason::InvalidPointerTypeArguments)
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                return Err(SemaError {
+                    reason,
+                    loc: SourceLoc::default(),
+                    file: file_id.into(),
+                    package: package_id.into(),
+                });
+            }
+            let element_type = type_lookup(
+                &arguments[0],
+                collection,
+                package_id,
+                file_id,
+                imports,
+            )?;
+            if !matches!(
+                element_type.kind(),
+                types::TypeKind::Integer
+                    | types::TypeKind::Byte
+                    | types::TypeKind::Number
+                    | types::TypeKind::Bool
+                    | types::TypeKind::Pointer(_)
+            ) {
+                return Err(SemaError {
+                    reason: SemaErrorReason::InvalidPointerElementType,
+                    loc: SourceLoc::default(),
+                    file: file_id.into(),
+                    package: package_id.into(),
+                });
+            }
+            Ok(types::pointer(element_type))
+        }
         ast::Type::Identifier(id) => collection
             .get(imports, package_id, file_id, id)
             .cloned()
@@ -656,6 +702,9 @@ impl<'a> FuncTypeInference<'a> {
             | ast::BinaryExprKind::LessThanEqual
             | ast::BinaryExprKind::GreaterThanEqual => {
                 let typ = self.expr(&mut b.lhs, None)?;
+                if matches!(typ.kind(), types::TypeKind::Pointer(_)) {
+                    return self.error(SemaErrorReason::IncompatibleTypesInBinaryExpression);
+                }
                 self.expr(&mut b.rhs, Some(typ))?;
 
                 if types::compare(&b.lhs.typ, &b.rhs.typ) == types::ComparisonResult::Incompatible {
@@ -806,6 +855,37 @@ impl<'a> FuncTypeInference<'a> {
                     unreachable!();
                 }
             }
+        }
+    }
+
+    fn intrinsic(&mut self, intrinsic: &mut ast::Intrinsic) -> SemaResult<Type> {
+        let arity = match intrinsic.name.as_str() {
+            "load" | "is_null" => 1,
+            "store" | "offset" => 2,
+            _ => return self.error(SemaErrorReason::UnknownIntrinsic),
+        };
+        if intrinsic.parameters.len() < arity {
+            return self.error(SemaErrorReason::CallNotEnoughArguments);
+        }
+        if intrinsic.parameters.len() > arity {
+            return self.error(SemaErrorReason::CallTooManyArguments);
+        }
+        let pointer_type = self.expr(&mut intrinsic.parameters[0], None)?;
+        let types::TypeKind::Pointer(element_type) = pointer_type.kind() else {
+            return self.error_loc(SemaErrorReason::ExpectedPointer, intrinsic.parameters[0].loc);
+        };
+        match intrinsic.name.as_str() {
+            "load" => Ok(element_type.clone()),
+            "store" => {
+                self.expr(&mut intrinsic.parameters[1], Some(element_type.clone()))?;
+                Ok(types::bad())
+            }
+            "offset" => {
+                self.expr(&mut intrinsic.parameters[1], Some(types::integer()))?;
+                Ok(pointer_type)
+            }
+            "is_null" => Ok(types::bool()),
+            _ => unreachable!(),
         }
     }
 
@@ -1113,6 +1193,14 @@ impl<'a> FuncTypeInference<'a> {
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u, type_hint.clone()),
             ast::ExprKind::Assign(a) => self.assign(a, type_hint.clone()),
             ast::ExprKind::Call(c) => self.call(c, type_hint.clone()),
+            ast::ExprKind::Intrinsic(i) => {
+                let typ = self.intrinsic(i)?;
+                if types::is_bad(&typ) {
+                    self.error(SemaErrorReason::ExpressionHasNoValue)
+                } else {
+                    Ok(typ)
+                }
+            }
             ast::ExprKind::Integer(i) => self.integer(i, type_hint.clone()),
             ast::ExprKind::Number(f) => self.number(f, type_hint.clone()),
             ast::ExprKind::Boolean(b) => self.boolean(b, type_hint.clone()),
@@ -1304,6 +1392,14 @@ impl<'a> FuncTypeInference<'a> {
     }
 
     fn expr_stmt(&mut self, e: &mut Box<ast::ExprStmt>) -> SemaResult<()> {
+        if let ast::ExprKind::Intrinsic(intrinsic) = &mut e.expr.kind {
+            let old_loc = self.loc;
+            self.loc = e.expr.loc;
+            let result = self.intrinsic(intrinsic);
+            self.loc = old_loc;
+            e.expr.typ = result?;
+            return self.ok();
+        }
         match self.expr(&mut e.expr, None) {
             Ok(_) => self.ok(),
             Err(e) => Err(e),
@@ -1558,4 +1654,73 @@ pub fn check_program(program: &mut ast::Program, builtins: &Builtins) -> SemaRes
         check_package(file, &collection, &function_collection)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compiler::parser::Parser;
+
+    #[test]
+    fn rejects_invalid_pointer_operations() {
+        let cases = [
+            ("@unknown();", "UnknownIntrinsic"),
+            ("@load();", "CallNotEnoughArguments"),
+            ("@load(p, 1);", "CallTooManyArguments"),
+            ("@load(1);", "ExpectedPointer"),
+            ("@store(p);", "CallNotEnoughArguments"),
+            ("@store(p, true);", "ExpressionCannotBeCasted"),
+            ("@store(p, @store(p, 1));", "ExpressionHasNoValue"),
+            ("let value = @store(p, 1);", "ExpressionHasNoValue"),
+            ("let values = [@store(p, 1)];", "ExpressionHasNoValue"),
+            ("@offset(p, 1.5);", "ExpressionCannotBeCasted"),
+            ("@is_null(1);", "ExpectedPointer"),
+            ("@is_null(p, p);", "CallTooManyArguments"),
+            ("let value: ptr<byte> = p;", "ExpressionCannotBeCasted"),
+            ("let value: int = p;", "ExpressionCannotBeCasted"),
+            ("let value: ptr<int> = 0;", "ExpressionCannotBeCasted"),
+            ("let value = p + 1;", "IncompatibleTypesInBinaryExpression"),
+            ("let value = p == p;", "IncompatibleTypesInBinaryExpression"),
+        ];
+        for (body, expected) in cases {
+            let source = format!("func test(p: ptr<int>) {{ {body} }}");
+            let file = Parser::new("main", &source).parse_file().unwrap();
+            let mut program = ast::Program {
+                packages: vec![Box::new(ast::Package {
+                    id: "main".into(),
+                    files: vec![file],
+                    base_path: None,
+                })],
+            };
+            let error = check_program(&mut program, &Builtins::new()).unwrap_err();
+            assert_eq!(format!("{:?}", error.reason), expected, "{source}");
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_pointer_types() {
+        let cases = [
+            ("ptr", "TypeNotFound"),
+            ("ptr<>", "InvalidPointerTypeArguments"),
+            ("ptr<int, byte>", "InvalidPointerTypeArguments"),
+            ("ptr<string>", "InvalidPointerElementType"),
+            ("ptr<[]int>", "InvalidPointerElementType"),
+            ("ptr<ptr<string>>", "InvalidPointerElementType"),
+            ("ptr<Missing>", "TypeNotFound"),
+            ("Other<int>", "UnsupportedTypeArguments"),
+        ];
+        for (typ, expected) in cases {
+            let source = format!("func test(p: {typ}) {{}}");
+            let file = Parser::new("main", &source).parse_file().unwrap();
+            let mut program = ast::Program {
+                packages: vec![Box::new(ast::Package {
+                    id: "main".into(),
+                    files: vec![file],
+                    base_path: None,
+                })],
+            };
+            let error = check_program(&mut program, &Builtins::new()).unwrap_err();
+            assert_eq!(format!("{:?}", error.reason), expected, "{source}");
+        }
+    }
 }

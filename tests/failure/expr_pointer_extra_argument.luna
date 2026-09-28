@@ -1,0 +1,6 @@
+func invalid(p: ptr<int>) {
+    @load(p, 1);
+}
+
+func main() {
+}

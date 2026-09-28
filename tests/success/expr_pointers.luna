@@ -1,0 +1,46 @@
+func int_pointer(p: ptr<int>): int {
+    let next = @offset(@offset(p, 0), 1);
+    @store(next, @load(p) + 1);
+    return @load(next);
+}
+
+func byte_pointer(p: ptr<byte>): byte {
+    @store(@offset(p, 1), 42);
+    return @load(@offset(p, 1));
+}
+
+func number_pointer(p: ptr<number>): number {
+    @store(@offset(p, 1), @load(p) + 0.5);
+    return @load(@offset(p, 1));
+}
+
+func bool_pointer(p: ptr<bool>): bool {
+    @store(@offset(p, 1), @load(p));
+    return @load(@offset(p, 1));
+}
+
+func nested_pointer(p: ptr<ptr<int>>, value: ptr<int>): ptr<int> {
+    let original: ptr<ptr<int>>=p;
+    @store(@offset(original, 1), value);
+    return @load(@offset(p, 1));
+}
+
+func null_pointer(p: ptr<int>): bool {
+    return @is_null(p);
+}
+
+func read_after_call(p: ptr<int>): int {
+    let ignored = null_pointer(p);
+    return @load(p);
+}
+
+func offset_back(p: ptr<int>): ptr<int> {
+    return @offset(p, 0 - 1);
+}
+
+func identity(p: ptr<ptr<ptr<int>>>): ptr<ptr<ptr<int>>> {
+    return p;
+}
+
+func main() {
+}

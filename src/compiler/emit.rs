@@ -253,6 +253,7 @@ fn translate_type(ty: &crate::types::Type) -> ir::Type {
         crate::types::TypeKind::Number => ir::Type::Number,
         crate::types::TypeKind::String => ir::Type::String,
         crate::types::TypeKind::Array(_) => ir::Type::Array, 
+        crate::types::TypeKind::Pointer(_) => ir::Type::Pointer,
         _ => ir::Type::Reference,
     }
 }
@@ -477,6 +478,22 @@ impl<'a> FuncGen<'a> {
         }
     }
 
+    fn intrinsic(&mut self, intrinsic: &ast::Intrinsic) {
+        for parameter in &intrinsic.parameters {
+            self.expr(parameter);
+        }
+        let types::TypeKind::Pointer(element_type) = intrinsic.parameters[0].typ.kind() else {
+            unreachable!();
+        };
+        match intrinsic.name.as_str() {
+            "load" => self.bld.load_pointer(element_type.clone().into()),
+            "store" => self.bld.store_pointer(),
+            "offset" => self.bld.offset_pointer(element_type.clone().into()),
+            "is_null" => self.bld.is_null_pointer(),
+            _ => unreachable!(),
+        }
+    }
+
     fn integer(&mut self, e: &ast::Expr, i: &Box<ast::Integer>) {
         if types::is_byte(&e.typ) {
             self.bld.load_const_byte(i.value as u8);
@@ -659,6 +676,7 @@ impl<'a> FuncGen<'a> {
             ast::ExprKind::UnaryExpr(u) => self.unary_expr(u),
             ast::ExprKind::Assign(a) => self.assign(a),
             ast::ExprKind::Call(c) => self.call(c, e),
+            ast::ExprKind::Intrinsic(i) => self.intrinsic(i),
             ast::ExprKind::Integer(i) => self.integer(e, i),
             ast::ExprKind::Number(f) => self.number(f),
             ast::ExprKind::Boolean(b) => self.boolean(b),

@@ -102,6 +102,7 @@ pub fn keyword(k: &str) -> Option<Keywords> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Punctuation {
+    At,                                   // @
     And,                                  // &
     AndAnd,                               // &&
     AndAndEquals,                         // &&=

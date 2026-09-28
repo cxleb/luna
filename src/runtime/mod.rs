@@ -217,6 +217,7 @@ impl JitContext {
             crate::ir::Type::Number => AbiType::new(F64),
             crate::ir::Type::String => AbiType::new(ptr),
             crate::ir::Type::Reference => AbiType::new(ptr),
+            crate::ir::Type::Pointer => AbiType::new(ptr),
             crate::ir::Type::Array => AbiType::new(ptr),
         }
     }

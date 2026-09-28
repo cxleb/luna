@@ -13,6 +13,7 @@ pub enum Type {
     Bool,
     Identifier(String),
     Array(Box<Type>),
+    Application(String, Vec<Box<Type>>),
     //UnknownReference, // An internal detail before generics is correctly implemented
 }
 
@@ -55,6 +56,12 @@ pub struct Call {
     // filled in by the checker for direct calls, used for codegen
     pub symbol_name: Option<String>,
     pub enum_idx: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Intrinsic {
+    pub name: String,
+    pub parameters: Vec<Expr>,
 }
 
 #[derive(Debug, Clone)]
@@ -135,6 +142,7 @@ pub enum ExprKind {
     UnaryExpr(Box<UnaryExpr>),
     Assign(Box<Assign>),
     Call(Box<Call>),
+    Intrinsic(Box<Intrinsic>),
     Integer(Box<Integer>),
     Number(Box<Number>),
     StringLiteral(Box<StringLiteral>),

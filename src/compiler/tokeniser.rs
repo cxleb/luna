@@ -17,6 +17,7 @@ use super::token::{Punctuation, Token, TokenKind, keyword};
 */
 #[derive(PartialEq, Copy, Clone)]
 pub enum TokeniserMode {
+    Type,
     Div,
     Regex,
     RegexOrTemplateTail,
@@ -244,7 +245,11 @@ impl<'a> Tokeniser<'a> {
             });
             regex.insert(0, '/');
             Some(Token::new_string(loc, TokenKind::Regex, regex))
-        } else if (mode == TokeniserMode::Div || mode == TokeniserMode::Regex) && c == '}' {
+        } else if (mode == TokeniserMode::Div
+            || mode == TokeniserMode::Regex
+            || mode == TokeniserMode::Type)
+            && c == '}'
+        {
             self.source.next();
             Some(Token::new(
                 loc,
@@ -410,8 +415,15 @@ impl<'a> Tokeniser<'a> {
                         Punctuation::QuestionMark
                     }
                 }
+                '@' => {
+                    self.source.next();
+                    Punctuation::At
+                }
                 '>' => {
-                    if self.source.peek_str(">>>=") {
+                    if mode == TokeniserMode::Type {
+                        self.source.next();
+                        Punctuation::RightAngle
+                    } else if self.source.peek_str(">>>=") {
                         self.source.advance(4).unwrap();
                         Punctuation::RightAngleRightAngleRightAngleEquals
                     } else if self.source.peek_str(">>>") {

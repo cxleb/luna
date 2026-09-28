@@ -522,6 +522,33 @@ impl<'a> TranslationContext<'a> {
                         let (func_ref, _, _) = self.ensure_sig(&mut builder, id);
                         stack.push(builder.ins().func_addr(I64, func_ref));
                     }
+                    ir::Inst::LoadPointer(typ) => {
+                        let pointer = stack.pop();
+                        let typ = self.ctx.translate_type(typ).root;
+                        stack.push(builder.ins().load(typ, MemFlags::new(), pointer, 0));
+                    }
+                    ir::Inst::StorePointer => {
+                        let value = stack.pop();
+                        let pointer = stack.pop();
+                        builder.ins().store(MemFlags::new(), value, pointer, 0);
+                    }
+                    ir::Inst::OffsetPointer(typ) => {
+                        let count = stack.pop();
+                        let pointer = stack.pop();
+                        let pointer_type = self.ctx.context_type();
+                        let count = if pointer_type == I64 {
+                            count
+                        } else {
+                            builder.ins().ireduce(pointer_type, count)
+                        };
+                        let size = self.ctx.translate_type(typ).bytes();
+                        let offset = builder.ins().imul_imm(count, size as i64);
+                        stack.push(builder.ins().iadd(pointer, offset));
+                    }
+                    ir::Inst::IsNullPointer => {
+                        let pointer = stack.pop();
+                        stack.push(builder.ins().icmp_imm(IntCC::Equal, pointer, 0));
+                    }
                     ir::Inst::NewArray(size, typ) => {
                         // allocate
                         let clir_typ = self.ctx.translate_type(&typ);
@@ -772,4 +799,4 @@ impl<'a> TranslationContext<'a> {
             println!("{}", dest.func.display());
         }
     }
-} 
+}

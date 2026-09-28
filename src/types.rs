@@ -52,6 +52,7 @@ pub enum TypeKind {
     Bool,
     UnknownReference, // An internal detail before generics is correctly implemented
     Array(Type),
+    Pointer(Type),
     Struct(StructType),
     Enum(EnumType),
     Function(FunctionType),
@@ -317,6 +318,7 @@ pub fn name(typ: &Type) -> String {
         TypeKind::Bool => "bool".into(),
         TypeKind::UnknownReference => "unknown_reference".into(),
         TypeKind::Array(element_type) => format!("[]{}", name(element_type)),
+        TypeKind::Pointer(element_type) => format!("ptr<{}>", name(element_type)),
         TypeKind::Struct(struct_type) => format!(
             "{}:{}:{}",
             struct_type.spec.package, struct_type.spec.file, struct_type.spec.name
@@ -408,6 +410,18 @@ pub fn array(element_type: Type) -> Type {
     let array_type = create_type(TypeKind::Array(element_type.clone()));
     array_types.insert(element_type.inner.hash, array_type.clone());
     array_type
+}
+
+pub fn pointer(element_type: Type) -> Type {
+    static POINTER_TYPES: OnceLock<RwLock<HashMap<usize, Type>>> = OnceLock::new();
+    let pointer_types = POINTER_TYPES.get_or_init(|| RwLock::new(HashMap::new()));
+    let mut pointer_types = pointer_types.write().unwrap();
+    if let Some(pointer_type) = pointer_types.get(&element_type.inner.hash) {
+        return pointer_type.clone();
+    }
+    let pointer_type = create_type(TypeKind::Pointer(element_type.clone()));
+    pointer_types.insert(element_type.inner.hash, pointer_type.clone());
+    pointer_type
 }
 
 pub fn struct_type(spec: NameSpecification, fields: Vec<(String, Type)>) -> Type {

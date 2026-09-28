@@ -1,0 +1,6 @@
+func invalid(p: ptr<byte>): ptr<int> {
+    return p;
+}
+
+func main() {
+}

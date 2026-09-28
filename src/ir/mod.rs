@@ -14,6 +14,7 @@ pub enum Type {
     Bool,
     String,
     Reference,
+    Pointer,
     Array
 }
 
@@ -67,6 +68,11 @@ pub enum Inst {
     Call(String),
     IndirectCall(Signature), // top of the stack is the function to call, arity is the number of arguments (not including the function pointer)
     FuncAddr(String), // loads the address of the function onto the stack
+
+    LoadPointer(Type),
+    StorePointer,
+    OffsetPointer(Type),
+    IsNullPointer,
 
     NewArray(usize, Type),
     LoadArray(Type),  // Pops the index and array
